@@ -3,6 +3,7 @@ import { useState, useRef, useEffect } from 'react'
 
 export default function TaplyTemplate({ profile }: { profile: any }) {
   const reelRef = useRef<HTMLDivElement>(null)
+  const paymentSliderRef = useRef<HTMLDivElement>(null)
   const [current, setCurrent] = useState(1)
   const [isDark, setIsDark] = useState(true)
   const [lightboxOpen, setLightboxOpen] = useState(false)
@@ -11,6 +12,10 @@ export default function TaplyTemplate({ profile }: { profile: any }) {
   const [pan, setPan] = useState({ x: 0, y: 0 })
   const [isDragging, setIsDragging] = useState(false)
   const [dragStart, setDragStart] = useState({ x: 0, y: 0 })
+  const [showPaymentModal, setShowPaymentModal] = useState(false)
+  const [paymentIndex, setPaymentIndex] = useState(0)
+  const [touchStartX, setTouchStartX] = useState(0)
+  const [touchStartY, setTouchStartY] = useState(0)
   
   const accent = profile.accent_color || '#D4AF37'
   
@@ -25,7 +30,6 @@ export default function TaplyTemplate({ profile }: { profile: any }) {
     localStorage.setItem('tapvinci-theme-mode', newMode ? 'dark' : 'light')
   }
   
-  // FIXED FOR 4-5+ IMAGES: handles string or {src, alt} and keeps all 5
   const gallery = (profile.gallery || []).map((item: any) => {
     if (typeof item === 'string') return { src: item, alt: 'Gallery' }
     return { src: item.src, alt: item.alt || 'Gallery' }
@@ -50,6 +54,14 @@ export default function TaplyTemplate({ profile }: { profile: any }) {
   if (isVisible('whatsapp')) socialButtons.push({ id: 'whatsapp', href: socials.whatsapp, icon: 'fa-whatsapp', label: 'WhatsApp' })
   if (isVisible('website')) socialButtons.push({ id: 'website', href: socials.website, icon: 'fa-globe', label: 'Website' })
   if (isVisible('twitter') || isVisible('x')) socialButtons.push({ id: 'twitter', href: socials.twitter || socials.x, icon: 'fa-x-twitter', label: 'X / Twitter' })
+
+  // PAYMENT DATA - matches details.js structure
+  const gcashQR = profile.gcash_qr || profile.payment?.gcash?.qrImage || null
+  const mayaQR = profile.maya_qr || profile.payment?.maya?.qrImage || null
+  const gcashName = profile.payment?.gcash?.name || profile.name || 'Your Name'
+  const mayaName = profile.payment?.maya?.name || profile.name || 'Your Name'
+  const gcashNumber = profile.gcash_number || profile.payment?.gcash?.number || profile.phone || ''
+  const mayaNumber = profile.maya_number || profile.payment?.maya?.number || profile.phone || ''
 
   const getTheme = () => {
     const t = profile.theme || 'gold'
@@ -162,6 +174,88 @@ END:VCARD`
     URL.revokeObjectURL(url)
   }
 
+  // PAYMENT MODAL LOGIC - EXACT LIKE GALLERY
+  const openPaymentModal = () => {
+    setPaymentIndex(0)
+    setShowPaymentModal(true)
+    document.body.style.overflow = 'hidden'
+  }
+  const closePaymentModal = () => {
+    setShowPaymentModal(false)
+    document.body.style.overflow = ''
+  }
+
+  const switchQR = (index: number) => {
+    setPaymentIndex(index)
+    if (paymentSliderRef.current) {
+      const width = paymentSliderRef.current.offsetWidth
+      paymentSliderRef.current.scrollTo({ left: index * width, behavior: 'smooth' })
+    }
+  }
+
+  const handlePaymentTouchStart = (e: any) => {
+    setTouchStartX(e.touches[0].clientX)
+    setTouchStartY(e.touches[0].clientY)
+  }
+  const handlePaymentTouchEnd = (e: any) => {
+    const endX = e.changedTouches[0].clientX
+    const endY = e.changedTouches[0].clientY
+    const diffX = touchStartX - endX
+    const diffY = touchStartY - endY
+    // Horizontal swipe
+    if (Math.abs(diffX) > Math.abs(diffY) && Math.abs(diffX) > 50) {
+      if (diffX > 0 && paymentIndex < 1) switchQR(1)
+      if (diffX < 0 && paymentIndex > 0) switchQR(0)
+    }
+    // Swipe down to close
+    if (diffY < -80 && Math.abs(diffX) < 50) {
+      closePaymentModal()
+    }
+  }
+
+  const handlePaymentScroll = () => {
+    if (!paymentSliderRef.current) return
+    const scrollLeft = paymentSliderRef.current.scrollLeft
+    const width = paymentSliderRef.current.offsetWidth
+    const newIndex = Math.round(scrollLeft / width)
+    if (newIndex !== paymentIndex) setPaymentIndex(newIndex)
+  }
+
+  useEffect(() => {
+    const handleKey = (e: KeyboardEvent) => {
+      if (!showPaymentModal) return
+      if (e.key === 'Escape') closePaymentModal()
+      if (e.key === 'ArrowLeft' && paymentIndex > 0) switchQR(0)
+      if (e.key === 'ArrowRight' && paymentIndex < 1) switchQR(1)
+    }
+    window.addEventListener('keydown', handleKey)
+    return () => window.removeEventListener('keydown', handleKey)
+  }, [showPaymentModal, paymentIndex])
+
+  const downloadQR = (url: string, name: string) => {
+    if (!url) return
+    const a = document.createElement('a')
+    a.href = url
+    a.download = `${name}-QR-${profile.name || 'TapVinci'}.png`
+    a.target = '_blank'
+    a.click()
+  }
+
+  const shareQR = async (url: string, type: string) => {
+    if (!url) return
+    if (navigator.share) {
+      try {
+        await navigator.share({
+          title: `${type} QR - ${profile.name}`,
+          text: `Scan my ${type} QR to pay`,
+          url: url
+        })
+      } catch {}
+    } else {
+      navigator.clipboard.writeText(url).then(() => alert(`${type} QR link copied!`))
+    }
+  }
+
   return (
     <>
     <div className={`taply-gold-wrapper ${!isDark ? 'light-mode' : ''}`} style={{ background: '#050505', ['--sg' as any]: accent } as any}>
@@ -220,7 +314,8 @@ END:VCARD`
               {profile.phone && <a className="taply-action-btn" href={`sms:${profile.phone}`}><span className="ico"><i className="fa-solid fa-comment-sms"></i></span><span className="lbl">Text / SMS</span></a>}
               {profile.email && <a className="taply-action-btn" href={`mailto:${profile.email}`}><span className="ico"><i className="fa-solid fa-envelope"></i></span><span className="lbl">Send Email</span></a>}
             </div>
-            <div className="taply-secondary-pills">
+            {/* BOTTOM ROW - NOW 4 BUTTONS SCROLLABLE - SHOWS 3.5 TO HINT SCROLL */}
+            <div className="taply-secondary-pills quick-actions-row">
               {profile.address && socialsVisible.google_maps !== false && (
                 <a className="taply-action-btn small google-maps" href={profile.mapsLink || `https://maps.google.com/?q=${encodeURIComponent(profile.address)}`} target="_blank" rel="noreferrer">
                   <span className="ico"><i className="fa-solid fa-location-dot" style={{ color: '#E53935' }}></i></span><span className="lbl">Google Maps</span>
@@ -228,6 +323,9 @@ END:VCARD`
               )}
               <button className="taply-action-btn small gold" onClick={saveContact}><span className="ico"><i className="fa-solid fa-address-card"></i></span><span className="lbl">Save Contact</span></button>
               <button className="taply-action-btn small gold" onClick={()=>{navigator.clipboard.writeText(window.location.href).then(()=>alert('Link copied!'))}}><span className="ico"><i className="fa-solid fa-share-nodes"></i></span><span className="lbl">Share My Card</span></button>
+              <button className="taply-action-btn small gold payment-btn" onClick={openPaymentModal} style={{ background: '#E8C766' }}>
+                <span className="ico"><i className="fa-solid fa-qrcode"></i></span><span className="lbl">Payment</span>
+              </button>
             </div>
           </section>
 
@@ -242,6 +340,116 @@ END:VCARD`
         </main>
       </div>
     </div>
+
+    {/* PAYMENT BOTTOM SHEET MODAL - GCASH / MAYA SWIPEABLE */}
+    {showPaymentModal && (
+      <div className="payment-modal-overlay" onClick={closePaymentModal}>
+        <div className="payment-bottom-sheet" onClick={e => e.stopPropagation()} onTouchStart={handlePaymentTouchStart} onTouchEnd={handlePaymentTouchEnd}>
+          {/* Drag handle */}
+          <div className="payment-drag-handle"></div>
+          <div className="payment-modal-header">
+            <div>
+              <p className="payment-header-label">Scan to Pay</p>
+              <h3><i className="fa-solid fa-wallet"></i> Payment QR Codes</h3>
+            </div>
+            <button className="payment-close" onClick={closePaymentModal}><i className="fa-solid fa-xmark"></i></button>
+          </div>
+          
+          <div className="payment-tabs">
+            <button className={`payment-tab ${paymentIndex === 0 ? 'active' : ''}`} onClick={() => switchQR(0)}>
+              <span className="payment-tab-icon gcash">G</span> GCash
+            </button>
+            <button className={`payment-tab ${paymentIndex === 1 ? 'active' : ''}`} onClick={() => switchQR(1)}>
+              <span className="payment-tab-icon maya">M</span> Maya
+            </button>
+          </div>
+
+          <div className="payment-slider-wrapper">
+            <div className="payment-slider-scroll" ref={paymentSliderRef} onScroll={handlePaymentScroll}>
+              {/* GCASH CARD */}
+              <div className="payment-slide-card">
+                <div className="payment-qr-card gcash-card">
+                  <div className="qr-card-top">
+                    <span className="qr-brand gcash-brand"><i className="fa-solid fa-mobile-screen-button"></i> GCash</span>
+                    <span className="qr-verified"><i className="fa-solid fa-circle-check"></i> Verified</span>
+                  </div>
+                  <div className="payment-qr-box">
+                    {gcashQR ? (
+                      <img src={gcashQR} alt="GCash QR" className="payment-qr-img" />
+                    ) : (
+                      <div className="payment-qr-placeholder">
+                        <i className="fa-solid fa-qrcode"></i>
+                        <p>GCash QR</p>
+                        <small>Upload in Dashboard</small>
+                        <div className="placeholder-qr-grid"></div>
+                      </div>
+                    )}
+                  </div>
+                  <div className="payment-info">
+                    <p className="payment-name">{gcashName}</p>
+                    {gcashNumber && <p className="payment-number">{gcashNumber}</p>}
+                    <p className="payment-label">GCash QR Code • Scan to Pay</p>
+                  </div>
+                </div>
+                <div className="payment-actions">
+                  <button className="payment-action-btn save" onClick={() => gcashQR && downloadQR(gcashQR, 'GCash')}>
+                    <i className="fa-solid fa-download"></i> Save Image
+                  </button>
+                  <button className="payment-action-btn share" onClick={() => gcashQR && shareQR(gcashQR, 'GCash')}>
+                    <i className="fa-solid fa-share-nodes"></i> Share QR
+                  </button>
+                </div>
+              </div>
+
+              {/* MAYA CARD */}
+              <div className="payment-slide-card">
+                <div className="payment-qr-card maya-card">
+                  <div className="qr-card-top">
+                    <span className="qr-brand maya-brand"><i className="fa-solid fa-building-columns"></i> Maya</span>
+                    <span className="qr-verified"><i className="fa-solid fa-circle-check"></i> Verified</span>
+                  </div>
+                  <div className="payment-qr-box maya-box">
+                    {mayaQR ? (
+                      <img src={mayaQR} alt="Maya QR" className="payment-qr-img" />
+                    ) : (
+                      <div className="payment-qr-placeholder">
+                        <i className="fa-solid fa-qrcode"></i>
+                        <p>Maya QR</p>
+                        <small>Upload in Dashboard</small>
+                        <div className="placeholder-qr-grid"></div>
+                      </div>
+                    )}
+                  </div>
+                  <div className="payment-info">
+                    <p className="payment-name">{mayaName}</p>
+                    {mayaNumber && <p className="payment-number">{mayaNumber}</p>}
+                    <p className="payment-label maya-label">Maya QR Code • Scan to Pay</p>
+                  </div>
+                </div>
+                <div className="payment-actions">
+                  <button className="payment-action-btn save maya" onClick={() => mayaQR && downloadQR(mayaQR, 'Maya')}>
+                    <i className="fa-solid fa-download"></i> Save Image
+                  </button>
+                  <button className="payment-action-btn share" onClick={() => mayaQR && shareQR(mayaQR, 'Maya')}>
+                    <i className="fa-solid fa-share-nodes"></i> Share QR
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <div className="payment-dots">
+            <span className={`dot ${paymentIndex === 0 ? 'active' : ''}`} onClick={() => switchQR(0)}></span>
+            <span className={`dot ${paymentIndex === 1 ? 'active' : ''}`} onClick={() => switchQR(1)}></span>
+          </div>
+          <p className="payment-swipe-hint">
+            <i className="fa-solid fa-hand-pointer"></i> 
+            {paymentIndex === 0 ? 'Swipe to see Maya →' : '← Swipe to see GCash'} 
+            <span className="hint-keys">• Use ← → keys</span>
+          </p>
+        </div>
+      </div>
+    )}
 
     {lightboxOpen && gallery[lightboxIndex] && (
       <div className="taply-lightbox" onClick={closeLightbox}>
