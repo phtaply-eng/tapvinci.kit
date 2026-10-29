@@ -55,11 +55,11 @@ export default function TaplyTemplate({ profile }: { profile: any }) {
   if (isVisible('website')) socialButtons.push({ id: 'website', href: socials.website, icon: 'fa-globe', label: 'Website' })
   if (isVisible('twitter') || isVisible('x')) socialButtons.push({ id: 'twitter', href: socials.twitter || socials.x, icon: 'fa-x-twitter', label: 'X / Twitter' })
 
-  // PAYMENT DATA - matches details.js structure
-  const gcashQR = profile.gcash_qr || profile.payment?.gcash?.qrImage || null
-  const mayaQR = profile.maya_qr || profile.payment?.maya?.qrImage || null
-  const gcashName = profile.payment?.gcash?.name || profile.name || 'Your Name'
-  const mayaName = profile.payment?.maya?.name || profile.name || 'Your Name'
+  // PAYMENT DATA - DYNAMIC FROM DASHBOARD UPLOAD (NEW: gcash_qr_url, maya_qr_url)
+  const gcashQR = profile.gcash_qr_url || profile.gcash_qr || profile.payment?.gcash?.qrImage || profile.payment?.gcash?.qr || null
+  const mayaQR = profile.maya_qr_url || profile.maya_qr || profile.payment?.maya?.qrImage || profile.payment?.maya?.qr || null
+  const gcashName = profile.gcash_name || profile.payment?.gcash?.name || profile.name || 'Your Name'
+  const mayaName = profile.maya_name || profile.payment?.maya?.name || profile.name || 'Your Name'
   const gcashNumber = profile.gcash_number || profile.payment?.gcash?.number || profile.phone || ''
   const mayaNumber = profile.maya_number || profile.payment?.maya?.number || profile.phone || ''
 
