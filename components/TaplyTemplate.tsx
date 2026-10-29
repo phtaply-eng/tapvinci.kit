@@ -323,7 +323,7 @@ END:VCARD`
               )}
               <button className="taply-action-btn small gold" onClick={saveContact}><span className="ico"><i className="fa-solid fa-address-card"></i></span><span className="lbl">Save Contact</span></button>
               <button className="taply-action-btn small gold" onClick={()=>{navigator.clipboard.writeText(window.location.href).then(()=>alert('Link copied!'))}}><span className="ico"><i className="fa-solid fa-share-nodes"></i></span><span className="lbl">Share My Card</span></button>
-              <button className="taply-action-btn small gold payment-btn" onClick={openPaymentModal} style={{ background: '#E8C766' }}>
+              <button className="taply-action-btn small gold" onClick={openPaymentModal}>
                 <span className="ico"><i className="fa-solid fa-qrcode"></i></span><span className="lbl">Payment</span>
               </button>
             </div>

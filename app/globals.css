@@ -466,10 +466,8 @@ body {
   flex: 0 0 auto !important;
   scroll-snap-align: start !important;
 }
-.quick-actions-row .taply-action-btn.small.payment-btn {
-  background: #E8C766 !important;
-  color: #000 !important;
-}
+/* Payment button now inherits same theme as Share My Card - uses var(--sg) from .taply-secondary-pills .taply-action-btn.small */
+/* REMOVED: .payment-btn hardcoded #E8C766 - now theme-aware via --sg */
 
 
 
