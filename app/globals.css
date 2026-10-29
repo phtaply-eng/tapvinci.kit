@@ -1,0 +1,454 @@
+@import url('https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css');
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* ============ TapVinci design tokens — black / gold luxury ============ */
+:root {
+  --sg: #D4AF37;
+  --sg-ink: #000000;
+  --sg-text: var(--sg);
+  --bg: #050505;
+  --card: #151515;
+  --card2: #1a1a1a;
+  --text: #f5f5f5;
+  --heading: #ffffff;
+  --body: #d4d4d8;
+  --muted: #a1a1aa;
+  --faint: #71717a;
+  --border: #27272a;
+  --line: #222222;
+  --icon-bg: #27272a;
+  --font: Inter, system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+}
+
+* { box-sizing: border-box; }
+html { -webkit-text-size-adjust: 100%; }
+body {
+  background: var(--bg);
+  color: var(--text);
+  font-family: var(--font);
+  margin: 0;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+.taply-gold-wrapper {
+  min-height: 100vh;
+  min-height: 100dvh;
+  background: var(--bg);
+  display: flex;
+  justify-content: center;
+  padding: 16px;
+  position: relative;
+  overflow: hidden;
+}
+.taply-gold-wrapper.embedded { min-height: 0; }
+
+.taply-glow {
+  position: absolute;
+  top: 0; left: 50%;
+  transform: translateX(-50%);
+  width: 800px; height: 600px;
+  pointer-events: none;
+  opacity: 0.5;
+  filter: blur(70px);
+}
+
+.taply-gold-wrapper.light-mode {
+  --bg: #f1f5f9;
+  --card: #ffffff;
+  --card2: #f8fafc;
+  --text: #0f172a;
+  --heading: #0f172a;
+  --body: #475569;
+  --muted: #475569;
+  --faint: #94a3b8;
+  --border: #e2e8f0;
+  --line: #eef2f7;
+  --icon-bg: #e2e8f0;
+  --sg-text: color-mix(in srgb, var(--sg) 72%, #000);
+  background: var(--bg);
+}
+.taply-gold-wrapper.light-mode .taply-glow { opacity: 0.15; }
+
+.taply-card {
+  width: 100%;
+  max-width: 420px;
+  background: var(--card);
+  color: var(--text);
+  border: 1px solid var(--border);
+  border-radius: 28px;
+  overflow: hidden;
+  position: relative;
+  z-index: 1;
+}
+
+.taply-profile { position: relative; }
+.taply-hero { height: 380px; overflow: hidden; background: #000; position: relative; }
+.taply-profile-img { width: 100%; height: 100%; object-fit: cover; object-position: center 30%; display: block; }
+.taply-profile-body {
+  position: relative;
+  margin-top: -90px;
+  padding: 24px 24px 28px;
+  text-align: center;
+  background: linear-gradient(to top, var(--card) 65%, transparent);
+}
+.taply-profile-body h1 { font-size: 28px; font-weight: 800; letter-spacing: -0.02em; margin: 0 0 6px; color: var(--heading); }
+.taply-job-title { color: var(--sg-text); font-size: 10px; font-weight: 700; letter-spacing: 0.15em; text-transform: uppercase; margin: 0 0 16px; line-height: 1.5; }
+.taply-bio { color: var(--body); font-size: 13px; line-height: 1.6; margin: 0 0 20px; }
+.taply-primary-btn {
+  display: inline-flex; align-items: center; justify-content: center;
+  background: var(--sg); color: var(--sg-ink); font-weight: 700; font-size: 13px;
+  padding: 10px 22px; border-radius: 999px; text-decoration: none;
+  transition: transform .2s, filter .2s;
+}
+.taply-primary-btn:hover { filter: brightness(1.08); }
+
+.taply-section { padding: 24px; border-top: 1px solid var(--border); }
+.taply-section h2 { font-size: 11px; font-weight: 700; letter-spacing: 0.15em; text-transform: uppercase; color: var(--sg-text); margin: 0 0 16px; display: flex; align-items: center; gap: 8px; }
+.taply-section p { font-size: 13px; line-height: 1.7; color: var(--muted); margin: 0; }
+.taply-subtitle { margin: -8px 0 14px !important; font-size: 12px !important; }
+
+.taply-social-btn {
+  display: flex; align-items: center; gap: 12px; width: 100%;
+  padding: 14px 16px; border-radius: 14px; font-size: 14px; font-weight: 600;
+  color: #fff !important; text-decoration: none; margin-bottom: 10px; border: none;
+  transition: transform .2s, filter .2s;
+}
+.taply-social-btn:last-child { margin-bottom: 0; }
+.taply-social-btn:hover { filter: brightness(1.08); }
+.taply-social-btn i { width: 20px; text-align: center; font-size: 16px; }
+.taply-social-btn[data-href="facebook"]  { background: #1877F2; }
+.taply-social-btn[data-href="instagram"] { background: linear-gradient(45deg, #feda75, #fa7e1e, #d62976, #962fbf, #4f5bd5); }
+.taply-social-btn[data-href="tiktok"]    { background: #000000; border: 1px solid #222; }
+.taply-social-btn[data-href="messenger"] { background: #006AFF; }
+.taply-social-btn[data-href="linkedin"]  { background: #0A66C2; }
+.taply-social-btn[data-href="youtube"]   { background: #FF0000; }
+.taply-social-btn[data-href="whatsapp"]  { background: #25D366; }
+.taply-social-btn[data-href="twitter"]   { background: #000000; border: 1px solid #222; }
+.taply-social-btn[data-href="website"]   { background: #27272a; border: 1px solid #3f3f46; }
+
+.taply-carousel { position: relative; }
+.taply-reel { display: flex; gap: 16px; overflow-x: auto; scroll-snap-type: x mandatory; scrollbar-width: none; padding: 0 16px 12px; scroll-padding: 0 16px; -webkit-overflow-scrolling: touch; }
+.taply-reel::-webkit-scrollbar { display: none; }
+.taply-reel figure { flex: 0 0 94%; scroll-snap-align: center; margin: 0; border-radius: 24px; overflow: hidden; background: #111; aspect-ratio: 1 / 1; box-shadow: 0 4px 20px rgba(0,0,0,0.15); cursor: zoom-in; transition: transform .2s; }
+.taply-reel figure:active { transform: scale(0.98); }
+.taply-reel img { width: 100%; height: 100%; object-fit: cover; display: block; }
+.taply-carousel-btn { position: absolute; top: calc(50% - 12px); transform: translateY(-50%); width: 34px; height: 34px; border-radius: 50%; background: rgba(0,0,0,0.65); backdrop-filter: blur(8px); border: 1px solid rgba(255,255,255,0.12); color: #fff; display: flex; align-items: center; justify-content: center; cursor: pointer; z-index: 2; font-size: 12px; }
+.taply-carousel-btn.prev { left: 8px; }
+.taply-carousel-btn.next { right: 8px; }
+.taply-section .taply-carousel-count { text-align: center; font-size: 11px; color: var(--faint); margin-top: 10px; }
+
+.taply-pills { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; margin-bottom: 12px; }
+.taply-pills .taply-action-btn { min-height: 72px; width: 100%; }
+
+.taply-secondary-pills {
+  display: flex;
+  flex-wrap: nowrap;
+  gap: 10px;
+  overflow-x: auto;
+  overflow-y: hidden;
+  scroll-snap-type: x mandatory;
+  scrollbar-width: none;
+  -ms-overflow-style: none;
+  padding-bottom: 6px;
+  -webkit-overflow-scrolling: touch;
+}
+.taply-secondary-pills::-webkit-scrollbar { display: none; }
+.taply-secondary-pills .taply-action-btn.small {
+  flex: 0 0 auto;
+  scroll-snap-align: start;
+  white-space: nowrap;
+  width: auto;
+  justify-content: center;
+}
+
+.taply-action-btn {
+  display: flex; flex-direction: column; align-items: center; justify-content: center;
+  gap: 6px; padding: 14px 8px; border-radius: 14px;
+  background: var(--sg); color: var(--sg-ink); text-decoration: none;
+  font-family: inherit; font-weight: 600; font-size: 11px; border: none; cursor: pointer; text-align: center;
+  transition: transform .2s, filter .2s;
+}
+.taply-action-btn:hover { filter: brightness(1.06); }
+.taply-action-btn.small { flex-direction: row; padding: 12px 16px; border-radius: 999px; font-size: 11px; gap: 6px; min-height: 44px; }
+.taply-action-btn .ico { font-size: 12px; }
+
+.taply-action-btn.google-maps {
+  background-color: #ffffff !important;
+  color: #1f1f1f !important;
+  border: 2px solid transparent !important;
+  background-image: linear-gradient(#ffffff, #ffffff), linear-gradient(90deg, #4285F4 0%, #EA4335 33%, #FBBC05 66%, #34A853 100%) !important;
+  background-origin: border-box !important;
+  background-clip: padding-box, border-box !important;
+  box-shadow: 0 1px 3px rgba(0,0,0,0.12);
+  font-weight: 700;
+}
+.taply-action-btn.google-maps .ico { color: #4285F4; }
+
+.taply-contact { padding: 24px; background: var(--card2); border: 1px solid var(--border); border-radius: 16px; margin: 16px; }
+.taply-contact h2 { font-size: 11px; font-weight: 700; letter-spacing: 0.15em; text-transform: uppercase; color: var(--sg-text); margin: 0 0 8px; display: flex; align-items: center; gap: 8px; }
+.taply-contact-item { display: flex; gap: 12px; padding: 12px 0; border-bottom: 1px solid var(--line); }
+.taply-contact-item:last-child { border-bottom: none; padding-bottom: 0; }
+.taply-contact-icon { width: 32px; height: 32px; border-radius: 10px; background: var(--icon-bg); display: flex; align-items: center; justify-content: center; color: var(--sg-text); font-size: 12px; flex-shrink: 0; }
+.taply-contact-item > div { flex: 1; min-width: 0; }
+.taply-contact-item small { display: block; font-size: 10px; text-transform: uppercase; letter-spacing: 0.1em; color: var(--faint); margin-bottom: 2px; }
+.taply-contact-item a, .taply-contact-item p { font-size: 13px; color: var(--heading); text-decoration: none; margin: 0; word-break: break-word; }
+.taply-footer { padding: 12px 24px 24px; text-align: center; }
+.taply-footer p { font-size: 10px; color: var(--faint); margin: 0; }
+
+.taply-theme-toggle {
+  position: absolute; top: 16px; right: 16px; z-index: 10;
+  width: 36px; height: 36px; border-radius: 50%;
+  background: rgba(0,0,0,0.6); backdrop-filter: blur(12px);
+  border: 1px solid rgba(255,255,255,0.15); color: #fff;
+  display: flex; align-items: center; justify-content: center;
+  cursor: pointer; transition: transform .2s, background .2s; font-size: 14px;
+}
+.taply-theme-toggle:hover { transform: scale(1.05); background: rgba(0,0,0,0.8); }
+.taply-gold-wrapper.light-mode .taply-theme-toggle {
+  background: rgba(255,255,255,0.9); border: 1px solid #e2e8f0; color: #0f172a; box-shadow: 0 2px 8px rgba(0,0,0,0.08);
+}
+.taply-toast {
+  position: fixed; left: 50%; bottom: 28px; transform: translateX(-50%); z-index: 10000;
+  background: rgba(20,20,20,0.92); color: #fff; backdrop-filter: blur(12px);
+  border: 1px solid rgba(255,255,255,0.12); padding: 10px 18px; border-radius: 999px;
+  font-size: 12px; font-weight: 600; animation: fadeIn .2s ease;
+}
+
+@media (max-width: 380px) {
+  .taply-gold-wrapper { padding: 0; }
+  .taply-card { border-radius: 0 0 28px 28px; max-width: 100%; border: none; }
+  .taply-hero { height: 320px; }
+  .taply-profile-body h1 { font-size: 24px; }
+  .taply-pills { grid-template-columns: 1fr; }
+  .taply-pills .taply-action-btn { min-height: 52px; flex-direction: row; }
+  .taply-secondary-pills { gap: 8px; }
+  .taply-action-btn.small { font-size: 10px; padding: 10px 12px; }
+  .taply-reel figure { flex-basis: 96%; }
+}
+@media (min-width: 381px) and (max-width: 640px) {
+  .taply-gold-wrapper { padding: 0; }
+  .taply-card { border-radius: 0 0 28px 28px; max-width: 100%; border: none; border-bottom: 1px solid var(--border); }
+  .taply-hero { height: 380px; }
+}
+@media (min-width: 641px) and (max-width: 768px) {
+  .taply-gold-wrapper { padding: 24px; align-items: flex-start; }
+  .taply-card { max-width: 480px; border-radius: 28px; }
+  .taply-hero { height: 420px; }
+  .taply-profile-body h1 { font-size: 30px; }
+  .taply-glow { width: 900px; height: 700px; }
+}
+@media (min-width: 769px) and (max-width: 1024px) {
+  .taply-gold-wrapper { padding: 32px; }
+  .taply-card { max-width: 500px; border-radius: 32px; }
+  .taply-hero { height: 460px; }
+  .taply-profile-body { padding: 28px 28px 32px; }
+  .taply-profile-body h1 { font-size: 32px; }
+  .taply-section { padding: 28px; }
+  .taply-glow { width: 1000px; height: 800px; opacity: 0.6; }
+}
+@media (min-width: 1025px) and (max-width: 1440px) {
+  .taply-gold-wrapper { padding: 40px; }
+  .taply-card { max-width: 440px; border-radius: 32px; box-shadow: 0 25px 100px rgba(0,0,0,0.5); }
+  .taply-gold-wrapper.light-mode .taply-card { box-shadow: 0 25px 100px rgba(0,0,0,0.12); }
+  .taply-hero { height: 480px; }
+  .taply-profile-body h1 { font-size: 32px; }
+  .taply-glow { width: 1200px; height: 900px; }
+}
+@media (min-width: 1441px) {
+  .taply-gold-wrapper { padding: 60px; }
+  .taply-card { max-width: 460px; border-radius: 36px; }
+  .taply-hero { height: 500px; }
+  .taply-glow { width: 1400px; height: 1000px; }
+}
+@media (max-height: 500px) and (orientation: landscape) {
+  .taply-hero { height: 280px; }
+  .taply-profile-body { margin-top: -60px; padding: 16px 20px 20px; }
+  .taply-profile-body h1 { font-size: 22px; }
+  .taply-bio { font-size: 12px; margin-bottom: 12px; }
+}
+@media (min-width: 641px) { .taply-reel figure { flex-basis: 82%; } }
+@media (min-width: 1025px) { .taply-reel figure { flex-basis: 78%; } .taply-reel figure:hover { transform: scale(1.02); } }
+@media (min-width: 769px) {
+  .taply-secondary-pills { flex-wrap: wrap; overflow: visible; }
+  .taply-secondary-pills .taply-action-btn.small { flex: 1 1 auto; }
+}
+@media (min-width: 1025px) {
+  .taply-card { transition: transform .3s, box-shadow .3s; }
+  .taply-card:hover { transform: translateY(-4px); }
+  .taply-social-btn:hover, .taply-action-btn:hover { transform: translateY(-4px); }
+}
+
+@keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
+
+.taply-lightbox {
+  position: fixed; inset: 0; z-index: 9999;
+  background: rgba(0,0,0,0.92);
+  -webkit-backdrop-filter: blur(20px); backdrop-filter: blur(20px);
+  display: flex; align-items: center; justify-content: center;
+  padding: 16px; animation: fadeIn .2s ease;
+}
+.taply-lightbox-content { position: relative; width: 100%; max-width: 900px; max-height: 100%; display: flex; flex-direction: column; align-items: center; pointer-events: none; }
+.taply-lightbox-content > * { pointer-events: auto; }
+.taply-lightbox-img-wrapper {
+  position: relative; width: 100%; height: 70vh;
+  display: flex; align-items: center; justify-content: center;
+  overflow: hidden; border-radius: 20px; background: #000; touch-action: none;
+}
+.taply-lightbox-img-wrapper img {
+  max-width: 100%; max-height: 100%; object-fit: contain;
+  user-select: none; -webkit-user-drag: none; will-change: transform;
+}
+.taply-lightbox-controls {
+  display: flex; align-items: center; flex-wrap: wrap; justify-content: center; gap: 10px; margin-top: 20px;
+  background: rgba(255,255,255,0.1); backdrop-filter: blur(12px);
+  padding: 10px 16px; border-radius: 28px; border: 1px solid rgba(255,255,255,0.15);
+}
+.taply-lightbox-btn {
+  width: 40px; height: 40px; border-radius: 50%;
+  background: rgba(255,255,255,0.15); border: 1px solid rgba(255,255,255,0.2); color: #fff;
+  display: flex; align-items: center; justify-content: center;
+  cursor: pointer; transition: transform .2s, background .2s; font-size: 16px;
+}
+.taply-lightbox-btn:hover:not(:disabled) { background: rgba(255,255,255,0.25); transform: scale(1.05); }
+.taply-lightbox-btn:disabled { opacity: .35; cursor: default; }
+.taply-lightbox-btn.close { background: rgba(239,68,68,0.8); border-color: rgba(239,68,68,0.5); }
+.taply-lightbox-counter { color: #fff; font-size: 13px; font-weight: 600; min-width: 52px; text-align: center; letter-spacing: 0.05em; }
+.taply-lightbox-zoom-info { color: rgba(255,255,255,0.6); font-size: 11px; margin: 12px 0 0; text-align: center; }
+@media (max-width: 640px) {
+  .taply-lightbox-img-wrapper { height: 70vh; border-radius: 16px; }
+  .taply-lightbox-controls { padding: 8px 12px; gap: 8px; }
+  .taply-lightbox-btn { width: 36px; height: 36px; font-size: 14px; }
+}
+
+
+/* ===== V5 LIGHT MODE FIXED - NO HARD DARK !important - RESPECTS LIGHT MODE ===== */
+.phone-wrap {
+  position: relative;
+  width: 390px;
+  margin: 0 auto;
+}
+.glow-behind {
+  position: absolute;
+  inset: -32px;
+  background: var(--sg, #D4AF37);
+  filter: blur(55px);
+  opacity: 0.26;
+  border-radius: 60px;
+  z-index: -1;
+  pointer-events: none;
+  transition: opacity 0.3s;
+}
+.taply-gold-wrapper.light-mode .glow-behind { opacity: 0.12; }
+
+/* DARK MODE (default) */
+.taply-gold-wrapper:not(.light-mode) {
+  background: #050505 !important;
+}
+.taply-gold-wrapper:not(.light-mode) .taply-card {
+  width: 390px !important;
+  max-width: 390px !important;
+  background: #121214 !important;
+  border: 1px solid #242426 !important;
+  border-radius: 36px !important;
+  box-shadow: 0 0 80px rgba(212,175,55,0.22) !important;
+}
+
+/* LIGHT MODE - FIXED WHITE */
+.taply-gold-wrapper.light-mode {
+  background: #f1f5f9 !important;
+}
+.taply-gold-wrapper.light-mode .taply-card {
+  width: 390px !important;
+  max-width: 390px !important;
+  background: #ffffff !important;
+  border: 1px solid #e2e8f0 !important;
+  border-radius: 36px !important;
+  box-shadow: 0 25px 100px rgba(0,0,0,0.12) !important;
+}
+.taply-gold-wrapper.light-mode .taply-contact {
+  background: #f8fafc !important;
+  border-color: #e2e8f0 !important;
+}
+
+/* TOP 3 = grid big - THEME COLOR - works in both modes */
+.taply-pills {
+  display: grid !important;
+  grid-template-columns: repeat(3, 1fr) !important;
+  gap: 8px !important;
+  margin-bottom: 12px !important;
+  overflow: visible !important;
+}
+.taply-pills .taply-action-btn {
+  min-height: 74px !important;
+  height: 74px !important;
+  border-radius: 18px !important;
+  background: var(--sg, #D4AF37) !important;
+  color: #000 !important;
+  flex-direction: column !important;
+  justify-content: center !important;
+  gap: 4px !important;
+  font-size: 11px !important;
+  font-weight: 600 !important;
+  padding: 10px 4px !important;
+  width: 100% !important;
+  border: none !important;
+}
+.taply-pills .taply-action-btn .ico { font-size: 16px !important; color: #000 !important; }
+
+/* BOTTOM 3 = small pills scroll - OLD STYLE */
+.taply-secondary-pills {
+  display: flex !important;
+  flex-wrap: nowrap !important;
+  gap: 10px !important;
+  overflow-x: auto !important;
+  overflow-y: hidden !important;
+  scroll-snap-type: x mandatory !important;
+  scrollbar-width: none !important;
+  -ms-overflow-style: none !important;
+  padding-bottom: 6px !important;
+  -webkit-overflow-scrolling: touch !important;
+}
+.taply-secondary-pills::-webkit-scrollbar { display: none !important; }
+.taply-secondary-pills .taply-action-btn.small {
+  flex: 0 0 auto !important;
+  scroll-snap-align: start !important;
+  white-space: nowrap !important;
+  width: auto !important;
+  min-width: fit-content !important;
+  flex-direction: row !important;
+  padding: 12px 16px !important;
+  border-radius: 999px !important;
+  font-size: 11px !important;
+  gap: 6px !important;
+  min-height: 44px !important;
+  justify-content: center !important;
+  background: var(--sg, #D4AF37) !important;
+  color: #000 !important;
+  border: none !important;
+}
+.taply-secondary-pills .taply-action-btn.small .ico { font-size: 12px !important; }
+.taply-secondary-pills .taply-action-btn.small.google-maps {
+  background: #FFFFFF !important;
+  background-image: none !important;
+  color: #1f1f1f !important;
+  border: 2px solid var(--sg, #E8C766) !important;
+  box-shadow: 0 1px 3px rgba(0,0,0,0.12) !important;
+}
+.taply-secondary-pills .taply-action-btn.small.google-maps .ico { color: #E53935 !important; }
+
+/* Let's Connect follows theme */
+.taply-primary-btn { background: var(--sg, #D4AF37) !important; color: #000 !important; }
+
+@media (max-width: 380px) {
+  .taply-pills { grid-template-columns: 1fr !important; }
+  .taply-pills .taply-action-btn { min-height: 52px !important; flex-direction: row !important; }
+}
+@media (max-width: 420px) {
+  .phone-wrap { width: 100% !important; max-width: 390px !important; }
+  .taply-gold-wrapper:not(.light-mode) .taply-card,
+  .taply-gold-wrapper.light-mode .taply-card { width: 100% !important; max-width: 100% !important; }
+}
