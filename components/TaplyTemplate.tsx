@@ -186,7 +186,7 @@ END:VCARD`
 
           {gallery.length > 0 && (
             <section className="taply-section">
-              <h2><i className="fa-regular fa-images"></i> Gallery • {gallery.length} photos • Tap to zoom</h2>
+              <h2><i className="fa-regular fa-images"></i> Gallery </h2>
               <div className="taply-carousel">
                 <div className="taply-reel" ref={reelRef}>
                   {gallery.map((item:any,i:number)=>(
@@ -197,7 +197,7 @@ END:VCARD`
                 </div>
                 <button className="taply-carousel-btn prev" onClick={()=>scroll(-1)}><i className="fa-solid fa-chevron-left"></i></button>
                 <button className="taply-carousel-btn next" onClick={()=>scroll(1)}><i className="fa-solid fa-chevron-right"></i></button>
-                <p className="taply-carousel-count">{current} / {gallery.length} • Tap image to zoom</p>
+                <p className="taply-carousel-count">{current} / {gallery.length} </p>
               </div>
             </section>
           )}
