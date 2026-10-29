@@ -31,7 +31,7 @@ export default function TaplyTemplate({ profile }: { profile: any }) {
     return { src: item.src, alt: item.alt || 'Gallery' }
   }).filter((g: any) => g.src)
 
-  const heroImg = profile.hero_image || profile.avatar_url || 'https://images.unsplash.com/photo-1506905925346-21bda4d32df4?w=1200'
+  const heroImg = profile.hero_image || profile.avatar_url || ''
   const socials = profile.socials || {}
   const socialsVisible = profile.socials_visible || {}
 

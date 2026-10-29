@@ -57,17 +57,17 @@ body {
 }
 
 .taply-gold-wrapper.light-mode {
-  --bg: #f1f5f9;
-  --card: #ffffff;
-  --card2: #f8fafc;
-  --text: #0f172a;
-  --heading: #0f172a;
-  --body: #475569;
-  --muted: #475569;
-  --faint: #94a3b8;
-  --border: #e2e8f0;
-  --line: #eef2f7;
-  --icon-bg: #e2e8f0;
+  --bg: #f3f4f6;
+  --card: #fafafa;
+  --card2: #f3f4f6;
+  --text: #1f2937;
+  --heading: #111827;
+  --body: #6b7280;
+  --muted: #6b7280;
+  --faint: #9ca3af;
+  --border: #e5e7eb;
+  --line: #e5e7eb;
+  --icon-bg: #e5e7eb;
   --sg-text: color-mix(in srgb, var(--sg) 72%, #000);
   background: var(--bg);
 }
@@ -361,17 +361,23 @@ body {
 .taply-gold-wrapper.light-mode {
   background: #f1f5f9 !important;
 }
+.taply-gold-wrapper.light-mode {
+  background: #FFFBEB !important;
+}
+.taply-gold-wrapper.light-mode {
+  background: #f3f4f6 !important;
+}
 .taply-gold-wrapper.light-mode .taply-card {
   width: 390px !important;
   max-width: 390px !important;
-  background: #ffffff !important;
-  border: 1px solid #e2e8f0 !important;
+  background: #fafafa !important;
+  border: 1px solid #e5e7eb !important;
   border-radius: 36px !important;
-  box-shadow: 0 25px 100px rgba(0,0,0,0.12) !important;
+  box-shadow: 0 25px 80px rgba(0,0,0,0.08) !important;
 }
 .taply-gold-wrapper.light-mode .taply-contact {
-  background: #f8fafc !important;
-  border-color: #e2e8f0 !important;
+  background: #f3f4f6 !important;
+  border-color: #e5e7eb !important;
 }
 
 /* TOP 3 = grid big - THEME COLOR - works in both modes */
