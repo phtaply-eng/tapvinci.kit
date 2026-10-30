@@ -57,7 +57,7 @@ export default function Dashboard() {
   const [profile, setProfile] = useState<any>({
     username: 'TapVinci',
     name: 'TapVinci',
-    title: 'INTRODUCTIONS, REDEFINED • A NEW WAY TO CONNECT • PHILIPPINES 2026',
+    title: 'A NEW STANDARD OF INTRODUCTION • MADE TO CONNECT • PHILIPPINES 2026 ',
     bio: 'A simple tap. A smarter introduction. TapVinci turns calling cards into digital profiles where your contact details and links are easy to access and share.',
     about: "TapVinci Help professionals and local businesses get noticed - through NFC digital business cards that share contacts and links instantly. TapVinci goal is simple: make it personal, modern, and easy to share.",
     hero_image: 'hero.png',
