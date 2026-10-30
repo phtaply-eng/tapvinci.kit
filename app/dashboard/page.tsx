@@ -28,7 +28,9 @@ const DEFAULT_VISIBLE = {
   text: true,
   email_btn: true,
   save_contact: true,
-  share_card: true
+  share_card: true,
+  gcash_qr: true,
+  maya_qr: true
 }
 
 const SOCIALS_CONFIG = [
@@ -36,7 +38,7 @@ const SOCIALS_CONFIG = [
   { key: 'instagram', label: 'Instagram', color: 'text-pink-400', placeholder: 'https://instagram.com/...' },
   { key: 'tiktok', label: 'TikTok', color: 'text-white', placeholder: 'https://tiktok.com/@...' },
   { key: 'messenger', label: 'Messenger', color: 'text-blue-400', placeholder: 'https://m.me/...' },
-  { key: 'linkedin', label: 'LinkedIn ', color: 'text-blue-300', placeholder: 'https://linkedin.com/in/...' },
+  { key: 'linkedin', label: 'LinkedIn', color: 'text-blue-300', placeholder: 'https://linkedin.com/in/...' },
   { key: 'youtube', label: 'YouTube', color: 'text-red-400', placeholder: 'https://youtube.com/@...' },
   { key: 'whatsapp', label: 'WhatsApp', color: 'text-green-400', placeholder: 'https://wa.me/639...' },
   { key: 'website', label: 'Website', color: 'text-zinc-400', placeholder: 'https://yourwebsite.com' },
@@ -55,16 +57,16 @@ export default function Dashboard() {
   const [profile, setProfile] = useState<any>({
     username: 'TapVinci',
     name: 'TapVinci',
-    title: 'INTRODUCTIONS, REDEFINED • A NEW WAY TO CONNECT •  PHILIPPINES 2026 ',
+    title: 'INTRODUCTIONS, REDEFINED • A NEW WAY TO CONNECT • PHILIPPINES 2026',
     bio: 'A simple tap. A smarter introduction. TapVinci turns calling cards into digital profiles where your contact details and links are easy to access and share.',
-    about: "TapVinci Help professionals and local businesses get noticed - through NFC digital business cards that share contacts and links instanty. TapVinci goal is simple: make it personal, modern, and easy to share.  ",
+    about: "TapVinci Help professionals and local businesses get noticed - through NFC digital business cards that share contacts and links instantly. TapVinci goal is simple: make it personal, modern, and easy to share.",
     hero_image: 'hero.png',
     avatar_url: '',
     photoFocus: 'center 30%',
     phone: '+63 908 327 4971',
     email: 'tapvinci@yahoo.com',
     address: 'Quezon City, Philippines',
-    mapsLink: 'https://maps.app.goo.gl/wkt18UTaTZrxcFMA8',
+    mapsLink: 'https://maps.app.goo.gl/9JxYrjC499aCfgxW7',
     accent_color: '#D4AF37',
     theme: 'gold',
     galleryTitle: 'Gallery',
@@ -92,10 +94,16 @@ export default function Dashboard() {
   const [dragOverGallery, setDragOverGallery] = useState(false)
   const [dragOverGcash, setDragOverGcash] = useState(false)
   const [dragOverMaya, setDragOverMaya] = useState(false)
+  const [mounted, setMounted] = useState(false)
+
+  useEffect(() => {
+    setMounted(true)
+  }, [])
 
   useEffect(() => {
     const load = async () => {
-      const { data } = await supabase.from('profiles').select('*').eq('username', '').single()
+      const DEFAULT_USERNAME = process.env.NEXT_PUBLIC_DEFAULT_USERNAME || 'TapVinci'
+const { data } = await supabase.from('profiles').select('*').eq('username', DEFAULT_USERNAME).single()
       if (data) {
         const mergedSocials = { ...DEFAULT_SOCIALS, ...(data.socials || {}) }
         const mergedVisible = { ...DEFAULT_VISIBLE, ...(data.socials_visible || {}) }
@@ -197,7 +205,7 @@ export default function Dashboard() {
     <div className="min-h-screen bg-black text-white p-4">
       <div className="max-w-7xl mx-auto grid grid-cols-1 lg:grid-cols-2 gap-8">
         <div className="space-y-4 bg-zinc-900 p-6 rounded-2xl h-fit max-h-[95vh] overflow-y-auto">
-          <h1 className="text-xl font-bold">Edit Profile</h1>
+          <h1 className="text-xl font-bold">Edit Your Gold Profile — Complete</h1>
           
           {/* 1. USERNAME */}
           <label className="block text-[11px] tracking-widest text-zinc-400 uppercase">Username<input value={profile.username} onChange={e => setProfile({...profile, username: e.target.value.toLowerCase()})} className={inputCls} /></label>
@@ -251,7 +259,7 @@ export default function Dashboard() {
 
           {/* 4. TITLE, BIO, ABOUT ME - Grouped like Hero + About */}
           <div className="space-y-3 border-t border-zinc-800 pt-4">
-            <p className="text-[11px] uppercase tracking-widest text-[#D4AF37] font-bold">About Me</p>
+            <p className="text-[11px] uppercase tracking-widest text-[#D4AF37] font-bold">Hero</p>
             <label className="block text-[11px] tracking-widest text-zinc-400 uppercase">Title<input value={profile.title} onChange={e => setProfile({...profile, title: e.target.value})} className={inputCls} placeholder="WEB DEVELOPER | TAPVINCI FOUNDER..." /></label>
             <label className="block text-[11px] tracking-widest text-zinc-400 uppercase">Bio<textarea value={profile.bio} onChange={e => setProfile({...profile, bio: e.target.value})} rows={3} className={inputCls} placeholder="A simple tap. A smarter introduction..." /></label>
             <label className="block text-[11px] tracking-widest text-zinc-400 uppercase">About Me<textarea value={profile.about} onChange={e => setProfile({...profile, about: e.target.value})} rows={4} className={inputCls} placeholder="Hi, I'm Shua, owner of TapVinci..." /></label>
@@ -287,7 +295,7 @@ export default function Dashboard() {
           {/* 6. SOCIALS - Facebook, Instagram, TikTok, Messenger, LinkedIn, YouTube, WhatsApp, Website with Show/Hide */}
           <div className="space-y-3 border-t border-zinc-800 pt-4">
             <div className="flex items-center justify-between">
-              <p className="text-[11px] uppercase tracking-widest text-[#D4AF37] font-bold">Social Links — With Hide/Show Button</p>
+              <p className="text-[11px] uppercase tracking-widest text-[#D4AF37] font-bold">Social Links</p>
               <span className="text-[10px] bg-zinc-800 px-2 py-1 rounded-full">{activeSocialCount} visible</span>
             </div>
             <p className="text-[11px] text-zinc-500">👁️ Show = visible, 🙈 Hide = hidden but saved. Order matches Live Preview.</p>
@@ -331,7 +339,7 @@ export default function Dashboard() {
 
           {/* 7. QUICK ACTIONS + CONTACT INFO - Phone, Email, Address, Google Maps with Show/Hide */}
           <div className="space-y-3 border-t border-zinc-800 pt-4">
-            <p className="text-[11px] uppercase tracking-widest text-[#D4AF37] font-bold">Quick Actions + Contact Info</p>
+            <p className="text-[11px] uppercase tracking-widest text-[#D4AF37] font-bold">Quick Actions & Contact Info</p>
             <p className="text-[11px] text-zinc-500">Controls Quick Actions row + Contact section. Matches Live Preview order.</p>
             <div className="grid grid-cols-1 gap-3">
               <label className="block text-[11px] tracking-widest text-zinc-400 uppercase">Phone<input value={profile.phone} onChange={e => setProfile({...profile, phone: e.target.value})} className={inputCls} /></label>
@@ -357,15 +365,22 @@ export default function Dashboard() {
           {/* 8. PAYMENT QR CODES - Put at very bottom, before Save */}
           <div className="space-y-4 border-t border-zinc-800 pt-6">
             <div>
-              <p className="text-[10px] uppercase tracking-[1px] text-[#9CA3AF] font-bold flex items-center gap-2">
-                <i className="fa-solid fa-qrcode text-[#D4AF37]"></i> Payment QR Codes
-              </p>
-              <p className="text-[11px] text-zinc-500 mt-1">Upload GCash and Maya QR — shows in Payment modal when tapped</p>
+              <div className="flex items-center justify-between">
+                <p className="text-[10px] uppercase tracking-[1px] text-[#9CA3AF] font-bold flex items-center gap-2">
+                  <i className="fa-solid fa-qrcode text-[#D4AF37]"></i> Payment QR Codes
+                </p>
+                <span className="text-[10px] bg-zinc-800 px-2 py-1 rounded-full">{(profile.socials_visible.gcash_qr !== false ? 1 : 0) + (profile.socials_visible.maya_qr !== false ? 1 : 0)} visible</span>
+              </div>
+              <p className="text-[11px] text-zinc-500 mt-1">👁️ Show = visible, 🙈 Hide = hidden but saved</p>
             </div>
 
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               {/* GCASH */}
               <div className="space-y-2">
+                <div className="flex items-center justify-between mb-2">
+                  <p className="text-[11px] uppercase tracking-widest text-zinc-400 font-bold">GCash QR {profile.socials_visible.gcash_qr !== false ? <span className="text-[9px] bg-green-500/20 px-1.5 py-0.5 rounded text-green-300 ml-2">VISIBLE</span> : <span className="text-[9px] bg-red-500/20 px-1.5 py-0.5 rounded text-red-300 ml-2">HIDDEN</span>}</p>
+                  <button onClick={() => toggleVisibility('gcash_qr')} className={`px-3 py-1.5 rounded-full text-[11px] font-bold flex items-center gap-1.5 ${profile.socials_visible.gcash_qr !== false ? 'bg-green-500/20 text-green-300 border border-green-500/30' : 'bg-red-500/20 text-red-300 border border-red-500/30'}`}><i className={`fa-solid ${profile.socials_visible.gcash_qr !== false ? 'fa-eye' : 'fa-eye-slash'}`}></i>{profile.socials_visible.gcash_qr !== false ? 'Show' : 'Hide'}</button>
+                </div>
                 <div
                   onDragOver={(e) => { e.preventDefault(); setDragOverGcash(true) }}
                   onDragLeave={() => setDragOverGcash(false)}
@@ -397,6 +412,10 @@ export default function Dashboard() {
 
               {/* MAYA */}
               <div className="space-y-2">
+                <div className="flex items-center justify-between mb-2">
+                  <p className="text-[11px] uppercase tracking-widest text-zinc-400 font-bold">Maya QR {profile.socials_visible.maya_qr !== false ? <span className="text-[9px] bg-green-500/20 px-1.5 py-0.5 rounded text-green-300 ml-2">VISIBLE</span> : <span className="text-[9px] bg-red-500/20 px-1.5 py-0.5 rounded text-red-300 ml-2">HIDDEN</span>}</p>
+                  <button onClick={() => toggleVisibility('maya_qr')} className={`px-3 py-1.5 rounded-full text-[11px] font-bold flex items-center gap-1.5 ${profile.socials_visible.maya_qr !== false ? 'bg-green-500/20 text-green-300 border border-green-500/30' : 'bg-red-500/20 text-red-300 border border-red-500/30'}`}><i className={`fa-solid ${profile.socials_visible.maya_qr !== false ? 'fa-eye' : 'fa-eye-slash'}`}></i>{profile.socials_visible.maya_qr !== false ? 'Show' : 'Hide'}</button>
+                </div>
                 <div
                   onDragOver={(e) => { e.preventDefault(); setDragOverMaya(true) }}
                   onDragLeave={() => setDragOverMaya(false)}
