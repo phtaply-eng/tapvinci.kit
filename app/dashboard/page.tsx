@@ -4,10 +4,10 @@ import TaplyTemplate from '../../components/TaplyTemplate'
 import { supabase } from '../../lib/supabase'
 
 const DEFAULT_SOCIALS = {
-  facebook: 'https://facebook.com/shua.vallinas',
-  instagram: 'https://instagram.com/shuashushu',
-  tiktok: 'https://www.tiktok.com/@shuashushu5',
-  messenger: 'https://m.me/shua.vallinas',
+  facebook: 'https://facebook.com/',
+  instagram: 'https://instagram.com/',
+  tiktok: 'https://www.tiktok.com/',
+  messenger: 'https://m.me/',
   linkedin: '',
   youtube: '',
   whatsapp: '',
@@ -32,13 +32,13 @@ const DEFAULT_VISIBLE = {
 }
 
 const SOCIALS_CONFIG = [
-  { key: 'facebook', label: 'Facebook #1877F2', color: 'text-blue-400', placeholder: 'https://facebook.com/...' },
-  { key: 'instagram', label: 'Instagram Gradient', color: 'text-pink-400', placeholder: 'https://instagram.com/...' },
-  { key: 'tiktok', label: 'TikTok Black', color: 'text-white', placeholder: 'https://tiktok.com/@...' },
-  { key: 'messenger', label: 'Messenger #006AFF', color: 'text-blue-400', placeholder: 'https://m.me/...' },
-  { key: 'linkedin', label: 'LinkedIn #0077B5', color: 'text-blue-300', placeholder: 'https://linkedin.com/in/...' },
-  { key: 'youtube', label: 'YouTube Red', color: 'text-red-400', placeholder: 'https://youtube.com/@...' },
-  { key: 'whatsapp', label: 'WhatsApp Green', color: 'text-green-400', placeholder: 'https://wa.me/639...' },
+  { key: 'facebook', label: 'Facebook', color: 'text-blue-400', placeholder: 'https://facebook.com/...' },
+  { key: 'instagram', label: 'Instagram', color: 'text-pink-400', placeholder: 'https://instagram.com/...' },
+  { key: 'tiktok', label: 'TikTok', color: 'text-white', placeholder: 'https://tiktok.com/@...' },
+  { key: 'messenger', label: 'Messenger', color: 'text-blue-400', placeholder: 'https://m.me/...' },
+  { key: 'linkedin', label: 'LinkedIn ', color: 'text-blue-300', placeholder: 'https://linkedin.com/in/...' },
+  { key: 'youtube', label: 'YouTube', color: 'text-red-400', placeholder: 'https://youtube.com/@...' },
+  { key: 'whatsapp', label: 'WhatsApp', color: 'text-green-400', placeholder: 'https://wa.me/639...' },
   { key: 'website', label: 'Website', color: 'text-zinc-400', placeholder: 'https://yourwebsite.com' },
 ]
 
@@ -53,18 +53,18 @@ const THEMES = [
 
 export default function Dashboard() {
   const [profile, setProfile] = useState<any>({
-    username: 'shua',
-    name: 'Shua Vallinas',
-    title: 'Web Developer | FOUNDER OF TAPLYPH | Tour Coordinator',
-    bio: 'Founder of TaplyPH. I design and build landing pages that feel human, and coordinate tours that feel personal. Based in Quezon City, Manila',
-    about: "Hi, I'm Shua Vallinas, founder of TaplyPH. I help professionals and local businesses get noticed.",
-    hero_image: 'https://images.unsplash.com/photo-1506905925346-21bda4d32df4?w=1200',
+    username: 'TapVinci',
+    name: 'TapVinci',
+    title: 'INTRODUCTIONS, REDEFINED • A NEW WAY TO CONNECT •  PHILIPPINES 2026 ',
+    bio: 'A simple tap. A smarter introduction. TapVinci turns calling cards into digital profiles where your contact details and links are easy to access and share.',
+    about: "TapVinci Help professionals and local businesses get noticed - through NFC digital business cards that share contacts and links instanty. TapVinci goal is simple: make it personal, modern, and easy to share.  ",
+    hero_image: 'hero.png',
     avatar_url: '',
     photoFocus: 'center 30%',
     phone: '+63 908 327 4971',
-    email: 'shuarmaj@gmail.com',
+    email: 'tapvinci@yahoo.com',
     address: 'Quezon City, Philippines',
-    mapsLink: 'https://maps.app.goo.gl/9JxYrjC499aCfgxW7',
+    mapsLink: 'https://maps.app.goo.gl/wkt18UTaTZrxcFMA8',
     accent_color: '#D4AF37',
     theme: 'gold',
     galleryTitle: 'Gallery',
@@ -95,7 +95,7 @@ export default function Dashboard() {
 
   useEffect(() => {
     const load = async () => {
-      const { data } = await supabase.from('profiles').select('*').eq('username', 'shua').single()
+      const { data } = await supabase.from('profiles').select('*').eq('username', '').single()
       if (data) {
         const mergedSocials = { ...DEFAULT_SOCIALS, ...(data.socials || {}) }
         const mergedVisible = { ...DEFAULT_VISIBLE, ...(data.socials_visible || {}) }
@@ -197,7 +197,7 @@ export default function Dashboard() {
     <div className="min-h-screen bg-black text-white p-4">
       <div className="max-w-7xl mx-auto grid grid-cols-1 lg:grid-cols-2 gap-8">
         <div className="space-y-4 bg-zinc-900 p-6 rounded-2xl h-fit max-h-[95vh] overflow-y-auto">
-          <h1 className="text-xl font-bold">Edit Your Gold Profile — Complete</h1>
+          <h1 className="text-xl font-bold">Edit Profile</h1>
           
           {/* 1. USERNAME */}
           <label className="block text-[11px] tracking-widest text-zinc-400 uppercase">Username<input value={profile.username} onChange={e => setProfile({...profile, username: e.target.value.toLowerCase()})} className={inputCls} /></label>
@@ -238,7 +238,7 @@ export default function Dashboard() {
 
           {/* 3.5 THEME - After Profile Photo, Before Title per previous requirement */}
           <div className="space-y-3 border-t border-zinc-800 pt-4">
-            <p className="text-[11px] uppercase tracking-widest text-[#D4AF37] font-bold">Theme Packs - Client Color Choices</p>
+            <p className="text-[11px] uppercase tracking-widest text-[#D4AF37] font-bold">Themes</p>
             <div className="grid grid-cols-2 gap-2">
               {THEMES.map(t => (
                 <button key={t.id} onClick={() => setProfile({...profile, accent_color: t.hex, theme: t.id})} className={`p-3 rounded-xl border-2 text-left ${profile.theme === t.id ? 'border-white scale-[1.02]' : 'border-zinc-700 hover:border-zinc-500'}`}>
@@ -251,7 +251,7 @@ export default function Dashboard() {
 
           {/* 4. TITLE, BIO, ABOUT ME - Grouped like Hero + About */}
           <div className="space-y-3 border-t border-zinc-800 pt-4">
-            <p className="text-[11px] uppercase tracking-widest text-[#D4AF37] font-bold">Hero + About Me</p>
+            <p className="text-[11px] uppercase tracking-widest text-[#D4AF37] font-bold">About Me</p>
             <label className="block text-[11px] tracking-widest text-zinc-400 uppercase">Title<input value={profile.title} onChange={e => setProfile({...profile, title: e.target.value})} className={inputCls} placeholder="WEB DEVELOPER | TAPVINCI FOUNDER..." /></label>
             <label className="block text-[11px] tracking-widest text-zinc-400 uppercase">Bio<textarea value={profile.bio} onChange={e => setProfile({...profile, bio: e.target.value})} rows={3} className={inputCls} placeholder="A simple tap. A smarter introduction..." /></label>
             <label className="block text-[11px] tracking-widest text-zinc-400 uppercase">About Me<textarea value={profile.about} onChange={e => setProfile({...profile, about: e.target.value})} rows={4} className={inputCls} placeholder="Hi, I'm Shua, owner of TapVinci..." /></label>
@@ -259,7 +259,7 @@ export default function Dashboard() {
 
           {/* 5. GALLERY */}
           <div className="space-y-2 border-t border-zinc-800 pt-4">
-            <p className="text-[11px] uppercase tracking-widest text-[#D4AF37] font-bold">Gallery - File Upload (Drag & Drop)</p>
+            <p className="text-[11px] uppercase tracking-widest text-[#D4AF37] font-bold">Gallery</p>
             <div
               onDragOver={(e) => { e.preventDefault(); setDragOverGallery(true) }}
               onDragLeave={() => setDragOverGallery(false)}
@@ -393,8 +393,6 @@ export default function Dashboard() {
                   )}
                 </div>
                 <p className="text-[9px] text-zinc-500">/gcash-qr.png (Upload your GCash QR)</p>
-                <input value={profile.gcash_name} onChange={e => setProfile({...profile, gcash_name: e.target.value})} className={inputCls} placeholder="GCash Name: Shua Vallinas" />
-                <input value={profile.gcash_number} onChange={e => setProfile({...profile, gcash_number: e.target.value})} className={inputCls} placeholder="GCash Number: 0908 327 4971" />
               </div>
 
               {/* MAYA */}
@@ -426,13 +424,11 @@ export default function Dashboard() {
                   )}
                 </div>
                 <p className="text-[9px] text-zinc-500">/maya-qr.png (Upload your Maya QR)</p>
-                <input value={profile.maya_name} onChange={e => setProfile({...profile, maya_name: e.target.value})} className={inputCls} placeholder="Maya Name: Shua Vallinas" />
-                <input value={profile.maya_number} onChange={e => setProfile({...profile, maya_number: e.target.value})} className={inputCls} placeholder="Maya Number: 0908 327 4971" />
               </div>
             </div>
           </div>
 
-          <button onClick={save} disabled={saving || heroUploading || galleryUploading || gcashUploading || mayaUploading} className="w-full py-3 rounded-xl font-bold hover:brightness-110 disabled:opacity-50" style={{background: profile.accent_color, color: 'black'}}>{saving ? 'Saving...' : 'Save Profile — Complete'}</button>
+          <button onClick={save} disabled={saving || heroUploading || galleryUploading || gcashUploading || mayaUploading} className="w-full py-3 rounded-xl font-bold hover:brightness-110 disabled:opacity-50" style={{background: profile.accent_color, color: 'black'}}>{saving ? 'Saving...' : 'Save Profile'}</button>
         </div>
 
         <div className="lg:sticky lg:top-4">
