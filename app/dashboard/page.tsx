@@ -310,7 +310,15 @@ const { data } = await supabase.from('profiles').select('*').eq('username', DEFA
 
   const save = async () => {
     setSaving(true)
-    const fixed = { ...profile, username: profile.username.trim().toLowerCase() }
+    const fixedUsername = profile.username.trim().toLowerCase()
+    const { id, created_at, ...rest } = profile
+    const fixed = { ...rest, username: fixedUsername }
+    // new client or returning client? decides the email subject
+    let isNewProfile = true
+    try {
+      const { data: existing } = await supabase.from('profiles').select('username').eq('username', fixed.username).maybeSingle()
+      isNewProfile = !existing
+    } catch {}
     const { error } = await supabase.from('profiles').upsert(fixed, { onConflict: 'username' }).select()
     setSaving(false)
     if (error) {
@@ -319,6 +327,15 @@ const { data } = await supabase.from('profiles').select('*').eq('username', DEFA
       const url = `${SITE_URL}/${encodeURIComponent(fixed.username)}`
       setLiveUrl(url)
       setShowSuccessModal(true)
+      // Email the admin (fire-and-forget: the modal never waits for it, and a failure never blocks saving)
+      try {
+        fetch('/api/send-notification', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ username: fixed.username, type: isNewProfile ? 'created' : 'updated' }),
+          keepalive: true,
+        }).catch(() => {})
+      } catch {}
     }
   }
 
