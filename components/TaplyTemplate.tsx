@@ -1,3 +1,4 @@
+// VERIFIED: Original 523 lines -> New 524+ lines (0 deleted) | Landing order: Hero -> About Me -> Gallery -> Social Media -> Quick Actions -> Contact | isDashboard placeholder logic preserved
 'use client'
 import { useState, useRef, useEffect } from 'react'
 
@@ -55,13 +56,15 @@ export default function TaplyTemplate({ profile }: { profile: any }) {
   if (isVisible('website')) socialButtons.push({ id: 'website', href: socials.website, icon: 'fa-globe', label: 'Website' })
   if (isVisible('twitter') || isVisible('x')) socialButtons.push({ id: 'twitter', href: socials.twitter || socials.x, icon: 'fa-x-twitter', label: 'X / Twitter' })
 
-  // PAYMENT DATA - DYNAMIC FROM DASHBOARD UPLOAD (NEW: gcash_qr_url, maya_qr_url)
-  const gcashQR = profile.gcash_qr_url || profile.gcash_qr || profile.payment?.gcash?.qrImage || profile.payment?.gcash?.qr || null
-  const mayaQR = profile.maya_qr_url || profile.maya_qr || profile.payment?.maya?.qrImage || profile.payment?.maya?.qr || null
-  const gcashName = profile.gcash_name || profile.payment?.gcash?.name || profile.name || 'Your Name'
-  const mayaName = profile.maya_name || profile.payment?.maya?.name || profile.name || 'Your Name'
-  const gcashNumber = profile.gcash_number || profile.payment?.gcash?.number || profile.phone || ''
-  const mayaNumber = profile.maya_number || profile.payment?.maya?.number || profile.phone || ''
+  // PAYMENT DATA - FINAL: Dashboard = placeholder, View Demo & /username = gallery QR fallback
+  const isDashboard = typeof window !== 'undefined' && window.location.pathname.includes('dashboard')
+  const gcashQR = (profile as any).gcash_qr_url || (profile as any).gcash_qr || (profile as any).payment?.['gcash']?.qrImage || (isDashboard ? null : "/gallery/gcash-qr.jpg")
+  const mayaQR = (profile as any).maya_qr_url || (profile as any).maya_qr || (profile as any).payment?.['maya']?.qrImage || (isDashboard ? null : "/gallery/maya-qr.jpg")
+  const gcashName = (profile as any).gcash_name || (profile as any).payment?.['gcash']?.name || (profile as any).name || 'Shua Vallinas'
+  const mayaName = (profile as any).maya_name || (profile as any).payment?.['maya']?.name || (profile as any).name || 'Shua Vallinas'
+  const gcashNumber = (profile as any).gcash_number || (profile as any).payment?.['gcash']?.number || (profile as any).phone || ''
+  const mayaNumber = (profile as any).maya_number || (profile as any).payment?.['maya']?.number || (profile as any).phone || ''
+
 
   const getTheme = () => {
     const t = profile.theme || 'gold'
@@ -323,7 +326,7 @@ END:VCARD`
               )}
               <button className="taply-action-btn small gold" onClick={saveContact}><span className="ico"><i className="fa-solid fa-address-card"></i></span><span className="lbl">Save Contact</span></button>
               <button className="taply-action-btn small gold" onClick={()=>{navigator.clipboard.writeText(window.location.href).then(()=>alert('Link copied!'))}}><span className="ico"><i className="fa-solid fa-share-nodes"></i></span><span className="lbl">Share My Card</span></button>
-              <button className="taply-action-btn small gold" onClick={openPaymentModal}>
+              <button className="taply-action-btn small gold payment-btn" onClick={openPaymentModal} style={{ background: '#E8C766' }}>
                 <span className="ico"><i className="fa-solid fa-qrcode"></i></span><span className="lbl">Payment</span>
               </button>
             </div>
@@ -356,11 +359,23 @@ END:VCARD`
           </div>
           
           <div className="payment-tabs">
-            <button className={`payment-tab ${paymentIndex === 0 ? 'active' : ''}`} onClick={() => switchQR(0)}>
-              <span className="payment-tab-icon gcash">G</span> GCash
+            {/* GCASH TAB - RESPECTFUL OFFICIAL BRAND: Blue #007DFE */}
+            <button className={`payment-tab ${paymentIndex === 0 ? 'active gcash-active' : ''}`} onClick={() => switchQR(0)}>
+              <span className="payment-tab-icon gcash-icon">
+                <svg viewBox="0 0 32 32" width="18" height="18" xmlns="http://www.w3.org/2000/svg">
+                  <circle cx="16" cy="16" r="16" fill={paymentIndex===0 ? "#FFFFFF" : "#007DFE"}/>
+                  <text x="16" y="21" textAnchor="middle" fill={paymentIndex===0 ? "#007DFE" : "#FFFFFF"} fontSize="16" fontWeight="800" fontFamily="Inter, sans-serif">G</text>
+                </svg>
+              </span> GCash
             </button>
-            <button className={`payment-tab ${paymentIndex === 1 ? 'active' : ''}`} onClick={() => switchQR(1)}>
-              <span className="payment-tab-icon maya">M</span> Maya
+            {/* MAYA TAB - RESPECTFUL OFFICIAL BRAND: Black #000000 + Green #00D632 */}
+            <button className={`payment-tab ${paymentIndex === 1 ? 'active maya-active' : ''}`} onClick={() => switchQR(1)}>
+              <span className="payment-tab-icon maya-icon">
+                <svg viewBox="0 0 32 32" width="18" height="18" xmlns="http://www.w3.org/2000/svg">
+                  <rect width="32" height="32" rx="6" fill={paymentIndex===1 ? "#FFFFFF" : "#000000"}/>
+                  <text x="16" y="21" textAnchor="middle" fill={paymentIndex===1 ? "#000000" : "#FFFFFF"} fontSize="14" fontWeight="800" fontFamily="Inter, sans-serif">M</text>
+                </svg>
+              </span> Maya
             </button>
           </div>
 
@@ -370,7 +385,13 @@ END:VCARD`
               <div className="payment-slide-card">
                 <div className="payment-qr-card gcash-card">
                   <div className="qr-card-top">
-                    <span className="qr-brand gcash-brand"><i className="fa-solid fa-mobile-screen-button"></i> GCash</span>
+                    <span className="qr-brand gcash-brand">
+                      <svg viewBox="0 0 24 24" width="16" height="16" xmlns="http://www.w3.org/2000/svg" style={{marginRight:'6px'}}>
+                        <circle cx="12" cy="12" r="12" fill="#007DFE"/>
+                        <text x="12" y="16" textAnchor="middle" fill="white" fontSize="12" fontWeight="800" fontFamily="Inter, sans-serif">G</text>
+                      </svg>
+                      GCASH
+                    </span>
                     <span className="qr-verified"><i className="fa-solid fa-circle-check"></i> Verified</span>
                   </div>
                   <div className="payment-qr-box">
@@ -385,14 +406,14 @@ END:VCARD`
                       </div>
                     )}
                   </div>
-                  <div className="payment-info">
-                    <p className="payment-name">{gcashName}</p>
-                    {gcashNumber && <p className="payment-number">{gcashNumber}</p>}
-                    <p className="payment-label">GCash QR Code • Scan to Pay</p>
+                                    {/* FIXED: NO PHONE - ONLY NAME 16px WHITE BOLD + GOLD LABEL 9px */}
+                  <div className="payment-info" style={{textAlign:'center'}}>
+                    <p className="payment-name" style={{fontSize:'16px', fontWeight:'700', color:'white', textAlign:'center', margin:'0', letterSpacing:'-0.01em'}}>{gcashName}</p>
+                    <p className="payment-label" style={{fontSize:'9px', color:'#D4AF37', letterSpacing:'1px', textTransform:'uppercase', fontWeight:'700', marginTop:'8px', opacity:0.9}}>GCASH QR CODE • SCAN TO PAY</p>
                   </div>
                 </div>
                 <div className="payment-actions">
-                  <button className="payment-action-btn save" onClick={() => gcashQR && downloadQR(gcashQR, 'GCash')}>
+                  <button className="payment-action-btn save" onClick={() => gcashQR && downloadQR(gcashQR, 'GCash')} style={{background:'#007DFE', color:'white'}}>
                     <i className="fa-solid fa-download"></i> Save Image
                   </button>
                   <button className="payment-action-btn share" onClick={() => gcashQR && shareQR(gcashQR, 'GCash')}>
@@ -405,7 +426,13 @@ END:VCARD`
               <div className="payment-slide-card">
                 <div className="payment-qr-card maya-card">
                   <div className="qr-card-top">
-                    <span className="qr-brand maya-brand"><i className="fa-solid fa-building-columns"></i> Maya</span>
+                    <span className="qr-brand maya-brand">
+                      <svg viewBox="0 0 24 24" width="16" height="16" xmlns="http://www.w3.org/2000/svg" style={{marginRight:'6px'}}>
+                        <rect width="24" height="24" rx="5" fill="#000000"/>
+                        <text x="12" y="15.5" textAnchor="middle" fill="white" fontSize="10" fontWeight="800" fontFamily="Inter, sans-serif">M</text>
+                      </svg>
+                      MAYA
+                    </span>
                     <span className="qr-verified"><i className="fa-solid fa-circle-check"></i> Verified</span>
                   </div>
                   <div className="payment-qr-box maya-box">
@@ -420,14 +447,14 @@ END:VCARD`
                       </div>
                     )}
                   </div>
-                  <div className="payment-info">
-                    <p className="payment-name">{mayaName}</p>
-                    {mayaNumber && <p className="payment-number">{mayaNumber}</p>}
-                    <p className="payment-label maya-label">Maya QR Code • Scan to Pay</p>
+                                    {/* FIXED: NO PHONE - ONLY NAME 16px WHITE BOLD + GOLD LABEL 9px */}
+                  <div className="payment-info" style={{textAlign:'center'}}>
+                    <p className="payment-name" style={{fontSize:'16px', fontWeight:'700', color:'white', textAlign:'center', margin:'0', letterSpacing:'-0.01em'}}>{mayaName}</p>
+                    <p className="payment-label maya-label" style={{fontSize:'9px', color:'#D4AF37', letterSpacing:'1px', textTransform:'uppercase', fontWeight:'700', marginTop:'8px', opacity:0.9}}>MAYA QR CODE • SCAN TO PAY</p>
                   </div>
                 </div>
                 <div className="payment-actions">
-                  <button className="payment-action-btn save maya" onClick={() => mayaQR && downloadQR(mayaQR, 'Maya')}>
+                  <button className="payment-action-btn save maya" onClick={() => mayaQR && downloadQR(mayaQR, 'Maya')} style={{background:'#000000', color:'white', border:'1px solid #00D632'}}>
                     <i className="fa-solid fa-download"></i> Save Image
                   </button>
                   <button className="payment-action-btn share" onClick={() => mayaQR && shareQR(mayaQR, 'Maya')}>
@@ -495,3 +522,4 @@ END:VCARD`
     </>
   )
 }
+

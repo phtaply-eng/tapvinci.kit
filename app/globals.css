@@ -733,3 +733,151 @@ body {
 .qr-upload-box:hover { border-color: rgba(212,175,55,0.5); }
 .qr-upload-preview { width: 120px; height: 120px; background: white; border-radius: 12px; object-fit: contain; }
 /* ===== END QR PAYMENT ADDITION - SURGICAL APPEND ONLY ===== */
+
+
+/* ===== FIXED PAYMENT MODAL - RESPECTFUL BRAND COLORS - NO PHONE - SURGICAL APPEND 736+ ===== */
+
+/* Tabs base - inactive is dark #2A2A2A per requirement */
+.payment-tabs {
+  display: flex !important;
+  gap: 10px !important;
+  padding: 20px 24px 12px !important;
+}
+.payment-tab {
+  flex: 1 !important;
+  display: flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  gap: 8px !important;
+  padding: 11px 14px !important;
+  border-radius: 999px !important;
+  background: #2A2A2A !important;
+  border: 1px solid #2A2A2A !important;
+  color: #9CA3AF !important;
+  font-size: 12px !important;
+  font-weight: 700 !important;
+  cursor: pointer !important;
+  transition: all 0.25s ease !important;
+  font-family: inherit !important;
+}
+.payment-tab:hover {
+  background: #3A3A3C !important;
+  border-color: #3A3A3C !important;
+  color: #FFFFFF !important;
+}
+
+/* GCash active - Official GCash Blue #007DFE with white text - respectful, no gold */
+.payment-tab.active.gcash-active {
+  background: #007DFE !important;
+  color: #FFFFFF !important;
+  border-color: #007DFE !important;
+  box-shadow: 0 4px 16px rgba(0,125,254,0.30) !important;
+}
+
+/* Maya active - Official Maya Black #000000 with white text + green accent #00D632 */
+.payment-tab.active.maya-active {
+  background: #000000 !important;
+  color: #FFFFFF !important;
+  border-color: #00D632 !important;
+  box-shadow: 0 4px 16px rgba(0,214,50,0.25) !important;
+}
+
+.payment-tab-icon {
+  width: 22px !important;
+  height: 22px !important;
+  border-radius: 50% !important;
+  display: flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  font-size: 10px !important;
+  font-weight: 900 !important;
+  flex-shrink: 0 !important;
+  overflow: hidden !important;
+}
+.payment-tab-icon.gcash-icon {
+  background: #007DFE !important;
+  color: white !important;
+}
+.payment-tab.active.gcash-active .payment-tab-icon.gcash-icon {
+  background: #FFFFFF !important;
+}
+.payment-tab-icon.maya-icon {
+  background: #000000 !important;
+  color: white !important;
+  border-radius: 6px !important;
+}
+.payment-tab.active.maya-active .payment-tab-icon.maya-icon {
+  background: #FFFFFF !important;
+}
+
+/* Card headers - respectful brand colors - DO NOT use gold for GCash */
+.qr-brand.gcash-brand {
+  background: rgba(0,125,254,0.12) !important;
+  color: #007DFE !important;
+  border: 1px solid rgba(0,125,254,0.25) !important;
+}
+.qr-brand.maya-brand {
+  background: rgba(0,0,0,0.8) !important;
+  color: #FFFFFF !important;
+  border: 1px solid rgba(255,255,255,0.15) !important;
+}
+
+/* QR Cards - brand respectful borders - keep white background for QR image itself */
+.payment-qr-card.gcash-card {
+  border-color: rgba(0,125,254,0.30) !important;
+  box-shadow: 0 0 30px rgba(0,125,254,0.08) !important;
+}
+.payment-qr-card.maya-card {
+  border: 1px solid rgba(255,255,255,0.10) !important;
+  box-shadow: 0 0 30px rgba(0,214,50,0.06), 0 0 0 1px rgba(255,255,255,0.06) !important;
+}
+
+/* FIXED INFO - NO PHONE NUMBER - ONLY NAME 16px WHITE BOLD + GOLD LABEL 9px */
+.payment-info {
+  text-align: center !important;
+  margin-top: 16px !important;
+  display: flex !important;
+  flex-direction: column !important;
+  align-items: center !important;
+  gap: 0 !important;
+}
+.payment-name {
+  font-size: 16px !important;
+  font-weight: 700 !important;
+  color: #FFFFFF !important;
+  margin: 0 !important;
+  letter-spacing: -0.01em !important;
+  text-align: center !important;
+  line-height: 1.2 !important;
+}
+/* HIDE PHONE NUMBER COMPLETELY - QR is enough for payment */
+.payment-number {
+  display: none !important;
+}
+.payment-label {
+  font-size: 9px !important;
+  letter-spacing: 1px !important;
+  text-transform: uppercase !important;
+  color: #D4AF37 !important;
+  font-weight: 700 !important;
+  margin: 8px 0 0 !important;
+  opacity: 0.9 !important;
+  text-align: center !important;
+}
+.payment-label.maya-label {
+  color: #D4AF37 !important;
+}
+
+/* Action buttons - GCash blue save, Maya black save - respectful */
+.payment-action-btn.save {
+  background: #007DFE !important;
+  color: #FFFFFF !important;
+  border: none !important;
+}
+.payment-action-btn.save.maya {
+  background: #000000 !important;
+  color: #FFFFFF !important;
+  border: 1px solid #00D632 !important;
+}
+/* END FIXED PAYMENT MODAL */
+
