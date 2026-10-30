@@ -47,13 +47,11 @@ const THEMES = [
 
 export default function Dashboard() {
   const [profile, setProfile] = useState<any>({ 
-    
     username: 'TapVinci',
     name: 'TapVinci',
     title: 'A NEW WAY TO CONNECT • PHILIPPINES 2026',
     bio: 'A simple tap. A smarter introduction. TapVinci turns calling cards into digital calling card profiles where your contact details and links are easy to access and share.',
     about: 'TapVinci help professionals and local businesses get noticed - through NFC digital business cards that share contacts and links instanty. TapVinci goal is simple: make it personal, modern, and easy to share.  ',
-    // LOGO stays as hero by default, not profile photo
     hero_image: '/hero.png',
     avatar_url: '',
     photoFocus: 'center 30%',
@@ -70,7 +68,6 @@ export default function Dashboard() {
     socials_visible: { ...DEFAULT_VISIBLE },
   })
   
-   // INSERT MY 8 LINES HERE - AFTER your bio/about, BEFORE other logic
   const [gcashQR, setGcashQR] = useState('')
   const [mayaQR, setMayaQR] = useState('')
   const [gcashName, setGcashName] = useState('')
@@ -88,8 +85,7 @@ export default function Dashboard() {
   const [dragOverHero, setDragOverHero] = useState(false)
   const [dragOverGallery, setDragOverGallery] = useState(false)
 
-  // REMOVED auto-load of 'shua' - now dashboard starts blank for new clients
-  // Optional: Load if ?username=xxx is in URL
+  // Load if ?username=xxx is in URL - FIXED WITH QR LOAD
   useEffect(() => {
     const params = new URLSearchParams(window.location.search)
     const usernameFromUrl = params.get('username')
@@ -102,6 +98,13 @@ export default function Dashboard() {
         const mergedVisible = { ...DEFAULT_VISIBLE, ...(data.socials_visible || {}) }
         setProfile((p:any) => ({ ...p, ...data, socials: mergedSocials, socials_visible: mergedVisible }))
         setOriginalUsername(data.username)
+        // LOAD QR FIELDS
+        setGcashQR(data.gcash_qr_url || '')
+        setMayaQR(data.maya_qr_url || '')
+        setGcashName(data.gcash_name || '')
+        setGcashNumber(data.gcash_number || '')
+        setMayaName(data.maya_name || '')
+        setMayaNumber(data.maya_number || '')
       }
     }
     load()
@@ -122,7 +125,6 @@ export default function Dashboard() {
     return publicUrl.publicUrl
   }
 
-  // FIXED: Only sets avatar_url, NOT hero_image, so logo stays
   const handleHeroFiles = async (files: FileList | null) => {
     if (!files || files.length === 0) return
     const file = files[0]
@@ -133,7 +135,6 @@ export default function Dashboard() {
     if (url) setProfile((p:any) => ({ ...p, avatar_url: url }))
   }
 
-  // ===== PAYMENT QR HANDLERS - SAME PATTERN AS YOUR HERO =====
 const handleGcashFiles = async (files: FileList | null) => {
   if (!files || files.length === 0) return
   const file = files[0]
@@ -162,7 +163,6 @@ const handleMayaFiles = async (files: FileList | null) => {
     setProfile((p:any) => ({ ...p, maya_qr_url: url }))
   }
 }
-  // Separate handler if you want to change the logo/hero banner
   const handleLogoFiles = async (files: FileList | null) => {
     if (!files || files.length === 0) return
     const file = files[0]
@@ -212,6 +212,13 @@ const handleMayaFiles = async (files: FileList | null) => {
     const mergedVisible = { ...DEFAULT_VISIBLE, ...(data.socials_visible || {}) }
     setProfile((p:any) => ({ ...p, ...data, socials: mergedSocials, socials_visible: mergedVisible }))
     setOriginalUsername(data.username)
+    // LOAD QR FIELDS - FIXED
+    setGcashQR(data.gcash_qr_url || '')
+    setMayaQR(data.maya_qr_url || '')
+    setGcashName(data.gcash_name || '')
+    setGcashNumber(data.gcash_number || '')
+    setMayaName(data.maya_name || '')
+    setMayaNumber(data.maya_number || '')
     alert(`Loaded ${data.username}`)
   }
 
@@ -228,7 +235,6 @@ const handleMayaFiles = async (files: FileList | null) => {
 
     setSaving(true)
 
-    // USERNAME TAKEN CHECK - only if changing username
     if (normalizedUsername !== originalUsername) {
       const { data: existing } = await supabase
         .from('profiles')
@@ -244,14 +250,14 @@ const handleMayaFiles = async (files: FileList | null) => {
     }
 
     const fixed = { 
-  ...profile,
-    username: normalizedUsername,
-    gcash_qr_url: gcashQR,
-    maya_qr_url: mayaQR,
-    gcash_name: gcashName,
-    gcash_number: gcashNumber,
-    maya_name: mayaName,
-    maya_number: mayaNumber,
+      ...profile,
+      username: normalizedUsername,
+      gcash_qr_url: gcashQR,
+      maya_qr_url: mayaQR,
+      gcash_name: gcashName,
+      gcash_number: gcashNumber,
+      maya_name: mayaName,
+      maya_number: mayaNumber,
     }
     const { error } = await supabase.from('profiles').upsert(fixed, { onConflict: 'username' })
     setSaving(false)
@@ -315,7 +321,7 @@ const handleMayaFiles = async (files: FileList | null) => {
   <div className="grid grid-cols-2 gap-4">
     <div className="space-y-2">
       <div onClick={()=>gcashInputRef.current?.click()} className="h-[160px] border border-dashed border-[#2A2A2A] bg-[#1E1E20] rounded-[16px] flex flex-col items-center justify-center cursor-pointer hover:border-zinc-600 transition">
-        {gcashQR ? <img src={gcashQR} className="w-[120px] h-[120px] bg-white rounded-[12px] object-contain p-2" /> : <p className="text-[12px] font-bold text-white">Drop 【entity-GCash¦canonical_name=GCash】 QR here</p>}
+        {gcashQR ? <img src={gcashQR} className="w-[120px] h-[120px] bg-white rounded-[12px] object-contain p-2" /> : <p className="text-[12px] font-bold text-white">Drop GCash QR here</p>}
       </div>
       <input ref={gcashInputRef} type="file" hidden accept="image/*" onChange={e=>handleGcashFiles(e.target.files)} />
       <input value={gcashName} onChange={e=>setGcashName(e.target.value)} placeholder="GCash Name" className="w-full h-[38px] px-3 rounded-[10px] bg-[#1E1E20] border border-[#2A2A2A] text-[13px] text-white outline-none" />
@@ -392,7 +398,7 @@ const handleMayaFiles = async (files: FileList | null) => {
               className={`w-full rounded-xl border-2 border-dashed p-6 cursor-pointer text-center transition-all ${dragOverGallery ? 'border-[#D4AF37] bg-[#D4AF37]/10' : 'border-zinc-700 bg-zinc-800/50 hover:border-zinc-600'}`}
             >
               <input ref={galleryInputRef} type="file" accept="image/*" multiple className="hidden" onChange={(e) => handleGalleryFiles(e.target.files)} />
-              <div className="text-2xl mb-1">🖼️</div>
+              <div className="text-2xl mb-1">🖼</div>
               <p className="text-xs text-white font-semibold">{galleryUploading ? 'Uploading...' : 'Drop images here'}</p>
               <p className="text-[11px] text-zinc-400">or click to browse</p>
             </div>
@@ -430,4 +436,4 @@ const handleMayaFiles = async (files: FileList | null) => {
       </div>
     </div>
   )
-}
+} 
