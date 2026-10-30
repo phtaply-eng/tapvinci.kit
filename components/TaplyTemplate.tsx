@@ -70,8 +70,8 @@ export default function TaplyTemplate({ profile }: { profile: any }) {
   // PAYMENT DATA - FIXED: No window in render, uses isDashboard state
   const gcashQR = (profile as any).gcash_qr_url || (profile as any).gcash_qr || (profile as any).payment?.['gcash']?.qrImage || (isDashboard ? null : "/gallery/gcash-qr.jpg")
   const mayaQR = (profile as any).maya_qr_url || (profile as any).maya_qr || (profile as any).payment?.['maya']?.qrImage || (isDashboard ? null : "/gallery/maya-qr.jpg")
-  const gcashName = (profile as any).gcash_name || (profile as any).payment?.['gcash']?.name || (profile as any).name || 'Shua Vallinas'
-  const mayaName = (profile as any).maya_name || (profile as any).payment?.['maya']?.name || (profile as any).name || 'Shua Vallinas'
+  const gcashName = (profile as any).gcash_name || (profile as any).payment?.['gcash']?.name || (profile as any).name || ''
+  const mayaName = (profile as any).maya_name || (profile as any).payment?.['maya']?.name || (profile as any).name || ''
   const gcashNumber = (profile as any).gcash_number || (profile as any).payment?.['gcash']?.number || (profile as any).phone || ''
   const mayaNumber = (profile as any).maya_number || (profile as any).payment?.['maya']?.number || (profile as any).phone || ''
 
@@ -449,7 +449,7 @@ END:VCARD`
                       <img src={gcashQR} alt="GCash QR" className="payment-qr-img" />
                     </div>
                     <div className="payment-info" style={{textAlign:'center'}}>
-                      <p className="payment-name" style={{fontSize:'16px', fontWeight:'700', color:'white', textAlign:'center', margin:'0'}}>{gcashName}</p>
+                      <p className="payment-name" style={{fontSize:'16px', fontWeight:'700', color:'white', textAlign:'center', margin:'0'}}></p>
                       <p className="payment-label">GCASH QR CODE • SCAN TO PAY</p>
                     </div>
                   </div>
@@ -474,7 +474,7 @@ END:VCARD`
                       <img src={mayaQR} alt="Maya QR" className="payment-qr-img" />
                     </div>
                     <div className="payment-info" style={{textAlign:'center'}}>
-                      <p className="payment-name" style={{fontSize:'16px', fontWeight:'700', color:'white', textAlign:'center', margin:'0'}}>{mayaName}</p>
+                      <p className="payment-name" style={{fontSize:'16px', fontWeight:'700', color:'white', textAlign:'center', margin:'0'}}></p>
                       <p className="payment-label">MAYA QR CODE • SCAN TO PAY</p>
                     </div>
                   </div>
