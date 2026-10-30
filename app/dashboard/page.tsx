@@ -589,10 +589,6 @@ const { data } = await supabase.from('profiles').select('*').eq('username', DEFA
           </div>
 
           <button onClick={save} disabled={saving || heroUploading || galleryUploading || gcashUploading || mayaUploading} className="w-full py-3 rounded-xl font-bold hover:brightness-110 disabled:opacity-50" style={{background: profile.accent_color, color: 'black'}}>{saving ? 'Saving...' : 'Save Profile'}</button>
-
-          <div className="text-center pt-1">
-            <Link href="/admin" className="text-[11px] text-gray-500 hover:text-[#D4AF37]">Admin Panel</Link>
-          </div>
         </div>
 
         <div className="lg:sticky lg:top-4">
