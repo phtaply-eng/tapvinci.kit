@@ -34,6 +34,7 @@ type Row = {
   created_at?: string | null
   gcash_qr_url?: string | null
   maya_qr_url?: string | null
+  is_active?: boolean | null
   [key: string]: any
 }
 
@@ -46,6 +47,52 @@ const COLUMNS: { key: SortKey; label: string }[] = [
   { key: 'email', label: 'Email' },
   { key: 'theme', label: 'Theme' },
 ]
+
+const PROFILE_BUCKET = 'profile-images'
+
+type EditForm = { name: string; title: string; bio: string; about: string; phone: string; email: string; facebook: string; instagram: string; website: string }
+const EMPTY_EDIT: EditForm = { name: '', title: '', bio: '', about: '', phone: '', email: '', facebook: '', instagram: '', website: '' }
+const EDIT_FIELDS: { key: keyof EditForm; label: string; rows?: number }[] = [
+  { key: 'name', label: 'Name' },
+  { key: 'title', label: 'Title' },
+  { key: 'bio', label: 'Bio', rows: 3 },
+  { key: 'about', label: 'About Me', rows: 4 },
+  { key: 'phone', label: 'Phone' },
+  { key: 'email', label: 'Email' },
+  { key: 'facebook', label: 'Facebook Link' },
+  { key: 'instagram', label: 'Instagram Link' },
+  { key: 'website', label: 'Website' },
+]
+
+// socials may be plain strings ("https://...") or objects ({ url, visible }) - handle both
+function socialUrl(v: unknown): string {
+  if (typeof v === 'string') return v
+  if (v && typeof v === 'object' && typeof (v as { url?: unknown }).url === 'string') return (v as { url: string }).url
+  return ''
+}
+function withSocial(socials: Record<string, unknown>, key: string, url: string): unknown {
+  const cur = socials[key]
+  return cur && typeof cur === 'object' ? { ...(cur as object), url } : url
+}
+
+// "https://x.supabase.co/storage/v1/object/public/<bucket>/<path>?v=1" -> { bucket, path }
+function parseStorageUrl(u: unknown): { bucket: string; path: string } | null {
+  if (typeof u !== 'string') return null
+  const m = /\/storage\/v1\/object\/public\/([^/]+)\/([^?]+)/.exec(u)
+  if (!m) return null
+  try { return { bucket: m[1], path: decodeURIComponent(m[2]) } } catch { return null }
+}
+
+// every file under a folder, including sub-folders (Supabase list() is one level only)
+async function listAllFiles(bucket: string, prefix: string, depth = 0): Promise<string[]> {
+  const { data } = await supabase.storage.from(bucket).list(prefix, { limit: 1000 })
+  const out: string[] = []
+  for (const item of data || []) {
+    if (item.id === null && depth < 4) out.push(...(await listAllFiles(bucket, `${prefix}/${item.name}`, depth + 1)))
+    else if (item.id !== null) out.push(`${prefix}/${item.name}`)
+  }
+  return out
+}
 
 function displayName(p: Row) {
   return (p.name || p.business || '').toString()
@@ -91,6 +138,14 @@ export default function AdminPage() {
   const [showQRModal, setShowQRModal] = useState(false)
   const [selectedProfile, setSelectedProfile] = useState<Row | null>(null)
   const [qrUrl, setQrUrl] = useState('')
+
+  // Edit / Delete
+  const [editingProfile, setEditingProfile] = useState<Row | null>(null)
+  const [editForm, setEditForm] = useState<EditForm>(EMPTY_EDIT)
+  const [savingEdit, setSavingEdit] = useState(false)
+  const [deleteConfirm, setDeleteConfirm] = useState<Row | null>(null)
+  const [deleteText, setDeleteText] = useState('')
+  const [busyAction, setBusyAction] = useState(false)
 
   // restore a previous login for this browser tab
   useEffect(() => {
@@ -229,6 +284,114 @@ export default function AdminPage() {
     }
   }
 
+  // ---------- Edit ----------
+  function handleEdit(profile: Row) {
+    const soc = (profile.socials && typeof profile.socials === 'object' ? profile.socials : {}) as Record<string, unknown>
+    setEditForm({
+      name: displayName(profile),
+      title: profile.title || '',
+      bio: profile.bio || '',
+      about: profile.about || '',
+      phone: profile.phone || '',
+      email: profile.email || '',
+      facebook: socialUrl(soc.facebook),
+      instagram: socialUrl(soc.instagram),
+      website: socialUrl(soc.website),
+    })
+    setEditingProfile(profile)
+  }
+
+  async function handleSaveEdit() {
+    if (!editingProfile) return
+    setSavingEdit(true)
+    const f = editForm
+    const base = (editingProfile.socials && typeof editingProfile.socials === 'object' ? editingProfile.socials : {}) as Record<string, unknown>
+    const socials = {
+      ...base,
+      facebook: withSocial(base, 'facebook', f.facebook.trim()),
+      instagram: withSocial(base, 'instagram', f.instagram.trim()),
+      website: withSocial(base, 'website', f.website.trim()),
+    }
+    // premium-schema tables call the name column "business"
+    const nameKey = 'business' in editingProfile && !('name' in editingProfile) ? 'business' : 'name'
+    const { data, error } = await supabase
+      .from('profiles')
+      .update({ [nameKey]: f.name.trim(), title: f.title.trim(), bio: f.bio, about: f.about, phone: f.phone.trim(), email: f.email.trim(), socials })
+      .eq('username', editingProfile.username)
+      .select()
+    setSavingEdit(false)
+    if (error) return showToast('Save failed: ' + error.message)
+    if (!data || data.length === 0) return showToast('Nothing was updated - check the Supabase update policy')
+    showToast('Updated!')
+    setEditingProfile(null)
+    fetchProfiles()
+  }
+
+  // ---------- Delete / Deactivate ----------
+  function handleDeleteConfirm(profile: Row) {
+    setDeleteText('')
+    setDeleteConfirm(profile)
+  }
+
+  async function handleDelete(profile: Row) {
+    setBusyAction(true)
+    const username = profile.username
+    // 1) work out which stored files belong to this client
+    const targets: Record<string, Set<string>> = {}
+    const add = (bucket: string, path: string) => { (targets[bucket] ||= new Set()).add(path) }
+    const urls: unknown[] = [profile.hero_image, profile.heroImage, profile.avatar_url, profile.avatar, profile.gcash_qr_url, profile.maya_qr_url]
+    if (Array.isArray(profile.gallery)) profile.gallery.forEach((g: unknown) => urls.push(typeof g === 'string' ? g : (g as { src?: string })?.src))
+    for (const u of urls) {
+      const p = parseStorageUrl(u)
+      // profile-images is organised per client: never touch another client's folder
+      if (p && (p.bucket !== PROFILE_BUCKET || p.path.startsWith(`${username}/`))) add(p.bucket, p.path)
+    }
+    try { (await listAllFiles(PROFILE_BUCKET, username)).forEach((p) => add(PROFILE_BUCKET, p)) } catch {}
+
+    // 2) delete the row first, so a failure never leaves a live profile without its photos
+    const { data, error } = await supabase.from('profiles').delete().eq('username', username).select()
+    if (error) { setBusyAction(false); return showToast('Delete failed: ' + error.message) }
+    if (!data || data.length === 0) { setBusyAction(false); return showToast('Nothing was deleted - check the Supabase delete policy') }
+
+    // 3) remove the files (best effort)
+    let removed = 0
+    for (const [bucket, paths] of Object.entries(targets)) {
+      const { data: rm } = await supabase.storage.from(bucket).remove(Array.from(paths))
+      removed += rm?.length || 0
+    }
+    setBusyAction(false)
+    setDeleteConfirm(null)
+    showToast(`Deleted ${username}${removed ? ` and ${removed} file${removed > 1 ? 's' : ''}` : ''}`)
+    fetchProfiles()
+  }
+
+  async function handleSetActive(profile: Row, active: boolean) {
+    setBusyAction(true)
+    const { data, error } = await supabase
+      .from('profiles')
+      .update({ is_active: active, deactivated_at: active ? null : new Date().toISOString() })
+      .eq('username', profile.username)
+      .select()
+    setBusyAction(false)
+    if (error) return showToast(/is_active|deactivated_at/.test(error.message) ? 'Run supabase-admin.sql in Supabase first' : 'Failed: ' + error.message)
+    if (!data || data.length === 0) return showToast('Nothing was updated - check the Supabase update policy')
+    setDeleteConfirm(null)
+    showToast(active ? 'Reactivated - profile is live again' : 'Deactivated - profile hidden, data kept')
+    fetchProfiles()
+  }
+
+  // Esc closes the edit / delete modals
+  useEffect(() => {
+    if (!editingProfile && !deleteConfirm) return
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key !== 'Escape') return
+      setEditingProfile(null)
+      setDeleteConfirm(null)
+    }
+    window.addEventListener('keydown', onKey)
+    return () => window.removeEventListener('keydown', onKey)
+  }, [editingProfile, deleteConfirm])
+
   const exportCsv = () => {
     const header = ['username', 'name', 'phone', 'email', 'theme', 'created_at', 'link']
     const lines = filtered.map((p) =>
@@ -352,7 +515,7 @@ export default function AdminPage() {
                 ) : (
                   filtered.map((profile) => (
                     <tr key={profile.username}>
-                      <td className="font-bold text-[#D4AF37]">{profile.username}</td>
+                      <td className="font-bold text-[#D4AF37]">{profile.username}{profile.is_active === false && <span className="ml-2 text-[9px] font-semibold bg-[#f59e0b]/20 text-[#f59e0b] px-1.5 py-0.5 rounded align-middle">INACTIVE</span>}</td>
                       <td>{displayName(profile) || '-'}</td>
                       <td className="text-gray-400">{profile.phone || '-'}</td>
                       <td className="text-gray-400">{profile.email || '-'}</td>
@@ -364,9 +527,11 @@ export default function AdminPage() {
                       </td>
                       <td className="text-gray-500 whitespace-nowrap">{formatDate(profile.created_at)}</td>
                       <td>
-                        <div className="flex gap-2">
+                        <div className="flex gap-2 flex-wrap">
                           <button onClick={() => copyLink(profile.username)} className="text-[11px] bg-[#2A2A2A] hover:bg-[#333] px-2.5 py-1.5 rounded whitespace-nowrap">Copy Link</button>
                           <button onClick={() => window.open(`/${profile.username}`, '_blank', 'noopener')} className="text-[11px] bg-[#E8C766] hover:bg-[#D4AF37] text-black font-semibold px-2.5 py-1.5 rounded">Open</button>
+                          <button onClick={() => handleEdit(profile)} title="Edit client" className="text-[11px] bg-[#1E1E20] border border-[#2563eb]/50 text-[#60a5fa] hover:bg-[#2563eb]/20 font-semibold px-2.5 py-1.5 rounded transition">Edit</button>
+                          <button onClick={() => handleDeleteConfirm(profile)} title="Delete or deactivate client" className="text-[11px] bg-[#1E1E20] border border-[#ef4444]/50 text-[#f87171] hover:bg-[#ef4444]/20 font-semibold px-2.5 py-1.5 rounded transition">Delete</button>
                           <button onClick={() => handleGenerateQR(profile)} title="Generate QR" className="text-[11px] bg-[#121214] border border-[#D4AF37]/50 text-[#D4AF37] hover:bg-[#D4AF37] hover:text-black font-semibold px-2.5 py-1.5 rounded transition">
                             <i className="fa-solid fa-qrcode mr-1"></i>QR
                           </button>
@@ -380,6 +545,87 @@ export default function AdminPage() {
           </div>
         </div>
       </div>
+
+      {/* ===== ADMIN EDIT MODAL ===== */}
+      {editingProfile && (
+        <div className="admin-edit-modal" onClick={() => setEditingProfile(null)} role="dialog" aria-modal="true" aria-label={`Edit ${editingProfile.username}`}>
+          <div className="admin-edit-card" onClick={(e) => e.stopPropagation()}>
+            <div className="flex justify-between items-center mb-4">
+              <h3 className="text-white font-bold">Edit {editingProfile.username}</h3>
+              <button onClick={() => setEditingProfile(null)} aria-label="Close" className="w-8 h-8 bg-[#1E1E20] rounded-full flex items-center justify-center text-gray-400 hover:text-white">✕</button>
+            </div>
+            <div className="space-y-3">
+              {EDIT_FIELDS.map((fld) => (
+                <label key={fld.key} className="block text-[10px] uppercase tracking-widest text-gray-500">
+                  {fld.label}
+                  {fld.rows ? (
+                    <textarea
+                      rows={fld.rows}
+                      value={editForm[fld.key]}
+                      onChange={(e) => setEditForm((p) => ({ ...p, [fld.key]: e.target.value }))}
+                      className="w-full mt-1 bg-[#1E1E20] border border-[#2A2A2A] focus:border-[#D4AF37] outline-none rounded-[10px] p-3 text-[13px] normal-case tracking-normal text-white"
+                    />
+                  ) : (
+                    <input
+                      value={editForm[fld.key]}
+                      onChange={(e) => setEditForm((p) => ({ ...p, [fld.key]: e.target.value }))}
+                      className="w-full mt-1 h-10 bg-[#1E1E20] border border-[#2A2A2A] focus:border-[#D4AF37] outline-none rounded-[10px] px-3 text-[13px] normal-case tracking-normal text-white"
+                    />
+                  )}
+                </label>
+              ))}
+            </div>
+            <div className="grid grid-cols-2 gap-3 mt-6">
+              <button onClick={() => setEditingProfile(null)} className="h-[44px] bg-[#1E1E20] border border-[#2A2A2A] rounded-[12px] text-white text-sm">Cancel</button>
+              <button onClick={handleSaveEdit} disabled={savingEdit} className="h-[44px] bg-[#E8C766] hover:bg-[#D4AF37] text-black rounded-[12px] font-bold text-sm disabled:opacity-50">{savingEdit ? 'Saving...' : 'Save Changes'}</button>
+            </div>
+            <p className="text-[10px] text-gray-500 mt-3 text-center">Need photos, gallery, theme or payment QR? <a href={`/dashboard?edit=${encodeURIComponent(editingProfile.username)}`} className="text-[#D4AF37] underline">Open full dashboard editor →</a></p>
+          </div>
+        </div>
+      )}
+
+      {/* ===== ADMIN DELETE / DEACTIVATE MODAL ===== */}
+      {deleteConfirm && (
+        <div className="admin-delete-modal" onClick={() => !busyAction && setDeleteConfirm(null)} role="dialog" aria-modal="true" aria-label={`Delete ${deleteConfirm.username}`}>
+          <div className="admin-delete-card" onClick={(e) => e.stopPropagation()}>
+            <div className="w-12 h-12 bg-[#ef4444]/20 rounded-full flex items-center justify-center mx-auto mb-4 text-[#ef4444] font-bold">!</div>
+            <h3 className="text-white font-bold text-[16px]">Delete {deleteConfirm.username}?</h3>
+            <p className="text-gray-400 text-[12px] mt-2">Their live link /{deleteConfirm.username} will stop working and their uploaded photos will be removed. This cannot be undone.</p>
+            <div className="bg-[#1E1E20] rounded-[12px] p-3 mt-4 text-left text-[11px]">
+              <p className="text-white">{displayName(deleteConfirm) || deleteConfirm.username}</p>
+              <p className="text-gray-400">{deleteConfirm.email || '-'} • {deleteConfirm.phone || '-'}</p>
+              <p className="text-gray-500 text-[10px] mt-1">Created: {formatDate(deleteConfirm.created_at)}</p>
+            </div>
+            <label className="block text-left text-[10px] uppercase tracking-widest text-gray-500 mt-4">
+              Type <span className="text-white font-bold normal-case tracking-normal">{deleteConfirm.username}</span> to confirm
+              <input
+                value={deleteText}
+                onChange={(e) => setDeleteText(e.target.value)}
+                autoComplete="off"
+                className="w-full mt-1 h-10 bg-[#1E1E20] border border-[#2A2A2A] focus:border-[#ef4444] outline-none rounded-[10px] px-3 text-[13px] normal-case tracking-normal text-white"
+              />
+            </label>
+            <div className="grid grid-cols-2 gap-3 mt-5">
+              <button onClick={() => setDeleteConfirm(null)} disabled={busyAction} className="h-[44px] bg-[#1E1E20] border border-[#2A2A2A] rounded-[12px] text-white text-sm">Cancel</button>
+              <button
+                onClick={() => handleDelete(deleteConfirm)}
+                disabled={busyAction || deleteText.trim().toLowerCase() !== deleteConfirm.username.toLowerCase()}
+                className="h-[44px] bg-[#ef4444] hover:bg-[#dc2626] text-white rounded-[12px] font-bold text-sm disabled:opacity-40 disabled:cursor-not-allowed"
+              >
+                {busyAction ? 'Working...' : 'Delete Permanently'}
+              </button>
+            </div>
+            <div className="mt-4 pt-4 border-t border-[#1E1E20]">
+              <p className="text-[10px] text-gray-500">{deleteConfirm.is_active === false ? 'This profile is currently deactivated.' : 'Alternative: hide the profile but keep all data.'}</p>
+              {deleteConfirm.is_active === false ? (
+                <button onClick={() => handleSetActive(deleteConfirm, true)} disabled={busyAction} className="mt-2 text-[11px] text-[#22c55e] underline">Reactivate (make live again) →</button>
+              ) : (
+                <button onClick={() => handleSetActive(deleteConfirm, false)} disabled={busyAction} className="mt-2 text-[11px] text-[#f59e0b] underline">Deactivate (hide but keep data) →</button>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* ===== ADMIN QR GENERATOR MODAL ===== */}
       {showQRModal && selectedProfile && (

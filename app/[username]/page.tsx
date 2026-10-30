@@ -9,7 +9,10 @@ export const revalidate = 0
 
 async function getProfile(username: string): Promise<Profile | null> {
   const { data } = await supabase.from('profiles').select('*').eq('username', username.toLowerCase()).maybeSingle()
-  return (data as Profile | null) ?? null
+  if (!data) return null
+  // Deactivated from the Admin panel: behave like the profile does not exist
+  if ((data as { is_active?: boolean | null }).is_active === false) return null
+  return data as Profile
 }
 
 export async function generateMetadata({ params }: { params: { username: string } }): Promise<Metadata> {

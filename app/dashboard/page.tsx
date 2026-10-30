@@ -167,7 +167,9 @@ export default function Dashboard() {
 
   useEffect(() => {
     const load = async () => {
-      const DEFAULT_USERNAME = process.env.NEXT_PUBLIC_DEFAULT_USERNAME || 'TapVinci'
+      // /dashboard?edit=username (used by the Admin panel) loads that client; usernames are stored lowercase
+      const editParam = (new URLSearchParams(window.location.search).get('edit') || '').trim().toLowerCase()
+      const DEFAULT_USERNAME = (editParam || process.env.NEXT_PUBLIC_DEFAULT_USERNAME || 'TapVinci').toLowerCase()
 const { data } = await supabase.from('profiles').select('*').eq('username', DEFAULT_USERNAME).single()
       if (data) {
         const mergedSocials = { ...DEFAULT_SOCIALS, ...(data.socials || {}) }
