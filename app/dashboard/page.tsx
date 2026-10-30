@@ -46,7 +46,8 @@ const THEMES = [
 ]
 
 export default function Dashboard() {
-  const [profile, setProfile] = useState<any>({
+  const [profile, setProfile] = useState<any>({ 
+    
     username: 'TapVinci',
     name: 'TapVinci',
     title: 'A NEW WAY TO CONNECT • PHILIPPINES 2026',
@@ -68,6 +69,16 @@ export default function Dashboard() {
     socials: { ...DEFAULT_SOCIALS },
     socials_visible: { ...DEFAULT_VISIBLE },
   })
+  
+   // INSERT MY 8 LINES HERE - AFTER your bio/about, BEFORE other logic
+  const [gcashQR, setGcashQR] = useState('')
+  const [mayaQR, setMayaQR] = useState('')
+  const [gcashName, setGcashName] = useState('')
+  const [gcashNumber, setGcashNumber] = useState('')
+  const [mayaName, setMayaName] = useState('')
+  const [mayaNumber, setMayaNumber] = useState('')
+  const gcashInputRef = useRef<HTMLInputElement>(null)
+  const mayaInputRef = useRef<HTMLInputElement>(null)
   const [originalUsername, setOriginalUsername] = useState<string>('')
   const [saving, setSaving] = useState(false)
   const [heroUploading, setHeroUploading] = useState(false)
@@ -122,6 +133,35 @@ export default function Dashboard() {
     if (url) setProfile((p:any) => ({ ...p, avatar_url: url }))
   }
 
+  // ===== PAYMENT QR HANDLERS - SAME PATTERN AS YOUR HERO =====
+const handleGcashFiles = async (files: FileList | null) => {
+  if (!files || files.length === 0) return
+  const file = files[0]
+  if (!file.type.startsWith('image/')) return
+  setHeroUploading(true)
+  const preview = URL.createObjectURL(file)
+  setGcashQR(preview)
+  const url = await uploadToSupabase(file, 'qr-codes')
+  setHeroUploading(false)
+  if (url) {
+    setGcashQR(url)
+    setProfile((p:any) => ({ ...p, gcash_qr_url: url }))
+  }
+}
+const handleMayaFiles = async (files: FileList | null) => {
+  if (!files || files.length === 0) return
+  const file = files[0]
+  if (!file.type.startsWith('image/')) return
+  setHeroUploading(true)
+  const preview = URL.createObjectURL(file)
+  setMayaQR(preview)
+  const url = await uploadToSupabase(file, 'qr-codes')
+  setHeroUploading(false)
+  if (url) {
+    setMayaQR(url)
+    setProfile((p:any) => ({ ...p, maya_qr_url: url }))
+  }
+}
   // Separate handler if you want to change the logo/hero banner
   const handleLogoFiles = async (files: FileList | null) => {
     if (!files || files.length === 0) return
@@ -203,7 +243,16 @@ export default function Dashboard() {
       }
     }
 
-    const fixed = { ...profile, username: normalizedUsername }
+    const fixed = { 
+  ...profile,
+    username: normalizedUsername,
+    gcash_qr_url: gcashQR,
+    maya_qr_url: mayaQR,
+    gcash_name: gcashName,
+    gcash_number: gcashNumber,
+    maya_name: mayaName,
+    maya_number: mayaNumber,
+    }
     const { error } = await supabase.from('profiles').upsert(fixed, { onConflict: 'username' })
     setSaving(false)
     if (error) alert(error.message)
@@ -258,7 +307,30 @@ export default function Dashboard() {
             </div>
             <p className="text-[10px] text-zinc-500"> {profile.hero_image} (Upload your profile)</p>
           </div>
-
+        {/* ===== PAYMENT QR CODES ===== */}
+          <div className="mt-6 pt-6 border-t border-zinc-800">
+  <p className="text-[10px] uppercase tracking-[1px] text-[#9CA3AF] font-bold flex gap-2 mb-4">
+    PAYMENT QR CODES
+  </p>
+  <div className="grid grid-cols-2 gap-4">
+    <div className="space-y-2">
+      <div onClick={()=>gcashInputRef.current?.click()} className="h-[160px] border border-dashed border-[#2A2A2A] bg-[#1E1E20] rounded-[16px] flex flex-col items-center justify-center cursor-pointer hover:border-zinc-600 transition">
+        {gcashQR ? <img src={gcashQR} className="w-[120px] h-[120px] bg-white rounded-[12px] object-contain p-2" /> : <p className="text-[12px] font-bold text-white">Drop 【entity-GCash¦canonical_name=GCash】 QR here</p>}
+      </div>
+      <input ref={gcashInputRef} type="file" hidden accept="image/*" onChange={e=>handleGcashFiles(e.target.files)} />
+      <input value={gcashName} onChange={e=>setGcashName(e.target.value)} placeholder="GCash Name" className="w-full h-[38px] px-3 rounded-[10px] bg-[#1E1E20] border border-[#2A2A2A] text-[13px] text-white outline-none" />
+      <input value={gcashNumber} onChange={e=>setGcashNumber(e.target.value)} placeholder="GCash Number" className="w-full h-[38px] px-3 rounded-[10px] bg-[#1E1E20] border border-[#2A2A2A] text-[13px] text-white outline-none" />
+    </div>
+    <div className="space-y-2">
+      <div onClick={()=>mayaInputRef.current?.click()} className="h-[160px] border border-dashed border-[#2A2A2A] bg-[#1E1E20] rounded-[16px] flex flex-col items-center justify-center cursor-pointer hover:border-zinc-600 transition">
+        {mayaQR ? <img src={mayaQR} className="w-[120px] h-[120px] bg-white rounded-[12px] object-contain p-2" /> : <p className="text-[12px] font-bold text-white">Drop Maya QR here</p>}
+      </div>
+      <input ref={mayaInputRef} type="file" hidden accept="image/*" onChange={e=>handleMayaFiles(e.target.files)} />
+      <input value={mayaName} onChange={e=>setMayaName(e.target.value)} placeholder="Maya Name" className="w-full h-[38px] px-3 rounded-[10px] bg-[#1E1E20] border border-[#2A2A2A] text-[13px] text-white outline-none" />
+      <input value={mayaNumber} onChange={e=>setMayaNumber(e.target.value)} placeholder="Maya Number" className="w-full h-[38px] px-3 rounded-[10px] bg-[#1E1E20] border border-[#2A2A2A] text-[13px] text-white outline-none" />
+    </div>
+  </div>
+</div>
           <label className="block text-[11px] tracking-widest text-zinc-400 uppercase">Title<input value={profile.title} onChange={e => setProfile({...profile, title: e.target.value})} className={inputCls} /></label>
           <label className="block text-[11px] tracking-widest text-zinc-400 uppercase">Bio<textarea value={profile.bio} onChange={e => setProfile({...profile, bio: e.target.value})} rows={2} className={inputCls} /></label>
           <label className="block text-[11px] tracking-widest text-zinc-400 uppercase">About<textarea value={profile.about} onChange={e => setProfile({...profile, about: e.target.value})} rows={3} className={inputCls} /></label>
