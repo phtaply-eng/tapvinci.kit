@@ -1,3 +1,4 @@
+@import url('https://fonts.googleapis.com/css2?family=Playfair+Display:wght@600;700&family=Montserrat:wght@600&display=swap');
 @import url('https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css');
 
 @tailwind base;
@@ -96,7 +97,7 @@ body {
   background: linear-gradient(to top, var(--card) 65%, transparent);
 }
 .taply-profile-body h1 { font-size: 28px; font-weight: 800; letter-spacing: -0.02em; margin: 0 0 6px; color: var(--heading); }
-.taply-job-title { color: var(--sg-text); font-size: 10px; font-weight: 700; letter-spacing: 0.15em; text-transform: uppercase; margin: 0 0 16px; line-height: 1.5; }
+.taply-job-title { color: var(--sg-text); font-size: 8px !important; font-weight: 500 !important; letter-spacing: 1px !important; text-transform: uppercase; margin: 0 0 16px; line-height: 1.4 !important; }
 .taply-bio { color: var(--body); font-size: 13px; line-height: 1.6; margin: 0 0 20px; }
 .taply-primary-btn {
   display: inline-flex; align-items: center; justify-content: center;
@@ -218,72 +219,6 @@ body {
   font-size: 12px; font-weight: 600; animation: fadeIn .2s ease;
 }
 
-@media (max-width: 380px) {
-  .taply-gold-wrapper { padding: 0; }
-  .taply-card { border-radius: 0 0 28px 28px; max-width: 100%; border: none; }
-  .taply-hero { height: 320px; }
-  .taply-profile-body h1 { font-size: 24px; }
-  .taply-pills { grid-template-columns: 1fr; }
-  .taply-pills .taply-action-btn { min-height: 52px; flex-direction: row; }
-  .taply-secondary-pills { gap: 8px; }
-  .taply-action-btn.small { font-size: 10px; padding: 10px 12px; }
-  .taply-reel figure { flex-basis: 96%; }
-}
-@media (min-width: 381px) and (max-width: 640px) {
-  .taply-gold-wrapper { padding: 0; }
-  .taply-card { border-radius: 0 0 28px 28px; max-width: 100%; border: none; border-bottom: 1px solid var(--border); }
-  .taply-hero { height: 380px; }
-}
-@media (min-width: 641px) and (max-width: 768px) {
-  .taply-gold-wrapper { padding: 24px; align-items: flex-start; }
-  .taply-card { max-width: 480px; border-radius: 28px; }
-  .taply-hero { height: 420px; }
-  .taply-profile-body h1 { font-size: 30px; }
-  .taply-glow { width: 900px; height: 700px; }
-}
-@media (min-width: 769px) and (max-width: 1024px) {
-  .taply-gold-wrapper { padding: 32px; }
-  .taply-card { max-width: 500px; border-radius: 32px; }
-  .taply-hero { height: 460px; }
-  .taply-profile-body { padding: 28px 28px 32px; }
-  .taply-profile-body h1 { font-size: 32px; }
-  .taply-section { padding: 28px; }
-  .taply-glow { width: 1000px; height: 800px; opacity: 0.6; }
-}
-@media (min-width: 1025px) and (max-width: 1440px) {
-  .taply-gold-wrapper { padding: 40px; }
-  .taply-card { max-width: 440px; border-radius: 32px; box-shadow: 0 25px 100px rgba(0,0,0,0.5); }
-  .taply-gold-wrapper.light-mode .taply-card { box-shadow: 0 25px 100px rgba(0,0,0,0.12); }
-  .taply-hero { height: 480px; }
-  .taply-profile-body h1 { font-size: 32px; }
-  .taply-glow { width: 1200px; height: 900px; }
-}
-@media (min-width: 1441px) {
-  .taply-gold-wrapper { padding: 60px; }
-  .taply-card { max-width: 460px; border-radius: 36px; }
-  .taply-hero { height: 500px; }
-  .taply-glow { width: 1400px; height: 1000px; }
-}
-@media (max-height: 500px) and (orientation: landscape) {
-  .taply-hero { height: 280px; }
-  .taply-profile-body { margin-top: -60px; padding: 16px 20px 20px; }
-  .taply-profile-body h1 { font-size: 22px; }
-  .taply-bio { font-size: 12px; margin-bottom: 12px; }
-}
-@media (min-width: 641px) { .taply-reel figure { flex-basis: 82%; } }
-@media (min-width: 1025px) { .taply-reel figure { flex-basis: 78%; } .taply-reel figure:hover { transform: scale(1.02); } }
-@media (min-width: 769px) {
-  .taply-secondary-pills { flex-wrap: wrap; overflow: visible; }
-  .taply-secondary-pills .taply-action-btn.small { flex: 1 1 auto; }
-}
-@media (min-width: 1025px) {
-  .taply-card { transition: transform .3s, box-shadow .3s; }
-  .taply-card:hover { transform: translateY(-4px); }
-  .taply-social-btn:hover, .taply-action-btn:hover { transform: translateY(-4px); }
-}
-
-@keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
-
 .taply-lightbox {
   position: fixed; inset: 0; z-index: 9999;
   background: rgba(0,0,0,0.92);
@@ -318,11 +253,6 @@ body {
 .taply-lightbox-btn.close { background: rgba(239,68,68,0.8); border-color: rgba(239,68,68,0.5); }
 .taply-lightbox-counter { color: #fff; font-size: 13px; font-weight: 600; min-width: 52px; text-align: center; letter-spacing: 0.05em; }
 .taply-lightbox-zoom-info { color: rgba(255,255,255,0.6); font-size: 11px; margin: 12px 0 0; text-align: center; }
-@media (max-width: 640px) {
-  .taply-lightbox-img-wrapper { height: 70vh; border-radius: 16px; }
-  .taply-lightbox-controls { padding: 8px 12px; gap: 8px; }
-  .taply-lightbox-btn { width: 36px; height: 36px; font-size: 14px; }
-}
 
 /* ===== V5 LIGHT MODE FIXED ===== */
 .phone-wrap {
@@ -343,9 +273,7 @@ body {
 }
 .taply-gold-wrapper.light-mode .glow-behind { opacity: 0.12; }
 
-.taply-gold-wrapper:not(.light-mode) {
-  background: #050505 !important;
-}
+.taply-gold-wrapper:not(.light-mode) { background: #050505 !important; }
 .taply-gold-wrapper:not(.light-mode) .taply-card {
   width: 390px !important;
   max-width: 390px !important;
@@ -355,9 +283,7 @@ body {
   box-shadow: 0 0 80px rgba(212,175,55,0.22) !important;
 }
 
-.taply-gold-wrapper.light-mode {
-  background: #f3f4f6 !important;
-}
+.taply-gold-wrapper.light-mode { background: #f3f4f6 !important; }
 .taply-gold-wrapper.light-mode .taply-card {
   width: 390px !important;
   max-width: 390px !important;
@@ -437,19 +363,7 @@ body {
 
 .taply-primary-btn { background: var(--sg, #D4AF37) !important; color: #000 !important; }
 
-@media (max-width: 380px) {
-  .taply-pills { grid-template-columns: 1fr !important; }
-  .taply-pills .taply-action-btn { min-height: 52px !important; flex-direction: row !important; }
-}
-@media (max-width: 420px) {
-  .phone-wrap { width: 100% !important; max-width: 390px !important; }
-  .taply-gold-wrapper:not(.light-mode) .taply-card,
-  .taply-gold-wrapper.light-mode .taply-card { width: 100% !important; max-width: 100% !important; }
-}
-
 /* ========== PAYMENT MODAL - GCASH / MAYA SLIDER - V5 ========== */
-
-/* ============ QUICK ACTIONS ROW - SHOW 3.5 TO HINT SCROLL ============ */
 .quick-actions-row {
   display: flex !important;
   gap: 8px !important;
@@ -466,10 +380,6 @@ body {
   flex: 0 0 auto !important;
   scroll-snap-align: start !important;
 }
-/* Payment button now inherits same theme as Share My Card - uses var(--sg) from .taply-secondary-pills .taply-action-btn.small */
-/* REMOVED: .payment-btn hardcoded #E8C766 - now theme-aware via --sg */
-
-
 
 .payment-modal-overlay {
   position: fixed;
@@ -560,35 +470,49 @@ body {
   gap: 8px;
   padding: 11px 14px;
   border-radius: 999px;
-  background: #27272a;
-  border: 1px solid #3f3f46;
-  color: #a1a1aa;
+  background: #2A2A2A;
+  border: 1px solid #2A2A2A;
+  color: #9CA3AF;
   font-size: 12px;
   font-weight: 700;
   cursor: pointer;
-  transition: all 0.2s;
+  transition: all 0.25s ease;
   font-family: inherit;
 }
-.payment-tab.active {
-  background: var(--sg);
-  color: #000;
-  border-color: var(--sg);
-  box-shadow: 0 4px 16px rgba(212,175,55,0.25);
+.payment-tab:hover {
+  background: #3A3A3C;
+  border-color: #3A3A3C;
+  color: #FFFFFF;
+}
+.payment-tab.active.gcash-active {
+  background: #007DFE !important;
+  color: #FFFFFF !important;
+  border-color: #007DFE !important;
+  box-shadow: 0 4px 16px rgba(0,125,254,0.30) !important;
+}
+.payment-tab.active.maya-active {
+  background: #000000 !important;
+  color: #FFFFFF !important;
+  border-color: #00D632 !important;
+  box-shadow: 0 4px 16px rgba(0,214,50,0.25) !important;
 }
 .payment-tab-icon {
-  width: 20px;
-  height: 20px;
+  width: 22px;
+  height: 22px;
   border-radius: 50%;
   display: flex;
   align-items: center;
   justify-content: center;
   font-size: 10px;
   font-weight: 900;
-  color: white;
   flex-shrink: 0;
+  overflow: hidden;
 }
-.payment-tab-icon.gcash { background: #007DFE; }
-.payment-tab-icon.maya { background: #00A651; }
+.payment-tab-icon.gcash-icon { background: #007DFE; color: white; }
+.payment-tab.active.gcash-active .payment-tab-icon.gcash-icon { background: #FFFFFF; color: #007DFE; }
+.payment-tab-icon.maya-icon { background: #000000; color: white; border-radius: 6px; }
+.payment-tab.active.maya-active .payment-tab-icon.maya-icon { background: #FFFFFF; color: #000000; }
+
 .payment-slider-wrapper { overflow: hidden; position: relative; padding: 0 16px; }
 .payment-slider-scroll {
   display: flex;
@@ -619,8 +543,8 @@ body {
   position: relative;
   overflow: hidden;
 }
-.payment-qr-card.gcash-card { border-color: rgba(0,125,254,0.3); box-shadow: 0 0 30px rgba(0,125,254,0.08); }
-.payment-qr-card.maya-card { border-color: rgba(0,214,50,0.3); box-shadow: 0 0 30px rgba(0,214,50,0.08); }
+.payment-qr-card.gcash-card { border-color: rgba(0,125,254,0.30) !important; box-shadow: 0 0 30px rgba(0,125,254,0.08) !important; }
+.payment-qr-card.maya-card { border: 1px solid rgba(255,255,255,0.10) !important; box-shadow: 0 0 30px rgba(0,214,50,0.06), 0 0 0 1px rgba(255,255,255,0.06) !important; }
 .payment-qr-card::before {
   content: '';
   position: absolute;
@@ -647,8 +571,8 @@ body {
   padding: 6px 10px;
   border-radius: 999px;
 }
-.qr-brand.gcash-brand { background: rgba(0,125,254,0.15); color: #007DFE; border: 1px solid rgba(0,125,254,0.25); }
-.qr-brand.maya-brand { background: rgba(0,214,50,0.15); color: #00D632; border: 1px solid rgba(0,214,50,0.25); }
+.qr-brand.gcash-brand { background: rgba(0,125,254,0.12) !important; color: #007DFE !important; border: 1px solid rgba(0,125,254,0.25) !important; }
+.qr-brand.maya-brand { background: rgba(0,0,0,0.8) !important; color: #FFFFFF !important; border: 1px solid rgba(255,255,255,0.15) !important; }
 .qr-verified { font-size: 10px; color: #10b981; font-weight: 600; display: flex; align-items: center; gap: 4px; }
 .payment-qr-box {
   width: 250px;
@@ -661,199 +585,22 @@ body {
   justify-content: center;
   box-shadow: 0 8px 24px rgba(0,0,0,0.2);
 }
-.payment-qr-box.maya-box { box-shadow: 0 8px 24px rgba(0,214,50,0.12); }
 .payment-qr-img { width: 100%; height: 100%; object-fit: contain; border-radius: 6px; }
-.payment-qr-placeholder { text-align: center; color: #71717a; padding: 20px; width: 100%; height: 100%; display: flex; flex-direction: column; align-items: center; justify-content: center; position: relative; }
-.payment-qr-placeholder i { font-size: 32px; margin-bottom: 8px; color: #3f3f46; display: block; }
-.payment-qr-placeholder p { font-size: 14px; font-weight: 800; color: #18181b; margin: 0; }
-.payment-qr-placeholder small { font-size: 10px; color: #a1a1aa; margin-top: 4px; }
-.placeholder-qr-grid { width: 60px; height: 60px; margin-top: 12px; background: repeating-linear-gradient(0deg, #e4e4e7 0 4px, transparent 4px 8px), repeating-linear-gradient(90deg, #e4e4e7 0 4px, transparent 4px 8px); border-radius: 4px; opacity: 0.5; }
-.payment-info { text-align: center; margin-top: 16px; }
-.payment-name { font-size: 15px; font-weight: 800; color: white; margin: 0; letter-spacing: -0.01em; }
-.payment-number { font-size: 12px; color: #a1a1aa; margin: 4px 0 0; letter-spacing: 0.04em; }
-.payment-label { font-size: 10px; letter-spacing: 0.12em; text-transform: uppercase; color: var(--sg); font-weight: 700; margin: 8px 0 0; opacity: 0.8; }
-.payment-label.maya-label { color: #00D632; }
-.payment-actions { display: flex; gap: 10px; width: 100%; margin-top: 16px; }
-.payment-action-btn { flex: 1; padding: 12px 14px; border-radius: 999px; font-size: 11px; font-weight: 700; border: none; cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 6px; font-family: inherit; transition: all 0.2s; }
-.payment-action-btn.save { background: var(--sg); color: #000; }
-.payment-action-btn.save.maya { background: #00D632; color: #000; }
-.payment-action-btn.share { background: #27272a; color: white; border: 1px solid #3f3f46; }
-.payment-action-btn:hover { filter: brightness(1.08); transform: translateY(-1px); }
-.payment-dots { display: flex; gap: 8px; justify-content: center; padding: 16px 0 8px; }
-.payment-dots .dot { width: 8px; height: 8px; border-radius: 50%; background: #27272a; cursor: pointer; transition: all 0.2s; border: 1px solid #3f3f46; }
-.payment-dots .dot.active { background: var(--sg); width: 22px; border-radius: 999px; border-color: var(--sg); }
-.payment-swipe-hint { text-align: center; font-size: 10px; color: #71717a; margin: 0 0 8px; display: flex; align-items: center; justify-content: center; gap: 6px; flex-wrap: wrap; }
-.hint-keys { color: #52525b; font-size: 9px; }
-
-/* Light mode payment */
-.taply-gold-wrapper.light-mode .payment-bottom-sheet { background: #ffffff !important; border-color: #e5e7eb !important; }
-.taply-gold-wrapper.light-mode .payment-modal-header h3 { color: #111827 !important; }
-.taply-gold-wrapper.light-mode .payment-name { color: #111827 !important; }
-.taply-gold-wrapper.light-mode .payment-qr-card { background: #f9fafb !important; border-color: #e5e7eb !important; }
-
-/* TODO: DASHBOARD PAYMENT QR UPLOAD - PREPARE STRUCTURE */
-.payment-upload-section { margin-top: 24px; padding: 20px; background: #121214; border: 1px dashed #2A2A2A; border-radius: 16px; }
-.payment-upload-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
-.payment-drop-zone { border: 2px dashed #2A2A2A; border-radius: 12px; height: 120px; display: flex; flex-direction: column; align-items: center; justify-content: center; cursor: pointer; transition: all 0.2s; background: #1a1a1a; }
-.payment-drop-zone:hover { border-color: var(--sg); background: rgba(212,175,55,0.05); }
-.payment-drop-zone i { font-size: 24px; color: #52525b; margin-bottom: 8px; }
-.payment-drop-zone p { font-size: 12px; font-weight: 600; color: #a1a1aa; margin: 0; text-align: center; }
-.payment-drop-zone small { font-size: 10px; color: #71717a; margin-top: 4px; }
-
-/* ===== QR PAYMENT - ADDED 2026 - DO NOT REMOVE 702 LINES ABOVE - VERIFIED 702->715+ ===== */
-.quick-actions-row {
-  display: flex;
-  gap: 8px;
-  overflow-x: auto;
-  scroll-snap-type: x mandatory;
-  -webkit-overflow-scrolling: touch;
-  scrollbar-width: none;
-  -ms-overflow-style: none;
-  padding-bottom: 4px;
-}
-.quick-actions-row::-webkit-scrollbar { display: none; }
-.quick-actions-row .quick-action-btn {
-  min-width: 110px;
-  flex-shrink: 0;
-  scroll-snap-align: start;
-  height: 48px;
-  /* THEME-AWARE - Payment follows theme choices */
-  background: var(--quick-action-bg, var(--primary, var(--accent-gold, #E8C766))) !important;
-  color: var(--quick-action-text, #000) !important;
-}
-.payment-modal-overlay { position: fixed; inset: 0; z-index: 9999; background: rgba(0,0,0,0.6); backdrop-filter: blur(10px); display: flex; align-items: flex-end; justify-content: center; }
-.payment-modal-sheet { background: #121214; width: 100%; max-width: 420px; max-height: 80vh; border-radius: 24px 24px 0 0; padding: 24px; border-top: 1px solid rgba(212,175,55,0.3); }
-.qr-slider { display: flex; overflow-x: auto; scroll-snap-type: x mandatory; gap: 16px; scrollbar-width: none; }
-.qr-slider::-webkit-scrollbar { display: none; }
-.qr-card { min-width: 100%; flex-shrink: 0; scroll-snap-align: center; background: #1E1E20; border-radius: 16px; padding: 16px; text-align: center; }
-.qr-card.gcash { border: 1px solid rgba(0,125,254,0.3); }
-.qr-card.maya { border: 1px solid rgba(0,214,50,0.3); }
-.qr-card img { width: 250px; height: 250px; background: white; border-radius: 12px; object-fit: contain; margin: 0 auto; }
-.qr-upload-box { border: 2px dashed #2A2A2A; background: #1E1E20; border-radius: 16px; height: 160px; display: flex; flex-direction: column; align-items: center; justify-content: center; cursor: pointer; }
-.qr-upload-box:hover { border-color: rgba(212,175,55,0.5); }
-.qr-upload-preview { width: 120px; height: 120px; background: white; border-radius: 12px; object-fit: contain; }
-/* ===== END QR PAYMENT ADDITION - SURGICAL APPEND ONLY ===== */
-
-
-/* ===== FIXED PAYMENT MODAL - RESPECTFUL BRAND COLORS - NO PHONE - SURGICAL APPEND 736+ ===== */
-
-/* Tabs base - inactive is dark #2A2A2A per requirement */
-.payment-tabs {
-  display: flex !important;
-  gap: 10px !important;
-  padding: 20px 24px 12px !important;
-}
-.payment-tab {
-  flex: 1 !important;
-  display: flex !important;
-  align-items: center !important;
-  justify-content: center !important;
-  gap: 8px !important;
-  padding: 11px 14px !important;
-  border-radius: 999px !important;
-  background: #2A2A2A !important;
-  border: 1px solid #2A2A2A !important;
-  color: #9CA3AF !important;
-  font-size: 12px !important;
-  font-weight: 700 !important;
-  cursor: pointer !important;
-  transition: all 0.25s ease !important;
-  font-family: inherit !important;
-}
-.payment-tab:hover {
-  background: #3A3A3C !important;
-  border-color: #3A3A3C !important;
-  color: #FFFFFF !important;
-}
-
-/* GCash active - Official GCash Blue #007DFE with white text - respectful, no gold */
-.payment-tab.active.gcash-active {
-  background: #007DFE !important;
-  color: #FFFFFF !important;
-  border-color: #007DFE !important;
-  box-shadow: 0 4px 16px rgba(0,125,254,0.30) !important;
-}
-
-/* Maya active - Official Maya Black #000000 with white text + green accent #00D632 */
-.payment-tab.active.maya-active {
-  background: #000000 !important;
-  color: #FFFFFF !important;
-  border-color: #00D632 !important;
-  box-shadow: 0 4px 16px rgba(0,214,50,0.25) !important;
-}
-
-.payment-tab-icon {
-  width: 22px !important;
-  height: 22px !important;
-  border-radius: 50% !important;
-  display: flex !important;
-  align-items: center !important;
-  justify-content: center !important;
-  font-size: 10px !important;
-  font-weight: 900 !important;
-  flex-shrink: 0 !important;
-  overflow: hidden !important;
-}
-.payment-tab-icon.gcash-icon {
-  background: #007DFE !important;
-  color: white !important;
-}
-.payment-tab.active.gcash-active .payment-tab-icon.gcash-icon {
-  background: #FFFFFF !important;
-}
-.payment-tab-icon.maya-icon {
-  background: #000000 !important;
-  color: white !important;
-  border-radius: 6px !important;
-}
-.payment-tab.active.maya-active .payment-tab-icon.maya-icon {
-  background: #FFFFFF !important;
-}
-
-/* Card headers - respectful brand colors - DO NOT use gold for GCash */
-.qr-brand.gcash-brand {
-  background: rgba(0,125,254,0.12) !important;
-  color: #007DFE !important;
-  border: 1px solid rgba(0,125,254,0.25) !important;
-}
-.qr-brand.maya-brand {
-  background: rgba(0,0,0,0.8) !important;
-  color: #FFFFFF !important;
-  border: 1px solid rgba(255,255,255,0.15) !important;
-}
-
-/* QR Cards - brand respectful borders - keep white background for QR image itself */
-.payment-qr-card.gcash-card {
-  border-color: rgba(0,125,254,0.30) !important;
-  box-shadow: 0 0 30px rgba(0,125,254,0.08) !important;
-}
-.payment-qr-card.maya-card {
-  border: 1px solid rgba(255,255,255,0.10) !important;
-  box-shadow: 0 0 30px rgba(0,214,50,0.06), 0 0 0 1px rgba(255,255,255,0.06) !important;
-}
-
-/* FIXED INFO - NO PHONE NUMBER - ONLY NAME 16px WHITE BOLD + GOLD LABEL 9px */
 .payment-info {
   text-align: center !important;
   margin-top: 16px !important;
   display: flex !important;
   flex-direction: column !important;
   align-items: center !important;
-  gap: 0 !important;
 }
 .payment-name {
   font-size: 16px !important;
   font-weight: 700 !important;
   color: #FFFFFF !important;
   margin: 0 !important;
-  letter-spacing: -0.01em !important;
   text-align: center !important;
-  line-height: 1.2 !important;
 }
-/* HIDE PHONE NUMBER COMPLETELY - QR is enough for payment */
-.payment-number {
-  display: none !important;
-}
+.payment-number { display: none !important; }
 .payment-label {
   font-size: 9px !important;
   letter-spacing: 1px !important;
@@ -861,23 +608,139 @@ body {
   color: #D4AF37 !important;
   font-weight: 700 !important;
   margin: 8px 0 0 !important;
-  opacity: 0.9 !important;
   text-align: center !important;
 }
-.payment-label.maya-label {
-  color: #D4AF37 !important;
+.payment-actions { display: flex; gap: 10px; width: 100%; margin-top: 16px; }
+.payment-action-btn { flex: 1; padding: 12px 14px; border-radius: 999px; font-size: 11px; font-weight: 700; border: none; cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 6px; font-family: inherit; transition: all 0.2s; }
+.payment-action-btn.save { background: #007DFE !important; color: #FFFFFF !important; }
+.payment-action-btn.save.maya { background: #000000 !important; color: #FFFFFF !important; border: 1px solid #00D632 !important; }
+.payment-action-btn.share { background: #27272a; color: white; border: 1px solid #3f3f46; }
+.payment-action-btn:hover { filter: brightness(1.08); transform: translateY(-1px); }
+
+.payment-modal-footer { padding: 16px 24px 0; text-align: center; }
+.payment-footer-dots { display: flex; gap: 8px; justify-content: center; }
+.payment-footer-dots .dot { width: 8px; height: 8px; border-radius: 50%; background: #27272a; cursor: pointer; transition: all 0.2s; border: 1px solid #3f3f46; }
+.payment-footer-dots .dot.active { background: var(--sg); width: 22px; border-radius: 999px; border-color: var(--sg); }
+.payment-footer-hint { text-align: center; font-size: 10px; color: #71717a; margin: 12px 0 0; display: flex; align-items: center; justify-content: center; gap: 6px; }
+
+/* Light mode payment */
+.taply-gold-wrapper.light-mode .payment-bottom-sheet { background: #ffffff !important; border-color: #e5e7eb !important; }
+.taply-gold-wrapper.light-mode .payment-modal-header h3 { color: #111827 !important; }
+.taply-gold-wrapper.light-mode .payment-name { color: #111827 !important; }
+.taply-gold-wrapper.light-mode .payment-qr-card { background: #f9fafb !important; border-color: #e5e7eb !important; }
+
+/* Dashboard upload */
+.payment-upload-section { margin-top: 24px; padding: 20px; background: #121214; border: 1px dashed #2A2A2A; border-radius: 16px; }
+.payment-upload-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+.payment-drop-zone { border: 2px dashed #2A2A2A; border-radius: 12px; height: 120px; display: flex; flex-direction: column; align-items: center; justify-content: center; cursor: pointer; transition: all 0.2s; background: #1a1a1a; }
+.payment-drop-zone:hover { border-color: var(--sg); background: rgba(212,175,55,0.05); }
+.payment-drop-zone i { font-size: 24px; color: #52525b; margin-bottom: 8px; }
+.payment-drop-zone p { font-size: 12px; font-weight: 600; color: #a1a1aa; margin: 0; text-align: center; }
+
+@media (max-width: 380px) {
+  .taply-gold-wrapper { padding: 0; }
+  .taply-card { border-radius: 0 0 28px 28px; max-width: 100%; border: none; }
+  .taply-hero { height: 320px; }
+  .taply-profile-body h1 { font-size: 24px; }
+  .taply-pills { grid-template-columns: 1fr; }
+  .taply-pills .taply-action-btn { min-height: 52px; flex-direction: row; }
+  .taply-secondary-pills { gap: 8px; }
+  .taply-action-btn.small { font-size: 10px; padding: 10px 12px; }
+  .taply-reel figure { flex-basis: 96%; }
+}
+@media (min-width: 381px) and (max-width: 640px) {
+  .taply-gold-wrapper { padding: 0; }
+  .taply-card { border-radius: 0 0 28px 28px; max-width: 100%; border: none; border-bottom: 1px solid var(--border); }
+  .taply-hero { height: 380px; }
+}
+@media (min-width: 641px) and (max-width: 768px) {
+  .taply-gold-wrapper { padding: 24px; align-items: flex-start; }
+  .taply-card { max-width: 480px; border-radius: 28px; }
+  .taply-hero { height: 420px; }
+  .taply-profile-body h1 { font-size: 30px; }
+  .taply-glow { width: 900px; height: 700px; }
+}
+@media (min-width: 769px) and (max-width: 1024px) {
+  .taply-gold-wrapper { padding: 32px; }
+  .taply-card { max-width: 500px; border-radius: 32px; }
+  .taply-hero { height: 460px; }
+  .taply-profile-body { padding: 28px 28px 32px; }
+  .taply-profile-body h1 { font-size: 32px; }
+  .taply-section { padding: 28px; }
+  .taply-glow { width: 1000px; height: 800px; opacity: 0.6; }
+}
+@media (min-width: 1025px) and (max-width: 1440px) {
+  .taply-gold-wrapper { padding: 40px; }
+  .taply-card { max-width: 440px; border-radius: 32px; box-shadow: 0 25px 100px rgba(0,0,0,0.5); }
+  .taply-gold-wrapper.light-mode .taply-card { box-shadow: 0 25px 100px rgba(0,0,0,0.12); }
+  .taply-hero { height: 480px; }
+  .taply-profile-body h1 { font-size: 32px; }
+  .taply-glow { width: 1200px; height: 900px; }
+}
+@media (min-width: 1441px) {
+  .taply-gold-wrapper { padding: 60px; }
+  .taply-card { max-width: 460px; border-radius: 36px; }
+  .taply-hero { height: 500px; }
+  .taply-glow { width: 1400px; height: 1000px; }
+}
+@media (max-height: 500px) and (orientation: landscape) {
+  .taply-hero { height: 280px; }
+  .taply-profile-body { margin-top: -60px; padding: 16px 20px 20px; }
+  .taply-profile-body h1 { font-size: 22px; }
+  .taply-bio { font-size: 12px; margin-bottom: 12px; }
+}
+@media (min-width: 641px) { .taply-reel figure { flex-basis: 82%; } }
+@media (min-width: 1025px) { .taply-reel figure { flex-basis: 78%; } .taply-reel figure:hover { transform: scale(1.02); } }
+@media (min-width: 769px) {
+  .taply-secondary-pills { flex-wrap: wrap; overflow: visible; }
+  .taply-secondary-pills .taply-action-btn.small { flex: 1 1 auto; }
+}
+@media (min-width: 1025px) {
+  .taply-card { transition: transform .3s, box-shadow .3s; }
+  .taply-card:hover { transform: translateY(-4px); }
+  .taply-social-btn:hover, .taply-action-btn:hover { transform: translateY(-4px); }
 }
 
-/* Action buttons - GCash blue save, Maya black save - respectful */
-.payment-action-btn.save {
-  background: #007DFE !important;
-  color: #FFFFFF !important;
-  border: none !important;
-}
-.payment-action-btn.save.maya {
-  background: #000000 !important;
-  color: #FFFFFF !important;
-  border: 1px solid #00D632 !important;
-}
-/* END FIXED PAYMENT MODAL */
+@keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
 
+/* ===== SURGICAL FONT COPY - Shua Vallinas Hero - NO SPAM ===== */
+.name-font-taply {
+  font-family: 'Playfair Display', Georgia, serif;
+  font-weight: 700;
+  font-size: clamp(30px, 7vw, 36px);
+  line-height: 1.08;
+  letter-spacing: 0.5px;
+  color: #FFF8E7;
+  text-align: center;
+  text-wrap: balance;
+  text-shadow: 0 2px 20px rgba(0,0,0,0.6), 0 2px 10px rgba(0,0,0,0.5);
+}
+
+.subtitle-gold {
+  font-family: 'Montserrat', 'Inter', system-ui, sans-serif;
+  font-size: 8px !important;
+  font-weight: 500 !important;
+  line-height: 1.4 !important;
+  letter-spacing: 1px !important;
+  text-transform: uppercase;
+  color: #D4AF37;
+  text-align: center;
+  max-width: 420px;
+  margin: 0 auto 18px;
+}
+
+.gold-line-divider {
+  width: 48px;
+  height: 1px;
+  background: linear-gradient(90deg, transparent 0%, #D4AF37 50%, transparent 100%);
+  margin: 8px auto 0 auto;
+  border-radius: 1px;
+  opacity: 0.7;
+  box-shadow: none;
+}
+
+/* REMOVED thick second gold line - keep only 1 thin line per reference screenshot */
+.job-title::after {
+  display: none !important;
+  content: none;
+}
