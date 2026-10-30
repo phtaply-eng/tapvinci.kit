@@ -55,6 +55,50 @@ const THEMES = [
   { id: 'orange', name: 'Sunrise Orange', hex: '#f97316', desc: 'Energetic' },
 ]
 
+// ---- Permanent image storage: Supabase Storage bucket "profile-images" ----
+const BUCKET = 'profile-images'
+const MAX_INPUT_BYTES = 20 * 1024 * 1024 // refuse absurdly large originals; stored files end up well under 1 MB
+
+type UploadKind = 'hero' | 'gallery' | 'gcash' | 'maya'
+// Gallery: 800px / 70% webp. Profile photo a bit larger; payment QRs kept sharp so they still scan.
+const UPLOAD_OPTS: Record<UploadKind, { maxWidth: number; quality: number }> = {
+  hero: { maxWidth: 1000, quality: 0.8 },
+  gallery: { maxWidth: 800, quality: 0.7 },
+  gcash: { maxWidth: 1000, quality: 0.92 },
+  maya: { maxWidth: 1000, quality: 0.92 },
+}
+
+function compressImage(file: File, maxWidth: number, quality: number): Promise<File> {
+  return new Promise((resolve, reject) => {
+    const objectUrl = URL.createObjectURL(file)
+    const img = new Image()
+    img.onload = () => {
+      URL.revokeObjectURL(objectUrl)
+      let width = img.naturalWidth
+      let height = img.naturalHeight
+      if (width > maxWidth) {
+        height = Math.round((maxWidth / width) * height)
+        width = maxWidth
+      }
+      const canvas = document.createElement('canvas')
+      canvas.width = width
+      canvas.height = height
+      const ctx = canvas.getContext('2d')
+      if (!ctx) return reject(new Error('Canvas not supported in this browser'))
+      ctx.drawImage(img, 0, 0, width, height)
+      canvas.toBlob((blob) => {
+        if (!blob) return reject(new Error('Could not compress the image'))
+        resolve(new File([blob], file.name.replace(/\.[^/.]+$/, '') + '.webp', { type: 'image/webp' }))
+      }, 'image/webp', quality)
+    }
+    img.onerror = () => {
+      URL.revokeObjectURL(objectUrl)
+      reject(new Error('Could not read this image. Try a JPG or PNG.'))
+    }
+    img.src = objectUrl
+  })
+}
+
 export default function Dashboard() {
   const [profile, setProfile] = useState<any>({
     username: 'TapVinci',
@@ -134,19 +178,39 @@ const { data } = await supabase.from('profiles').select('*').eq('username', DEFA
     load()
   }, [])
 
-  const uploadToSupabase = async (file: File, folder: string = 'gallery'): Promise<string | null> => {
-    const ext = file.name.split('.').pop()
-    const fileName = `${folder}/${Date.now()}-${Math.random().toString(36).substring(2)}.${ext}`
-    const { data, error } = await supabase.storage.from('images').upload(fileName, file, {
-      cacheControl: '3600',
-      upsert: false
-    })
-    if (error) {
-      alert('Upload failed: ' + error.message + '\nMake sure you ran create_storage_bucket.sql in Supabase SQL Editor')
+  const uploadToSupabase = async (file: File, kind: UploadKind): Promise<string | null> => {
+    const username = (profile.username || '').toLowerCase().replace(/[^a-z0-9_-]/g, '')
+    if (!username) {
+      alert('Type a username first - photos are stored under it.')
       return null
     }
-    const { data: publicUrl } = supabase.storage.from('images').getPublicUrl(fileName)
-    return publicUrl.publicUrl
+    if (file.size > MAX_INPUT_BYTES) {
+      alert(`${file.name} is too large (max ${MAX_INPUT_BYTES / 1024 / 1024} MB).`)
+      return null
+    }
+    try {
+      const { maxWidth, quality } = UPLOAD_OPTS[kind]
+      const compressed = await compressImage(file, maxWidth, quality)
+      const safeName = file.name.replace(/\.[^/.]+$/, '').replace(/[^a-zA-Z0-9-]/g, '').slice(0, 40) || 'photo'
+      const stamp = Date.now()
+      const isQR = kind === 'gcash' || kind === 'maya'
+      const path =
+        kind === 'hero' ? `${username}/avatar/${stamp}-avatar.webp`
+        : kind === 'gallery' ? `${username}/gallery/${stamp}-${safeName}.webp`
+        : `${username}/payment/${kind}-qr.webp`
+      const { error } = await supabase.storage.from(BUCKET).upload(path, compressed, {
+        cacheControl: '3600',
+        upsert: isQR, // QR keeps one fixed file name per client, so replacing it overwrites
+        contentType: 'image/webp'
+      })
+      if (error) throw error
+      const url = supabase.storage.from(BUCKET).getPublicUrl(path).data.publicUrl
+      // fixed file name -> add a version so browsers/CDN do not show the old QR
+      return isQR ? `${url}?v=${stamp}` : url
+    } catch (err) {
+      alert('Upload failed: ' + ((err as Error)?.message || 'unknown error') + '\nMake sure you ran the profile-images SQL in Supabase.')
+      return null
+    }
   }
 
   const handleHeroFiles = async (files: FileList | null) => {
@@ -154,7 +218,7 @@ const { data } = await supabase.from('profiles').select('*').eq('username', DEFA
     const file = files[0]
     if (!file.type.startsWith('image/')) return
     setHeroUploading(true)
-    const url = await uploadToSupabase(file, 'heroes')
+    const url = await uploadToSupabase(file, 'hero')
     setHeroUploading(false)
     if (url) setProfile((p:any) => ({ ...p, hero_image: url }))
   }
@@ -180,7 +244,7 @@ const { data } = await supabase.from('profiles').select('*').eq('username', DEFA
     const file = files[0]
     if (!file.type.startsWith('image/')) return
     setGcashUploading(true)
-    const url = await uploadToSupabase(file, 'payments')
+    const url = await uploadToSupabase(file, 'gcash')
     setGcashUploading(false)
     if (url) setProfile((p:any) => ({ ...p, gcash_qr_url: url }))
   }
@@ -190,7 +254,7 @@ const { data } = await supabase.from('profiles').select('*').eq('username', DEFA
     const file = files[0]
     if (!file.type.startsWith('image/')) return
     setMayaUploading(true)
-    const url = await uploadToSupabase(file, 'payments')
+    const url = await uploadToSupabase(file, 'maya')
     setMayaUploading(false)
     if (url) setProfile((p:any) => ({ ...p, maya_qr_url: url }))
   }
