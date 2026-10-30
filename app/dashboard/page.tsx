@@ -1,3 +1,4 @@
+
 'use client'
 import { useState, useEffect, useRef } from 'react'
 import TaplyTemplate from '../../components/TaplyTemplate'
@@ -95,6 +96,25 @@ export default function Dashboard() {
   const [dragOverGcash, setDragOverGcash] = useState(false)
   const [dragOverMaya, setDragOverMaya] = useState(false)
   const [mounted, setMounted] = useState(false)
+  // After-save UX
+  const [showSuccessModal, setShowSuccessModal] = useState(false)
+  const [liveUrl, setLiveUrl] = useState('')
+  const [toast, setToast] = useState('')
+  const toastTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
+
+  const showToast = (msg: string) => {
+    setToast(msg)
+    if (toastTimer.current) clearTimeout(toastTimer.current)
+    toastTimer.current = setTimeout(() => setToast(''), 2200)
+  }
+
+  // Close the success modal with Esc
+  useEffect(() => {
+    if (!showSuccessModal) return
+    const onKey = (e: KeyboardEvent) => { if (e.key === 'Escape') setShowSuccessModal(false) }
+    window.addEventListener('keydown', onKey)
+    return () => window.removeEventListener('keydown', onKey)
+  }, [showSuccessModal])
 
   useEffect(() => {
     setMounted(true)
@@ -186,15 +206,52 @@ const { data } = await supabase.from('profiles').select('*').eq('username', DEFA
     setProfile((p:any) => ({ ...p, socials: { ...p.socials, [key]: '' } }))
   }
 
+  // Public site base URL. Set NEXT_PUBLIC_SITE_URL in Vercel (e.g. https://tapvinci.vercel.app) to change it.
+  const SITE_URL = (process.env.NEXT_PUBLIC_SITE_URL || 'https://tapvinci.vercel.app').replace(/\/+$/, '')
+
+  const copyLink = async (url: string) => {
+    try {
+      await navigator.clipboard.writeText(url)
+      showToast('Link copied!')
+    } catch {
+      showToast('Copy failed - select the link and copy it manually')
+    }
+  }
+
+  // 500x500 PNG of the live link. Uses the free qrserver.com API (no npm package needed).
+  const downloadQR = async (url: string) => {
+    const qrApiUrl = `https://api.qrserver.com/v1/create-qr-code/?size=500x500&margin=10&format=png&data=${encodeURIComponent(url)}`
+    try {
+      const res = await fetch(qrApiUrl)
+      if (!res.ok) throw new Error('QR request failed')
+      const blob = await res.blob()
+      const a = document.createElement('a')
+      const objectUrl = URL.createObjectURL(blob)
+      a.href = objectUrl
+      a.download = `${profile.username.toLowerCase()}-tapvinci-qr.png`
+      document.body.appendChild(a)
+      a.click()
+      a.remove()
+      URL.revokeObjectURL(objectUrl)
+      showToast('QR downloaded')
+    } catch {
+      // Fallback: open the image so it can be saved manually
+      window.open(qrApiUrl, '_blank', 'noopener')
+      showToast('Opened QR in a new tab - right-click to save')
+    }
+  }
+
   const save = async () => {
     setSaving(true)
-    const fixed = { ...profile, username: profile.username.toLowerCase() }
-    const { error } = await supabase.from('profiles').upsert(fixed, { onConflict: 'username' })
+    const fixed = { ...profile, username: profile.username.trim().toLowerCase() }
+    const { error } = await supabase.from('profiles').upsert(fixed, { onConflict: 'username' }).select()
     setSaving(false)
-    if (error) alert(error.message)
-    else {
-      const visibleCount = SOCIALS_CONFIG.filter(s => profile.socials_visible[s.key] && profile.socials[s.key]?.trim()).length
-      alert(`Saved! ${visibleCount} social buttons visible, gallery ${profile.gallery?.length || 0} photos, theme ${profile.theme}`)
+    if (error) {
+      showToast('Failed to save: ' + error.message)
+    } else {
+      const url = `${SITE_URL}/${encodeURIComponent(fixed.username)}`
+      setLiveUrl(url)
+      setShowSuccessModal(true)
     }
   }
 
@@ -276,7 +333,7 @@ const { data } = await supabase.from('profiles').select('*').eq('username', DEFA
               className={`w-full rounded-xl border-2 border-dashed p-6 cursor-pointer text-center transition-all ${dragOverGallery ? 'border-[#D4AF37] bg-[#D4AF37]/10' : 'border-zinc-700 bg-zinc-800/50 hover:border-zinc-600'}`}
             >
               <input ref={galleryInputRef} type="file" accept="image/*" multiple className="hidden" onChange={(e) => handleGalleryFiles(e.target.files)} />
-              <div className="text-2xl mb-1">🖼️</div>
+              <div className="text-2xl mb-1">🖼</div>
               <p className="text-xs text-white font-semibold">{galleryUploading ? 'Uploading...' : 'Drop images here'}</p>
               <p className="text-[11px] text-zinc-400">or click to pick from computer — multiple allowed</p>
             </div>
@@ -298,7 +355,7 @@ const { data } = await supabase.from('profiles').select('*').eq('username', DEFA
               <p className="text-[11px] uppercase tracking-widest text-[#D4AF37] font-bold">Social Links</p>
               <span className="text-[10px] bg-zinc-800 px-2 py-1 rounded-full">{activeSocialCount} visible</span>
             </div>
-            <p className="text-[11px] text-zinc-500">👁️ Show = visible, 🙈 Hide = hidden but saved. Order matches Live Preview.</p>
+            <p className="text-[11px] text-zinc-500">👁 Show = visible, 🙈 Hide = hidden but saved. Order matches Live Preview.</p>
             
             {SOCIALS_CONFIG.map(s => {
               const hasUrl = !!profile.socials[s.key]?.trim()
@@ -371,7 +428,7 @@ const { data } = await supabase.from('profiles').select('*').eq('username', DEFA
                 </p>
                 <span className="text-[10px] bg-zinc-800 px-2 py-1 rounded-full">{(profile.socials_visible.gcash_qr !== false ? 1 : 0) + (profile.socials_visible.maya_qr !== false ? 1 : 0)} visible</span>
               </div>
-              <p className="text-[11px] text-zinc-500 mt-1">👁️ Show = visible, 🙈 Hide = hidden but saved</p>
+              <p className="text-[11px] text-zinc-500 mt-1">👁 Show = visible, 🙈 Hide = hidden but saved</p>
             </div>
 
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -455,6 +512,40 @@ const { data } = await supabase.from('profiles').select('*').eq('username', DEFA
           <TaplyTemplate profile={profile} />
         </div>
       </div>
+      {/* ===== AFTER SAVE SUCCESS MODAL ===== */}
+      {showSuccessModal && (
+        <div className="success-modal-overlay" onClick={() => setShowSuccessModal(false)} role="dialog" aria-modal="true" aria-label="Profile saved">
+          <div className="success-modal" onClick={e => e.stopPropagation()}>
+            <div className="success-check">✓</div>
+            <h3 className="success-title">Profile Saved!</h3>
+            <p className="success-sub">Your TapVinci is now live</p>
+
+            <div className="live-url-box">
+              <span className="live-url-text">{liveUrl}</span>
+              <button onClick={() => copyLink(liveUrl)} className="live-url-copy">Copy</button>
+            </div>
+
+            <div className="mt-4 grid grid-cols-1 gap-3">
+              <a href={liveUrl} target="_blank" rel="noopener noreferrer" className="success-primary-btn">
+                View My Live Profile → /{profile.username.toLowerCase()}
+              </a>
+              <div className="grid grid-cols-2 gap-3">
+                <button onClick={() => copyLink(liveUrl)} className="success-secondary-btn">Copy Link</button>
+                <button onClick={() => downloadQR(liveUrl)} className="success-secondary-btn">Download QR of my link</button>
+              </div>
+            </div>
+
+            <div className="success-qr-box">
+              <img src={`https://api.qrserver.com/v1/create-qr-code/?size=320x320&margin=0&format=png&data=${encodeURIComponent(liveUrl)}`} alt="QR code for your profile link" width={136} height={136} />
+            </div>
+            <p className="success-hint">Scan to view profile • Print this QR on your NFC card</p>
+
+            <button onClick={() => setShowSuccessModal(false)} className="success-close">Close</button>
+          </div>
+        </div>
+      )}
+
+      {toast && <div className="success-toast" role="status">{toast}</div>}
     </div>
   )
 }
