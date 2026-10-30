@@ -87,6 +87,11 @@ export default function AdminPage() {
   const [sortAsc, setSortAsc] = useState(false)
   const [toast, setToast] = useState('')
 
+  // QR generator modal
+  const [showQRModal, setShowQRModal] = useState(false)
+  const [selectedProfile, setSelectedProfile] = useState<Row | null>(null)
+  const [qrUrl, setQrUrl] = useState('')
+
   // restore a previous login for this browser tab
   useEffect(() => {
     try {
@@ -182,6 +187,45 @@ export default function AdminPage() {
       showToast('Link copied!')
     } catch {
       showToast('Copy failed')
+    }
+  }
+
+  function handleGenerateQR(profile: Row) {
+    setSelectedProfile(profile)
+    setQrUrl(`${SITE_URL}/${encodeURIComponent(profile.username)}`)
+    setShowQRModal(true)
+  }
+
+  const closeQR = () => setShowQRModal(false)
+
+  // Esc closes the QR modal
+  useEffect(() => {
+    if (!showQRModal) return
+    const onKey = (e: KeyboardEvent) => { if (e.key === 'Escape') setShowQRModal(false) }
+    window.addEventListener('keydown', onKey)
+    return () => window.removeEventListener('keydown', onKey)
+  }, [showQRModal])
+
+  async function downloadQR() {
+    if (!selectedProfile) return
+    const apiUrl = `https://api.qrserver.com/v1/create-qr-code/?size=800x800&margin=10&format=png&data=${encodeURIComponent(qrUrl)}`
+    try {
+      const res = await fetch(apiUrl)
+      if (!res.ok) throw new Error('QR request failed')
+      const blob = await res.blob()
+      const objectUrl = URL.createObjectURL(blob)
+      const a = document.createElement('a')
+      a.href = objectUrl
+      a.download = `${selectedProfile.username}-tapvinci-qr.png`
+      document.body.appendChild(a)
+      a.click()
+      a.remove()
+      URL.revokeObjectURL(objectUrl)
+      showToast('QR downloaded')
+    } catch {
+      // fallback: open the image so it can be saved manually
+      window.open(apiUrl, '_blank', 'noopener')
+      showToast('Opened QR in a new tab - right-click to save')
     }
   }
 
@@ -323,6 +367,9 @@ export default function AdminPage() {
                         <div className="flex gap-2">
                           <button onClick={() => copyLink(profile.username)} className="text-[11px] bg-[#2A2A2A] hover:bg-[#333] px-2.5 py-1.5 rounded whitespace-nowrap">Copy Link</button>
                           <button onClick={() => window.open(`/${profile.username}`, '_blank', 'noopener')} className="text-[11px] bg-[#E8C766] hover:bg-[#D4AF37] text-black font-semibold px-2.5 py-1.5 rounded">Open</button>
+                          <button onClick={() => handleGenerateQR(profile)} title="Generate QR" className="text-[11px] bg-[#121214] border border-[#D4AF37]/50 text-[#D4AF37] hover:bg-[#D4AF37] hover:text-black font-semibold px-2.5 py-1.5 rounded transition">
+                            <i className="fa-solid fa-qrcode mr-1"></i>QR
+                          </button>
                         </div>
                       </td>
                     </tr>
@@ -333,6 +380,56 @@ export default function AdminPage() {
           </div>
         </div>
       </div>
+
+      {/* ===== ADMIN QR GENERATOR MODAL ===== */}
+      {showQRModal && selectedProfile && (
+        <div className="admin-qr-modal" onClick={closeQR} role="dialog" aria-modal="true" aria-label={`QR code for ${selectedProfile.username}`}>
+          <div className="admin-qr-card" onClick={(e) => e.stopPropagation()}>
+            <div className="flex justify-between items-center mb-4">
+              <h3 className="text-white font-bold text-lg">QR Code - {selectedProfile.username}</h3>
+              <button onClick={closeQR} aria-label="Close" className="w-8 h-8 bg-[#1E1E20] rounded-full flex items-center justify-center text-gray-400 hover:text-white">✕</button>
+            </div>
+
+            <p className="text-xs text-gray-400 mb-3 break-all">{qrUrl}</p>
+
+            <div className="admin-qr-print">
+              <div className="admin-qr-white-box">
+                <img
+                  src={`https://api.qrserver.com/v1/create-qr-code/?size=480x480&margin=0&format=png&data=${encodeURIComponent(qrUrl)}`}
+                  alt={`QR code for ${qrUrl}`}
+                  width={228}
+                  height={228}
+                  className="w-full h-full"
+                />
+              </div>
+              <p className="text-[11px] text-[#D4AF37] mt-3 uppercase tracking-widest admin-qr-caption">{displayName(selectedProfile) || selectedProfile.username} • {themeLabel(selectedProfile)}</p>
+            </div>
+            <p className="text-xs text-gray-500 mt-1">Scan to view profile • For NFC card printing</p>
+
+            <div className="grid grid-cols-2 gap-3 mt-6">
+              <button onClick={() => { navigator.clipboard.writeText(qrUrl).then(() => showToast('Link copied!'), () => showToast('Copy failed')) }} className="h-11 bg-[#2A2A2A] text-white rounded-xl text-sm border border-[#2A2A2A] hover:border-[#D4AF37]/50">
+                Copy Link
+              </button>
+              <button onClick={downloadQR} className="h-11 bg-[#E8C766] text-black rounded-xl text-sm font-bold hover:bg-[#D4AF37]">
+                Download QR
+              </button>
+            </div>
+            <div className="grid grid-cols-2 gap-3 mt-3">
+              <button onClick={() => window.open(qrUrl, '_blank', 'noopener')} className="h-11 bg-[#1E1E20] text-white rounded-xl text-sm border border-[#2A2A2A] hover:border-[#D4AF37]/50">
+                View Profile →
+              </button>
+              <button onClick={() => window.print()} className="h-11 bg-[#1E1E20] text-white rounded-xl text-sm border border-[#2A2A2A] hover:border-[#D4AF37]/50">
+                Print QR
+              </button>
+            </div>
+
+            <div className="mt-4 pt-4 border-t border-[#1E1E20]">
+              <p className="text-[11px] text-gray-500">Use this QR for:</p>
+              <p className="text-[11px] text-gray-400 mt-1">• Printing on NFC cards • Stickers • Table tents • Client handout</p>
+            </div>
+          </div>
+        </div>
+      )}
 
       {toast && <div className="success-toast" role="status">{toast}</div>}
     </div>
