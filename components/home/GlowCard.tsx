@@ -2,7 +2,7 @@
 import { useRef } from 'react'
 
 // Glass card with a gold spotlight that follows the cursor (CSS reads --mx / --my).
-export default function GlowCard({ className = '', children }: { className?: string; children: React.ReactNode }) {
+export default function GlowCard({ className = '', style, children }: { className?: string; style?: React.CSSProperties; children: React.ReactNode }) {
   const ref = useRef<HTMLElement>(null)
   const move = (e: React.PointerEvent<HTMLElement>) => {
     const el = ref.current
@@ -12,7 +12,7 @@ export default function GlowCard({ className = '', children }: { className?: str
     el.style.setProperty('--my', `${e.clientY - r.top}px`)
   }
   return (
-    <article ref={ref} onPointerMove={move} className={`tv-glass ${className}`}>
+    <article ref={ref} onPointerMove={move} className={`tv-glass ${className}`} style={style}>
       {children}
     </article>
   )

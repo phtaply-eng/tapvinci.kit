@@ -13,9 +13,9 @@ const ITEMS = [
 
 // sections of the homepage (these work from any page that shows the menu)
 const SECTIONS = [
-  { href: '/#how-it-works', icon: '⚙️', label: 'How It Works' },
   { href: '/#about', icon: '✨', label: 'About TapVinci' },
   { href: '/#offer', icon: '💳', label: 'What We Offer' },
+  { href: '/#how-it-works', icon: '⚙️', label: 'How It Works' },
   { href: '/#gallery', icon: '🖼️', label: 'Gallery' },
   { href: '/#follow', icon: '📣', label: 'Follow & Share' },
   { href: '/#faq', icon: '❓', label: 'NFC Help / FAQ' },
