@@ -80,7 +80,7 @@ export default function Home() {
         <div className="tv-wrap tv-about">
           <div className="tv-about-copy">
             <SectionHead label="About TapVinci" title="A better way to make an introduction." id="about-title" />
-            <p className="tv-lead tv-rise">TapVinci is a Philippines-based NFC business. It offers digital calling card with landing pages, so people can share contact details and links with a single tap.</p>
+            <p className="tv-lead tv-rise">TapVinci is a Philippines-based. It offers digital calling card with landing pages, so people can share contact details and links with a single tap.</p>
             <p className="tv-p tv-rise">We help professionals and local businesses get noticed — Our goal is simple: make it personal, modern, and easy to share.</p>
             <p className="tv-sign tv-rise"><span>Shua Vallinas</span><small>Founder, TapVinci</small></p>
           </div>
