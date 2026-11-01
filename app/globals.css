@@ -1302,3 +1302,33 @@ html:has(.tv-home) { scroll-behavior: smooth; }
   .tv-reviews-avg-card { padding: 24px; }
   .tv-reviews-teaser-card { padding: 24px 18px; }
 }
+/* ===== MOBILE ANIMATION FIX - FORCE ON - APPENDED - DO NOT DELETE ABOVE ===== */
+@media (max-width: 768px) {
+  .tv-rise, .tv-in, .tv-head, .tv-lead, .tv-p, .tv-sign, 
+  .tv-codex, .tv-gallery, .tv-social, .tv-cardviz, 
+  .tv-reviews-teaser-card, .tv-about-copy {
+    animation: tvFadeIn 0.7s cubic-bezier(0.16,1,0.3,1) both !important;
+    opacity: 1 !important;
+    transform: translateY(0) !important;
+    will-change: transform, opacity;
+  }
+  /* Stagger delays keep Apple feel on mobile */
+  .tv-in { animation-delay: var(--d, 0s) !important; }
+  .tv-rise:nth-child(1) { animation-delay: 0.1s !important; }
+  .tv-rise:nth-child(2) { animation-delay: 0.2s !important; }
+  .tv-rise:nth-child(3) { animation-delay: 0.3s !important; }
+}
+/* Force spiral to show on mobile Safari */
+.tv-spiral {
+  stroke-dasharray: 1;
+  stroke-dashoffset: 0 !important;
+  animation: none !important;
+  opacity: 1 !important;
+  transform: translateZ(0);
+}
+/* Disable reduced-motion block for main content - keep for hamburger only */
+@media (prefers-reduced-motion: reduce) {
+  .tv-home .tv-rise, .tv-home .tv-in {
+    animation: tvFadeIn 0.6s ease both !important;
+  }
+}
