@@ -6,6 +6,8 @@ import ShareCard from '../components/home/ShareCard'
 import FlowSections from '../components/home/FlowSections'
 import FlipCard from '../components/home/FlipCard'
 import { ICONS } from '../components/home/icons'
+import SiteFooter from '../components/SiteFooter'
+import Dial from '../components/Dial'
 
 const fraunces = Fraunces({ subsets: ['latin'], style: ['normal', 'italic'], variable: '--font-fraunces', display: 'swap' })
 const dmSans = DM_Sans({ subsets: ['latin'], variable: '--font-dmsans', display: 'swap' })
@@ -20,15 +22,6 @@ const SOCIALS = [
   { key: 'tiktok', label: 'TikTok', href: 'https://www.tiktok.com/@shuashushu5', icon: 'fa-brands fa-tiktok' },
   { key: 'messenger', label: 'Messenger', href: 'https://m.me/shua.vallinas', icon: 'fa-brands fa-facebook-messenger' },
 ]
-
-const TICKS = Array.from({ length: 120 }, (_, i) => {
-  const a = (i * 3 * Math.PI) / 180
-  const major = i % 10 === 0
-  const mid = i % 5 === 0
-  const r1 = 96
-  const r2 = major ? 89 : mid ? 91.5 : 93.5
-  return { x1: Math.sin(a) * r1, y1: -Math.cos(a) * r1, x2: Math.sin(a) * r2, y2: -Math.cos(a) * r2, major, mid }
-})
 
 function SectionHead({ label, title, id }: { label: string; title: string; id?: string }) {
   return (
@@ -49,14 +42,7 @@ export default function Home() {
         <div className="tv-hero-art" aria-hidden="true">
           <span className="tv-orb" />
           <span className="tv-ripple" /><span className="tv-ripple" /><span className="tv-ripple" />
-          <svg className="tv-bezel" viewBox="-100 -100 200 200" fill="none">
-            <circle r="98.5" stroke="#D4AF37" strokeOpacity="0.28" strokeWidth="0.3" />
-            <circle r="86" stroke="#D4AF37" strokeOpacity="0.14" strokeWidth="0.25" />
-            {TICKS.map((t, i) => (
-              <line key={i} x1={t.x1} y1={t.y1} x2={t.x2} y2={t.y2} stroke="#E8C766" strokeOpacity={t.major ? 0.85 : t.mid ? 0.5 : 0.25} strokeWidth={t.major ? 0.7 : 0.35} />
-            ))}
-            <circle cy="-96" r="1.3" fill="#FFC21C" />
-          </svg>
+          <Dial className="tv-bezel" withTicks />
         </div>
         <div className="tv-wrap tv-hero-inner">
           <p className="tv-est tv-in" style={{ ['--d' as string]: '0s' }}></p>
@@ -73,7 +59,6 @@ export default function Home() {
           </div>
           <p className="tv-tagline tv-in" style={{ ['--d' as string]: '.66s' }}>A NEW STANDARD OF INTRODUCTION • MADE TO CONNECT • PHILIPPINES 2026</p>
         </div>
-        <a href="#about" className="tv-scroll" aria-label="Scroll down"><span /></a>
       </section>
 
       {/* 3. ABOUT */}
@@ -199,21 +184,7 @@ export default function Home() {
       </section>
 
       {/* Footer - COPIED FROM MAIN SITE - EXACT SAME */}
-      <footer className="tv-footer">
-        <div className="tv-footer-mark" aria-hidden="true">TapVinci</div>
-        <div className="tv-wrap tv-footer-inner">
-          <div className="tv-logo tv-logo-sm flex flex-col items-center">
-            <Image src="/logo.png" alt="TapVinci" width={220} height={56} className="h-10 md:h-12 w-auto object-contain mx-auto" />
-          </div>
-          <p className="tv-tagline">A NEW STANDARD OF INTRODUCTION • MADE TO CONNECT • PHILIPPINES 2026</p>
-          <div className="tv-footer-actions">
-            <Link href="/dashboard" className="tv-btn tv-btn-gold tv-btn-sm">Open Dashboard</Link>
-            <Link href="/admin" className="tv-btn tv-btn-glass tv-btn-sm">Admin Panel</Link>
-            <a href="mailto:tapvinci@yahoo.com" className="tv-btn tv-btn-glass tv-btn-sm">Contact</a>
-          </div>
-          <p className="tv-copy">© 2026 TapVinci • Philippines. All rights reserved.</p>
-        </div>
-      </footer>
+      <SiteFooter copyright="© 2026 TapVinci • Philippines. All rights reserved." />
     </main>
   )
 }

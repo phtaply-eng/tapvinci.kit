@@ -1,7 +1,6 @@
 
 'use client'
 import { useState, useEffect, useRef } from 'react'
-import Link from 'next/link'
 import TaplyTemplate from '../../components/TaplyTemplate'
 import { supabase } from '../../lib/supabase'
 
@@ -140,7 +139,6 @@ export default function Dashboard() {
   const [dragOverGallery, setDragOverGallery] = useState(false)
   const [dragOverGcash, setDragOverGcash] = useState(false)
   const [dragOverMaya, setDragOverMaya] = useState(false)
-  const [mounted, setMounted] = useState(false)
   // After-save UX
   const [showSuccessModal, setShowSuccessModal] = useState(false)
   const [liveUrl, setLiveUrl] = useState('')
@@ -160,10 +158,6 @@ export default function Dashboard() {
     window.addEventListener('keydown', onKey)
     return () => window.removeEventListener('keydown', onKey)
   }, [showSuccessModal])
-
-  useEffect(() => {
-    setMounted(true)
-  }, [])
 
   useEffect(() => {
     const load = async () => {

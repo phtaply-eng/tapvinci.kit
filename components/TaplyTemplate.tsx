@@ -70,10 +70,6 @@ export default function TaplyTemplate({ profile }: { profile: any }) {
   // PAYMENT DATA - FIXED: No window in render, uses isDashboard state
   const gcashQR = (profile as any).gcash_qr_url || (profile as any).gcash_qr || (profile as any).payment?.['gcash']?.qrImage || (isDashboard ? null : "/gallery/gcash-qr.jpg")
   const mayaQR = (profile as any).maya_qr_url || (profile as any).maya_qr || (profile as any).payment?.['maya']?.qrImage || (isDashboard ? null : "/gallery/maya-qr.jpg")
-  const gcashName = (profile as any).gcash_name || (profile as any).payment?.['gcash']?.name || (profile as any).name || ''
-  const mayaName = (profile as any).maya_name || (profile as any).payment?.['maya']?.name || (profile as any).name || ''
-  const gcashNumber = (profile as any).gcash_number || (profile as any).payment?.['gcash']?.number || (profile as any).phone || ''
-  const mayaNumber = (profile as any).maya_number || (profile as any).payment?.['maya']?.number || (profile as any).phone || ''
 
   const getTheme = () => {
     const t = profile.theme || 'gold'

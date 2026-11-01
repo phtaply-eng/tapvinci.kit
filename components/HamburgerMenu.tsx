@@ -1,6 +1,8 @@
 'use client'
 import { useState, useEffect } from 'react'
 import Link from 'next/link'
+import Image from 'next/image'
+import Dial from './Dial'
 
 const SOCIALS = [
   { key: 'facebook', label: 'Facebook', href: 'https://facebook.com/shua.vallinas', icon: 'fa-brands fa-facebook-f' },
@@ -52,22 +54,17 @@ export default function HamburgerMenu() {
         <div className="menu-scroll">
           {/* Dial background art */}
           <div className="menu-dial-wrap" aria-hidden="true">
-            <svg className="menu-dial" viewBox="-100 -100 200 200" fill="none">
-              <circle r="98.5" stroke="#D4AF37" strokeOpacity="0.28" strokeWidth="0.3" />
-              <circle r="86" stroke="#D4AF37" strokeOpacity="0.14" strokeWidth="0.25" />
-              <circle cy="-96" r="1.3" fill="#FFC21C" />
-            </svg>
+            <Dial className="menu-dial" />
           </div>
 
           {/* ===== TOP: Logo + Tagline ===== */}
           <div className="menu-head">
             <Link href="/" className="menu-logo" onClick={close} aria-label="TapVinci Home">
-              <div className="tv-logo tv-logo-sm" style={{ display: 'flex', gap: '0', fontWeight: 700, fontSize: '22px', letterSpacing: '-0.02em' }}>
-                <span className="tv-logo-tap" style={{ color: '#fff' }}>Tap</span>
-                <span className="tv-logo-vinci" style={{ color: '#D4AF37' }}>Vinci</span>
-              </div>
+              <div className="tv-logo tv-logo-sm" style={{ display: 'flex', alignItems: 'center' }}>
+              <Image src="/logo.png" alt="TapVinci" width={140} height={36} className="h-7 w-auto object-contain" priority />
+            </div>
             </Link>
-            <p className="menu-tagline">DRIVEN BY QUALITY • CHOSEN BY THOSE WHO KNOW THE DIFFERENCE • PHILIPPINES • 2026</p>
+            <p className="menu-tagline">A NEW STANDARD OF INTRODUCTION • MADE TO CONNECT • PHILIPPINES 2026</p>
             <span className="menu-gold-line" aria-hidden="true" />
           </div>
 
