@@ -3,6 +3,7 @@ import { notFound } from 'next/navigation'
 import { supabase } from '../../lib/supabase'
 import TaplyTemplate from '../../components/TaplyTemplate'
 import type { Profile } from '../../lib/types'
+import HamburgerMenu from "@/components/HamburgerMenu"
 
 export const dynamic = 'force-dynamic'
 export const revalidate = 0

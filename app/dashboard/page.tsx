@@ -1,8 +1,8 @@
-
 'use client'
 import { useState, useEffect, useRef } from 'react'
 import TaplyTemplate from '../../components/TaplyTemplate'
 import { supabase } from '../../lib/supabase'
+import HamburgerMenu from "@/components/HamburgerMenu"
 
 const DEFAULT_SOCIALS = {
   facebook: 'https://facebook.com/',
@@ -337,7 +337,9 @@ const { data } = await supabase.from('profiles').select('*').eq('username', DEFA
   const activeSocialCount = SOCIALS_CONFIG.filter(s => profile.socials_visible[s.key] && profile.socials[s.key]?.trim()).length
 
   return (
-    <div className="min-h-screen bg-black text-white p-4">
+    <>
+      <HamburgerMenu />
+      <div className="min-h-screen bg-black text-white p-4">
       <div className="max-w-7xl mx-auto grid grid-cols-1 lg:grid-cols-2 gap-8">
         <div className="space-y-4 bg-zinc-900 p-6 rounded-2xl h-fit max-h-[95vh] overflow-y-auto">
           <h1 className="text-xl font-bold">Edit Profile</h1>
@@ -625,5 +627,6 @@ const { data } = await supabase.from('profiles').select('*').eq('username', DEFA
 
       {toast && <div className="success-toast" role="status">{toast}</div>}
     </div>
+    </>
   )
 }

@@ -8,6 +8,7 @@ import FlipCard from '../components/home/FlipCard'
 import { ICONS } from '../components/home/icons'
 import SiteFooter from '../components/SiteFooter'
 import Dial from '../components/Dial'
+import HamburgerMenu from '../components/HamburgerMenu'
 
 const fraunces = Fraunces({ subsets: ['latin'], style: ['normal', 'italic'], variable: '--font-fraunces', display: 'swap' })
 const dmSans = DM_Sans({ subsets: ['latin'], variable: '--font-dmsans', display: 'swap' })
@@ -35,6 +36,7 @@ function SectionHead({ label, title, id }: { label: string; title: string; id?: 
 export default function Home() {
   return (
     <main className={`tv-home ${fraunces.variable} ${dmSans.variable}`}>
+      <HamburgerMenu />
       <div className="tv-vignette" aria-hidden="true" />
 
       {/* 1. HERO */}

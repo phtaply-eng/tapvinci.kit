@@ -150,7 +150,7 @@ export default function ReviewsPage() {
           <Link href="/" className="tv-reviews-logo">
             <img src="/logo.png" alt="TapVinci" onError={(e) => { (e.target as HTMLImageElement).src = '/tapvinci-logo.png' }} />
           </Link>
-          <Link href="/" className="tv-reviews-back">
+          <Link href="/" className="tv-reviews-back mr-11">
             <i className="fa-solid fa-arrow-left"></i> Back to Home
           </Link>
         </div>
