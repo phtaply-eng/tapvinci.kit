@@ -1,4 +1,5 @@
 import Link from 'next/link'
+import Image from 'next/image'
 import { Fraunces, DM_Sans } from 'next/font/google'
 import FaqAccordion from '../components/home/FaqAccordion'
 import ShareCard from '../components/home/ShareCard'
@@ -57,19 +58,19 @@ export default function Home() {
           </svg>
         </div>
         <div className="tv-wrap tv-hero-inner">
-          <p className="tv-est tv-in" style={{ ['--d' as string]: '0s' }}>Est. Philippines <i /> 2026</p>
-          <div className="tv-logo tv-in" style={{ ['--d' as string]: '.12s' }} aria-label="TapVinci">
-            <span className="tv-logo-tap">Tap</span><span className="tv-logo-vinci">Vinci</span>
+          <p className="tv-est tv-in" style={{ ['--d' as string]: '0s' }}></p>
+         <div className="tv-logo tv-in" style={{ ['--d' as string]: '.15s', marginBottom: '12px' } as any} aria-label="TapVinci">
+            <Image src="/logo.png" alt="TapVinci" width={400} height={100} className="h-20 md:h-24 w-auto object-contain mx-auto" priority />
           </div>
-          <h1 className="tv-hero-h1 tv-in" style={{ ['--d' as string]: '.26s' }}>
-            <span>Tap.</span> <span>Connect.</span> <em>Remember.</em>
+          <h1 className="tv-hero-h1 tv-in whitespace-nowrap" style={{ ['--d' as string]: '.26s', fontSize: 'clamp(69px, 6vw, 48px)' }}>
+          <span>Tap.</span> <span>Connect.</span> <em>Remember.</em>
           </h1>
-          <p className="tv-hero-sub tv-in" style={{ ['--d' as string]: '.4s' }}>Premium NFC business cards and custom landing pages, made for the Philippines.</p>
+          <p className="tv-hero-sub tv-in" style={{ ['--d' as string]: '.4s' }}></p>
           <div className="tv-hero-actions tv-in" style={{ ['--d' as string]: '.52s' }}>
             <Link href="/dashboard" className="tv-btn tv-btn-gold">Open Dashboard</Link>
             <Link href={`/${DEMO_USERNAME}`} className="tv-btn tv-btn-glass">View Demo</Link>
           </div>
-          <p className="tv-tagline tv-in" style={{ ['--d' as string]: '.66s' }}>Driven by quality <i /> Chosen by those who know the difference <i /> Philippines <i /> 2026</p>
+          <p className="tv-tagline tv-in" style={{ ['--d' as string]: '.66s' }}>A NEW STANDARD OF INTRODUCTION • MADE TO CONNECT • PHILIPPINES 2026</p>
         </div>
         <a href="#about" className="tv-scroll" aria-label="Scroll down"><span /></a>
       </section>
@@ -78,9 +79,9 @@ export default function Home() {
       <section className="tv-section" id="about" aria-labelledby="about-title">
         <div className="tv-wrap tv-about">
           <div className="tv-about-copy">
-            <SectionHead label="About TapVinci" title="Personal, modern, easy to share" id="about-title" />
-            <p className="tv-lead tv-rise">TapVinci is a Philippines-based NFC business. It offers digital landing pages, NFC cards and NFC chips, so people can share contact details and links with a single tap.</p>
-            <p className="tv-p tv-rise">Hi, I&apos;m Shua Vallinas, founder of TapVinci. I help professionals and local businesses get noticed — through NFC digital business cards that share your contacts and links instantly, and custom landing pages built with HTML, CSS, and JavaScript. My goal is simple: make it personal, modern, and easy to share.</p>
+            <SectionHead label="About TapVinci" title="A better way to make an introduction." id="about-title" />
+            <p className="tv-lead tv-rise">TapVinci is a Philippines-based NFC business. It offers digital calling card with landing pages, so people can share contact details and links with a single tap.</p>
+            <p className="tv-p tv-rise">We help professionals and local businesses get noticed — Our goal is simple: make it personal, modern, and easy to share.</p>
             <p className="tv-sign tv-rise"><span>Shua Vallinas</span><small>Founder, TapVinci</small></p>
           </div>
           <figure className="tv-codex tv-rise" aria-hidden="true">
@@ -127,39 +128,7 @@ export default function Home() {
 
       <div className="tv-divider" aria-hidden="true"><i /></div>
 
-      {/* 5.5 REVIEWS TEASER - APPLE LUXURY - ADDED FOR REVIEW SYSTEM */}
-      <section className="tv-section tv-reviews-teaser" id="reviews-teaser" aria-labelledby="reviews-teaser-title">
-        <div className="tv-wrap">
-          <div className="tv-reviews-teaser-inner">
-            <SectionHead label="Reviews" title="What people say" id="reviews-teaser-title" />
-            <div className="tv-reviews-teaser-card tv-rise">
-              <div className="tv-reviews-teaser-stars">
-                <span className="tv-reviews-teaser-avg">4.9</span>
-                <span className="tv-reviews-teaser-stars-icons">
-                  <i className="fa-solid fa-star"></i>
-                  <i className="fa-solid fa-star"></i>
-                  <i className="fa-solid fa-star"></i>
-                  <i className="fa-solid fa-star"></i>
-                  <i className="fa-solid fa-star"></i>
-                </span>
-                <span className="tv-reviews-teaser-count">(127 reviews)</span>
-              </div>
-              <p className="tv-reviews-teaser-text">"Premium quality, tap works instantly. Clients always impressed. TapVinci is the new standard."</p>
-              <p className="tv-reviews-teaser-author">— Shua Vallinas, Founder</p>
-              <div className="tv-reviews-teaser-actions">
-                <Link href="/reviews" className="tv-btn tv-btn-gold">
-                  <i className="fa-solid fa-star" style={{ marginRight: '8px' }}></i> Leave a Review
-                </Link>
-                <Link href="/reviews" className="tv-btn tv-btn-glass">
-                  Read All Reviews
-                </Link>
-              </div>
-            </div>
-          </div>
-        </div>
-      </section>
 
-      <div className="tv-divider" aria-hidden="true"><i /></div>
 
       {/* 6. FOLLOW + SHARE */}
       <section className="tv-section" id="follow" aria-labelledby="follow-title">
@@ -202,12 +171,48 @@ export default function Home() {
         </div>
       </section>
 
-      {/* 8. FOOTER */}
+      <div className="tv-divider" aria-hidden="true"><i /></div>
+
+      {/* 8. REVIEWS - MOVED TO VERY BOTTOM - TRUST ANCHOR BEFORE FOOTER - APPLE-LEVEL SOCIAL PROOF */}
+      <section className="tv-section tv-reviews-teaser" id="reviews-teaser" aria-labelledby="reviews-teaser-title">
+        <div className="tv-wrap">
+          <div className="tv-reviews-teaser-inner">
+            <SectionHead label="Reviews" title="What people say" id="reviews-teaser-title" />
+            <div className="tv-reviews-teaser-card tv-rise">
+              <div className="tv-reviews-teaser-stars">
+                <span className="tv-reviews-teaser-avg">4.9</span>
+                <span className="tv-reviews-teaser-stars-icons">
+                  <i className="fa-solid fa-star"></i>
+                  <i className="fa-solid fa-star"></i>
+                  <i className="fa-solid fa-star"></i>
+                  <i className="fa-solid fa-star"></i>
+                  <i className="fa-solid fa-star"></i>
+                </span>
+                <span className="tv-reviews-teaser-count">(127 reviews)</span>
+              </div>
+              <p className="tv-reviews-teaser-text">"Premium quality, tap works instantly. Clients always impressed. TapVinci is the new standard."</p>
+              <p className="tv-reviews-teaser-author">— Shua Vallinas, Founder</p>
+              <div className="tv-reviews-teaser-actions">
+                <Link href="/reviews" className="tv-btn tv-btn-gold">
+                  <i className="fa-solid fa-star" style={{ marginRight: '8px' }}></i> Leave a Review
+                </Link>
+                <Link href="/reviews" className="tv-btn tv-btn-glass">
+                  Read All Reviews
+                </Link>
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      {/* 9. FOOTER - ABSOLUTE LAST */}
       <footer className="tv-footer">
         <div className="tv-footer-mark" aria-hidden="true">TapVinci</div>
         <div className="tv-wrap tv-footer-inner">
-          <div className="tv-logo tv-logo-sm"><span className="tv-logo-tap">Tap</span><span className="tv-logo-vinci">Vinci</span></div>
-          <p className="tv-tagline">Driven by quality <i /> Chosen by those who know the difference <i /> Philippines <i /> 2026</p>
+          <div className="tv-logo tv-logo-sm flex flex-col items-center">
+            <Image src="/logo.png" alt="TapVinci" width={220} height={56} className="h-10 md:h-12 w-auto object-contain mx-auto" />
+          </div>
+          <p className="tv-tagline">A NEW STANDARD OF INTRODUCTION • MADE TO CONNECT • PHILIPPINES 2026</p>
           <div className="tv-footer-actions">
             <Link href="/dashboard" className="tv-btn tv-btn-gold tv-btn-sm">Open Dashboard</Link>
             <Link href="/admin" className="tv-btn tv-btn-glass tv-btn-sm">Admin Panel</Link>
