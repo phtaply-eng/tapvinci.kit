@@ -150,11 +150,9 @@ export default function Home() {
               <div className="tv-nfc">
                 <span className="tv-nfc-sheen" />
                 <div className="tv-nfc-top">
-                  <span className="tv-nfc-logo"><b>Tap</b>Vinci</span>
-                  <svg viewBox="0 0 32 32" width="30" height="30" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"><path d="M12 11.5a6.5 6.5 0 0 1 0 9M17 8a11.5 11.5 0 0 1 0 16M22 4.5a16.5 16.5 0 0 1 0 23" /></svg>
+                 <span className="tv-nfc-logo"><Image src="/logo.png" alt="TapVinci" width={100} height={24} className="h-5 w-auto object-contain" /></span>
                 </div>
-                <div className="tv-nfc-chip" />
-                <p className="tv-nfc-foot">A NEW STANDARD OF INTRODUCTION • MADE TO CONNECT • PHILIPPINES 2026</p>
+                <p className="tv-nfc-foot" style={{ whiteSpace: 'nowrap', fontSize: '6.5px', letterSpacing: '0.8px' }}>A NEW STANDARD OF INTRODUCTION • MADE TO CONNECT • PHILIPPINES 2026</p>
               </div>
             </div>
           </div>

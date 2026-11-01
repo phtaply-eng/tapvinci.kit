@@ -4,13 +4,13 @@ import GlowCard from './GlowCard'
 import { ICONS } from './icons'
 
 const OFFERS = [
-  { r: 'I', t: 'Digital landing pages', i: ICONS.page, p: 'A personalized digital profile for your professional details, contact information, and important links\u2014all in one place.' },
-  { r: 'II', t: 'NFC cards', i: ICONS.card, p: 'A premium physical card with built-in NFC technology, giving others access to your digital profile with a single tap.' },
+  { r: '', t: 'Digital landing pages', i: ICONS.page, p: 'A personalized digital profile for your professional details, contact information, and important links\u2014all in one place.' },
+  { r: '', t: 'NFC cards', i: ICONS.card, p: 'A premium physical card with built-in NFC technology, giving others access to your digital profile with a single tap.' },
 ]
 const STEPS = [
-  { n: '01', t: 'Tap', i: ICONS.tap, d: 8, p: 'Tap or hold the front or the back of the compatible phone against your TapVinci card.' },
-  { n: '02', t: 'Open', i: ICONS.open, d: 13, p: 'Your phone opens the digital profile, bringing contact details and links together in one place. No app is needed on most recent phones.' },
-  { n: '03', t: 'Connect', i: ICONS.connect, d: 18, p: 'Call, message, follow, or save the contact straight from the page.' },
+  { n: '', t: 'Tap', i: ICONS.tap, d: 8, p: 'Tap or hold your TapVinci card in front or back of the compatible phone.' },
+  { n: '', t: 'Open', i: ICONS.open, d: 13, p: 'Your phone opens the digital profile, bringing contact details and links together in one place. No app is needed on most recent phones.' },
+  { n: '', t: 'Connect', i: ICONS.connect, d: 18, p: 'Call, message, follow, or save the contact straight from the page.' },
 ]
 
 // Adds "tv-armed" after hydration (so the page is fully visible without JS) and "is-in" when the block scrolls into view.
