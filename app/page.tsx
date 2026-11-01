@@ -154,7 +154,7 @@ export default function Home() {
                   <svg viewBox="0 0 32 32" width="30" height="30" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"><path d="M12 11.5a6.5 6.5 0 0 1 0 9M17 8a11.5 11.5 0 0 1 0 16M22 4.5a16.5 16.5 0 0 1 0 23" /></svg>
                 </div>
                 <div className="tv-nfc-chip" />
-                <p className="tv-nfc-foot">Driven by quality · Philippines · 2026</p>
+                <p className="tv-nfc-foot">A NEW STANDARD OF INTRODUCTION • MADE TO CONNECT • PHILIPPINES 2026</p>
               </div>
             </div>
           </div>
@@ -205,7 +205,7 @@ export default function Home() {
         </div>
       </section>
 
-      {/* 9. FOOTER - ABSOLUTE LAST */}
+      {/* Footer - COPIED FROM MAIN SITE - EXACT SAME */}
       <footer className="tv-footer">
         <div className="tv-footer-mark" aria-hidden="true">TapVinci</div>
         <div className="tv-wrap tv-footer-inner">
@@ -216,9 +216,9 @@ export default function Home() {
           <div className="tv-footer-actions">
             <Link href="/dashboard" className="tv-btn tv-btn-gold tv-btn-sm">Open Dashboard</Link>
             <Link href="/admin" className="tv-btn tv-btn-glass tv-btn-sm">Admin Panel</Link>
-            <a href={`mailto:${CONTACT_EMAIL}`} className="tv-btn tv-btn-glass tv-btn-sm">Contact</a>
+            <a href="mailto:tapvinci@yahoo.com" className="tv-btn tv-btn-glass tv-btn-sm">Contact</a>
           </div>
-          <p className="tv-copy">© {new Date().getFullYear()} TapVinci • Philippines. All rights reserved.</p>
+          <p className="tv-copy">© 2026 TapVinci • Philippines. All rights reserved.</p>
         </div>
       </footer>
     </main>

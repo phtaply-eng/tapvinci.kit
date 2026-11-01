@@ -166,19 +166,12 @@ export default function HamburgerMenu() {
                 </a>
               ))}
             </div>
-
-            <a href="mailto:tapvinci@yahoo.com" className="menu-email menu-fade" style={{ ['--i' as any]: 5 } as any}>
-              tapvinci@yahoo.com
-            </a>
-
             <p className="menu-copy menu-fade" style={{ ['--i' as any]: 6 } as any}>
               © 2026 TapVinci • Philippines • All rights reserved.
             </p>
 
             {/* · Admin - ABSOLUTE LAST ELEMENT - OWNER-ONLY LOWKEY - NO ICON, NO BUTTON */}
-            <Link href="/admin" className="admin-lowkey menu-fade" onClick={close} style={{ ['--i' as any]: 7 } as any}>
-              · Admin
-            </Link>
+            <Link href="/admin" className="admin-lowkey menu-fade" onClick={close} style={{ ['--i' as any]: 7 } as any}>-ADMIN</Link>
           </div>
         </div>
       </aside>

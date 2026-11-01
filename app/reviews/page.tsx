@@ -1,6 +1,7 @@
 'use client'
 import { useState, useEffect } from 'react'
 import Link from 'next/link'
+import Image from 'next/image'
 import { Fraunces, DM_Sans } from 'next/font/google'
 import { supabase } from '../../lib/supabase'
 
@@ -141,7 +142,8 @@ export default function ReviewsPage() {
   }
 
   return (
-    <main className={`${fraunces.variable} ${dmSans.variable} tv-reviews-page`}>
+    <main className={`${fraunces.variable} ${dmSans.variable} tv-reviews-page tv-home`} style={{ background: '#050505' }}>
+  <div className="tv-vignette" aria-hidden="true" />
       {/* Header */}
       <header className="tv-reviews-header">
         <div className="tv-wrap tv-reviews-header-inner">
@@ -170,7 +172,7 @@ export default function ReviewsPage() {
             <p className="tv-reviews-avg-count">
               {totalReviews > 0 ? `${totalReviews} review${totalReviews !== 1 ? 's' : ''}` : 'No reviews yet'}
             </p>
-            <p className="tv-tagline" style={{ marginTop: '16px' }}>DRIVEN BY QUALITY • CHOSEN BY THOSE WHO KNOW THE DIFFERENCE • PHILIPPINES 2026</p>
+            <p className="tv-tagline" style={{ marginTop: '16px' }}>A NEW STANDARD OF INTRODUCTION • MADE TO CONNECT • PHILIPPINES 2026</p>
           </div>
         </div>
       </section>
@@ -294,12 +296,20 @@ export default function ReviewsPage() {
         </section>
       </div>
 
-      {/* Footer */}
-      <footer className="tv-footer" style={{ marginTop: '80px' }}>
+      {/* Footer - COPIED FROM MAIN SITE - EXACT SAME */}
+      <footer className="tv-footer">
+        <div className="tv-footer-mark" aria-hidden="true">TapVinci</div>
         <div className="tv-wrap tv-footer-inner">
-          <div className="tv-logo tv-logo-sm"><span className="tv-logo-tap">Tap</span><span className="tv-logo-vinci">Vinci</span></div>
-          <p className="tv-tagline">Driven by quality <i /> Chosen by those who know the difference <i /> Philippines <i /> 2026</p>
-          <p className="tv-copy">© 2026 TapVinci • Philippines. All rights reserved.</p>
+          <div className="tv-logo tv-logo-sm flex flex-col items-center">
+            <Image src="/logo.png" alt="TapVinci" width={220} height={56} className="h-10 md:h-12 w-auto object-contain mx-auto" />
+          </div>
+          <p className="tv-tagline">A NEW STANDARD OF INTRODUCTION • MADE TO CONNECT • PHILIPPINES 2026</p>
+          <div className="tv-footer-actions">
+            <Link href="/dashboard" className="tv-btn tv-btn-gold tv-btn-sm">Open Dashboard</Link>
+            <Link href="/admin" className="tv-btn tv-btn-glass tv-btn-sm">Admin Panel</Link>
+            <a href="mailto:tapvinci@yahoo.com" className="tv-btn tv-btn-glass tv-btn-sm">Contact</a>
+          </div>
+          <p className="tv-copy"></p>
         </div>
       </footer>
     </main>
