@@ -1302,3 +1302,32 @@ html:has(.tv-home) { scroll-behavior: smooth; }
   .tv-reviews-avg-card { padding: 24px; }
   .tv-reviews-teaser-card { padding: 24px 18px; }
 }
+
+/* ===== TapVinci flip card (black <-> white, 2-4 spins on click) - ADDED ===== */
+.tv-flip-wrap { display: flex; flex-direction: column; align-items: center; gap: 22px; width: 100%; }
+.tv-flip { position: relative; width: min(100%, 360px); aspect-ratio: 1.586; cursor: pointer; outline: none; -webkit-tap-highlight-color: transparent;
+  transform: rotateY(-14deg) rotateX(6deg) rotate(-3deg); transition: transform .9s var(--tv-ease); }
+.tv-cardviz:hover .tv-flip, .tv-flip:focus-visible { transform: rotateY(0) rotateX(0) rotate(0) translateY(-6px); }
+.tv-flip:focus-visible .tv-flip-front { box-shadow: 0 0 0 2px #FFC21C, 0 0 60px -14px rgba(212,175,55,.55); }
+.tv-flip-pop { position: absolute; inset: 0; }
+.tv-flip.is-spinning .tv-flip-pop { animation: tvFlipPop 1.8s cubic-bezier(0.16,1,0.3,1); }
+.tv-flip-inner { position: absolute; inset: 0; transform-style: preserve-3d; will-change: transform; }
+.tv-flip-face { position: absolute; inset: 0; border-radius: 22px; padding: 22px 24px; display: flex; flex-direction: column; justify-content: space-between; overflow: hidden;
+  backface-visibility: hidden; -webkit-backface-visibility: hidden; }
+.tv-flip-front { color: var(--tv-gold2); background: linear-gradient(135deg, #1b1a16 0%, #0a0a0a 45%, #17150f 100%); border: 1px solid rgba(232,199,102,.45);
+  box-shadow: 0 0 60px -14px rgba(212,175,55,.55), 0 40px 70px -30px #000, inset 0 1px 0 rgba(255,255,255,.12); }
+.tv-flip-back { transform: rotateY(180deg); color: #050505; background: linear-gradient(135deg, #FFFFFF 0%, #F5F1E8 55%, #EAE3D2 100%); border: 1px solid rgba(212,175,55,.5);
+  box-shadow: 0 0 36px -16px rgba(212,175,55,.5), 0 30px 60px -28px rgba(0,0,0,.65), inset 0 1px 0 rgba(255,255,255,.9); }
+/* the logo image is white/gold for the black side; on the white side invert it to black/gold (swap in a dark logo file if you have one) */
+.tv-flip-back .tv-nfc-logo img { filter: invert(1) hue-rotate(180deg); }
+.tv-flip-face .tv-nfc-logo { line-height: 0; }
+.tv-flip-face .tv-nfc-foot { white-space: nowrap; font-size: 6.5px; letter-spacing: .8px; }
+.tv-flip-back .tv-nfc-foot { color: rgba(5,5,5,.6); }
+.tv-flip-back .tv-nfc-sheen { background: linear-gradient(115deg, transparent 42%, rgba(212,175,55,.2) 50%, transparent 58%); }
+.tv-flip-back .tv-flip-wifi { color: #050505; }
+.tv-flip-wifi { transform-origin: 20% 80%; animation: tvWifiPulse 2.4s ease-in-out infinite; }
+.tv-flip-hint { margin: 0; font-size: 8px; letter-spacing: 2px; text-transform: uppercase; color: rgba(212,175,55,.6); transition: opacity .5s ease, transform .5s ease; }
+.tv-flip-hint.is-gone { opacity: 0; transform: translateY(-4px); }
+@keyframes tvFlipPop { 0% { transform: scale(1); } 12% { transform: scale(1.05); } 88% { transform: scale(1.05); } 100% { transform: scale(1); } }
+@keyframes tvWifiPulse { 0%, 100% { opacity: .55; transform: scale(.96); } 50% { opacity: 1; transform: scale(1.06); } }
+@media (max-width: 900px) { .tv-flip { margin-inline: auto; } }

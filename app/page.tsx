@@ -4,6 +4,7 @@ import { Fraunces, DM_Sans } from 'next/font/google'
 import FaqAccordion from '../components/home/FaqAccordion'
 import ShareCard from '../components/home/ShareCard'
 import FlowSections from '../components/home/FlowSections'
+import FlipCard from '../components/home/FlipCard'
 import { ICONS } from '../components/home/icons'
 
 const fraunces = Fraunces({ subsets: ['latin'], style: ['normal', 'italic'], variable: '--font-fraunces', display: 'swap' })
@@ -146,14 +147,8 @@ export default function Home() {
 
           <div className="tv-share-grid">
             <ShareCard url={`${SITE_URL}/`} />
-            <div className="tv-cardviz tv-rise" aria-hidden="true">
-              <div className="tv-nfc">
-                <span className="tv-nfc-sheen" />
-                <div className="tv-nfc-top">
-                 <span className="tv-nfc-logo"><Image src="/logo.png" alt="TapVinci" width={100} height={24} className="h-5 w-auto object-contain" /></span>
-                </div>
-                <p className="tv-nfc-foot" style={{ whiteSpace: 'nowrap', fontSize: '6.5px', letterSpacing: '0.8px' }}>A NEW STANDARD OF INTRODUCTION • MADE TO CONNECT • PHILIPPINES 2026</p>
-              </div>
+            <div className="tv-cardviz tv-rise">
+              <FlipCard />
             </div>
           </div>
         </div>

@@ -28,7 +28,7 @@ export default function ShareCard({ url }: { url: string }) {
       <p className="tv-share-sub">Copy the link or share it from your phone. You can also turn this link into a QR code with any QR generator.</p>
       <input className="tv-share-input" readOnly value={url} aria-label="TapVinci link" onFocus={(e) => e.currentTarget.select()} />
       <div className="tv-share-btns">
-        <button type="button" className="tv-btn tv-btn-light" onClick={copy}><i className="fa-regular fa-copy" aria-hidden="true" /> Copy link</button>
+        <button type="button" className="tv-btn tv-btn-gold" onClick={copy}><i className="fa-regular fa-copy" aria-hidden="true" /> Copy link</button>
         <button type="button" className="tv-btn tv-btn-glass" onClick={share}><i className="fa-solid fa-share-nodes" aria-hidden="true" /> Share...</button>
       </div>
       <p className="tv-share-msg" role="status" aria-live="polite">{msg}</p>
