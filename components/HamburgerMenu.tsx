@@ -1,95 +1,187 @@
 'use client'
-import { useEffect, useState } from 'react'
+import { useState, useEffect } from 'react'
 import Link from 'next/link'
-import { usePathname } from 'next/navigation'
 
-// Demo profile that "View Demo" opens (and where the menu is also shown). Override with NEXT_PUBLIC_DEMO_USERNAME.
-const DEMO = (process.env.NEXT_PUBLIC_DEMO_USERNAME || 'shua').toLowerCase()
-
-const ITEMS = [
-  { href: '/', icon: '🏠', label: 'Home', hint: 'Tap. Connect. Remember.' },
-  { href: `/${DEMO}`, icon: '👁️', label: 'View Demo', hint: '' },
-]
-
-// sections of the homepage (these work from any page that shows the menu)
-const SECTIONS = [
-  { href: '/#about', icon: '✨', label: 'About TapVinci' },
-  { href: '/#offer', icon: '💳', label: 'What We Offer' },
-  { href: '/#how-it-works', icon: '⚙️', label: 'How It Works' },
-  { href: '/#gallery', icon: '🖼️', label: 'Gallery' },
-  { href: '/#follow', icon: '📣', label: 'Follow & Share' },
-  { href: '/#faq', icon: '❓', label: 'NFC Help / FAQ' },
+const SOCIALS = [
+  { key: 'facebook', label: 'Facebook', href: 'https://facebook.com/shua.vallinas', icon: 'fa-brands fa-facebook-f' },
+  { key: 'instagram', label: 'Instagram', href: 'https://instagram.com/shuashushu', icon: 'fa-brands fa-instagram' },
+  { key: 'tiktok', label: 'TikTok', href: 'https://www.tiktok.com/@shuashushu5', icon: 'fa-brands fa-tiktok' },
 ]
 
 export default function HamburgerMenu() {
-  const pathname = usePathname() || '/'
-  const [open, setOpen] = useState(false)
+  const [isOpen, setIsOpen] = useState(false)
 
-  // close on page change and on Esc
-  useEffect(() => { setOpen(false) }, [pathname])
   useEffect(() => {
-    if (!open) return
-    const onKey = (e: KeyboardEvent) => { if (e.key === 'Escape') setOpen(false) }
-    window.addEventListener('keydown', onKey)
+    if (isOpen) {
+      document.body.style.overflow = 'hidden'
+    } else {
+      document.body.style.overflow = ''
+    }
+    return () => {
+      document.body.style.overflow = ''
+    }
+  }, [isOpen])
+
+  // Close on ESC
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') setIsOpen(false)
+    }
+    if (isOpen) window.addEventListener('keydown', onKey)
     return () => window.removeEventListener('keydown', onKey)
-  }, [open])
+  }, [isOpen])
 
-  // visible on: homepage, dashboard, demo profile. Hidden on /admin and on every other public profile.
-  const visible = pathname === '/' || pathname.startsWith('/dashboard') || pathname.toLowerCase() === `/${DEMO}`
-  if (!visible) return null
-
-  const row = 'flex items-center gap-3 h-12 px-4 rounded-xl bg-[#1E1E20] border border-[#2A2A2A] text-white text-sm hover:border-[#D4AF37]/50 transition'
+  const close = () => setIsOpen(false)
 
   return (
     <>
-      <button type="button" className="hamburger-btn" onClick={() => setOpen(true)} aria-label="Open menu" aria-expanded={open}>
-        <span /><span /><span />
+      <button
+        className={`hamburger-btn ${isOpen ? 'open' : ''}`}
+        onClick={() => setIsOpen(!isOpen)}
+        aria-label="Toggle menu"
+        aria-expanded={isOpen}
+      >
+        <span className="line"></span>
+        <span className="line"></span>
+        <span className="hamburger-dot"></span>
       </button>
 
-      {open && (
-        <div className="menu-overlay" onClick={() => setOpen(false)} role="dialog" aria-modal="true" aria-label="Menu">
-          <div className="menu-drawer" onClick={(e) => e.stopPropagation()}>
-            <div className="flex justify-between items-center mb-8">
-              <span className="text-white font-bold text-lg"><span className="text-[#E8C766]">Tap</span>Vinci</span>
-              <button type="button" onClick={() => setOpen(false)} aria-label="Close menu" className="w-8 h-8 bg-[#1E1E20] rounded-full flex items-center justify-center text-white">✕</button>
+      <div className={`menu-overlay ${isOpen ? 'open' : ''}`} onClick={close} aria-hidden="true" />
+
+      <aside className={`menu-panel ${isOpen ? 'open' : ''}`} aria-hidden={!isOpen}>
+        <div className="menu-scroll">
+          {/* Dial background art */}
+          <div className="menu-dial-wrap" aria-hidden="true">
+            <svg className="menu-dial" viewBox="-100 -100 200 200" fill="none">
+              <circle r="98.5" stroke="#D4AF37" strokeOpacity="0.28" strokeWidth="0.3" />
+              <circle r="86" stroke="#D4AF37" strokeOpacity="0.14" strokeWidth="0.25" />
+              <circle cy="-96" r="1.3" fill="#FFC21C" />
+            </svg>
+          </div>
+
+          {/* ===== TOP: Logo + Tagline ===== */}
+          <div className="menu-head">
+            <Link href="/" className="menu-logo" onClick={close} aria-label="TapVinci Home">
+              <div className="tv-logo tv-logo-sm" style={{ display: 'flex', gap: '0', fontWeight: 700, fontSize: '22px', letterSpacing: '-0.02em' }}>
+                <span className="tv-logo-tap" style={{ color: '#fff' }}>Tap</span>
+                <span className="tv-logo-vinci" style={{ color: '#D4AF37' }}>Vinci</span>
+              </div>
+            </Link>
+            <p className="menu-tagline">DRIVEN BY QUALITY • CHOSEN BY THOSE WHO KNOW THE DIFFERENCE • PHILIPPINES • 2026</p>
+            <span className="menu-gold-line" aria-hidden="true" />
+          </div>
+
+          {/* ===== MIDDLE: REQUIRED ORDER LOCKED ===== */}
+          {/* 1. Home (home icon, subtle) */}
+          {/* 2. Contact (mail icon, RIGHT AFTER HOME, subtle, 14px Montserrat) */}
+          <nav className="menu-nav" aria-label="Primary">
+            <Link
+              href="/"
+              className="menu-link menu-anim"
+              onClick={close}
+              style={{ ['--i' as any]: 0 }}
+            >
+              <span className="menu-link-main">
+                <span className="menu-link-icon"><i className="fa-solid fa-house" aria-hidden="true"></i></span>
+                Home
+              </span>
+              <span className="menu-link-end">
+                <span className="menu-link-tag">01</span>
+                <span className="menu-link-arrow"><i className="fa-solid fa-arrow-right" aria-hidden="true"></i></span>
+              </span>
+            </Link>
+
+            <Link
+              href="mailto:tapvinci@yahoo.com"
+              className="menu-link menu-anim"
+              onClick={close}
+              style={{ ['--i' as any]: 1 }}
+            >
+              <span className="menu-link-main">
+                <span className="menu-link-icon"><i className="fa-solid fa-envelope" aria-hidden="true"></i></span>
+                Contact
+              </span>
+              <span className="menu-link-end">
+                <span className="menu-link-tag">02</span>
+                <span className="menu-link-arrow"><i className="fa-solid fa-arrow-right" aria-hidden="true"></i></span>
+              </span>
+            </Link>
+
+            <Link
+              href="/reviews"
+              className="menu-link menu-anim"
+              onClick={close}
+              style={{ ['--i' as any]: 2 }}
+            >
+              <span className="menu-link-main">
+                <span className="menu-link-icon"><i className="fa-solid fa-star" aria-hidden="true"></i></span>
+                Reviews
+              </span>
+              <span className="menu-link-end">
+                <span className="menu-link-tag">03</span>
+                <span className="menu-link-arrow"><i className="fa-solid fa-arrow-right" aria-hidden="true"></i></span>
+              </span>
+            </Link>
+          </nav>
+
+          {/* 3. [24px spacer] */}
+          <div className="menu-spacer-24" aria-hidden="true" />
+
+          {/* 4. Open Dashboard (gold) + 5. View Demo (dark) */}
+          <div className="menu-btn-stack">
+            <Link
+              href="/dashboard"
+              className="menu-btn menu-btn-gold menu-anim"
+              onClick={close}
+              style={{ ['--i' as any]: 4, borderRadius: '24px' }}
+            >
+              Open Dashboard
+            </Link>
+            <Link
+              href="/shua"
+              className="menu-btn menu-btn-dark menu-anim"
+              onClick={close}
+              style={{ ['--i' as any]: 4, borderRadius: '24px' }}
+            >
+              View Demo
+            </Link>
+          </div>
+
+          {/* 6. [flex-1 spacer to push footer down] */}
+          <div className="menu-spacer-flex" aria-hidden="true" />
+
+          {/* 7. FOOTER GROUP (bottom) */}
+          <div className="menu-foot">
+            <div className="menu-socials menu-fade" style={{ ['--i' as any]: 8 } as any}>
+              {SOCIALS.map((s) => (
+                <a
+                  key={s.key}
+                  href={s.href}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="menu-social"
+                  aria-label={s.label}
+                >
+                  <i className={s.icon} aria-hidden="true"></i>
+                </a>
+              ))}
             </div>
 
-            <nav className="space-y-2 flex-1">
-              {ITEMS.map((it) => (
-                <Link key={it.label} href={it.href} className={row} onClick={() => setOpen(false)}>
-                  <span>{it.icon}</span><span>{it.label}</span>
-                  {it.hint && <span className="ml-auto text-[10px] text-gray-500">{it.hint}</span>}
-                </Link>
-              ))}
-              <Link href="/dashboard" onClick={() => setOpen(false)} className="flex items-center gap-3 h-12 px-4 rounded-xl bg-[#E8C766] text-black font-bold text-sm hover:bg-[#D4AF37] transition">
-                <span>⚡</span><span>Open Dashboard</span>
-              </Link>
+            <a href="mailto:tapvinci@yahoo.com" className="menu-email menu-fade" style={{ ['--i' as any]: 5 } as any}>
+              tapvinci@yahoo.com
+            </a>
 
-              <div className="h-px bg-[#2A2A2A] my-4" />
+            <p className="menu-copy menu-fade" style={{ ['--i' as any]: 6 } as any}>
+              © 2026 TapVinci • Philippines • All rights reserved.
+            </p>
 
-              {SECTIONS.map((it) => (
-                <Link key={it.label} href={it.href} onClick={() => setOpen(false)} className="flex items-center gap-3 h-11 px-4 rounded-xl text-gray-400 hover:text-white hover:bg-[#1E1E20] text-sm transition">
-                  <span>{it.icon}</span><span>{it.label}</span>
-                </Link>
-              ))}
-
-              <div className="h-px bg-[#2A2A2A] my-4" />
-
-              <Link href="/admin" onClick={() => setOpen(false)} className="flex items-center gap-3 h-11 px-4 rounded-xl text-gray-400 hover:text-white hover:bg-[#1E1E20] text-sm transition">
-                <span>🔐</span><span>Admin Panel - All Clients</span>
-              </Link>
-              <a href="mailto:tapvinci@yahoo.com" onClick={() => setOpen(false)} className="flex items-center gap-3 h-11 px-4 rounded-xl text-gray-400 hover:text-white hover:bg-[#1E1E20] text-sm transition">
-                <span>💬</span><span>Contact Us</span>
-              </a>
-            </nav>
-
-            <div className="mt-auto pt-6 border-t border-[#1E1E20]">
-              <p className="text-[10px] text-gray-500 uppercase tracking-widest">TapVinci • Philippines 2026</p>
-              <p className="text-[10px] text-white mt-1">Driven by quality • chosen by those who know the difference</p>
-            </div>
+            {/* · Admin - ABSOLUTE LAST ELEMENT - OWNER-ONLY LOWKEY - NO ICON, NO BUTTON */}
+            <Link href="/admin" className="admin-lowkey menu-fade" onClick={close} style={{ ['--i' as any]: 7 } as any}>
+              · Admin
+            </Link>
           </div>
         </div>
-      )}
+      </aside>
     </>
   )
 }

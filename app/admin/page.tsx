@@ -38,6 +38,15 @@ type Row = {
   [key: string]: any
 }
 
+type ReviewRow = {
+  id: string
+  name: string
+  rating: number
+  comment: string
+  created_at?: string | null
+  approved?: boolean | null
+}
+
 type SortKey = 'username' | 'name' | 'phone' | 'email' | 'theme' | 'created_at'
 
 const COLUMNS: { key: SortKey; label: string }[] = [
@@ -134,6 +143,11 @@ export default function AdminPage() {
   const [sortAsc, setSortAsc] = useState(false)
   const [toast, setToast] = useState('')
 
+  // Reviews - APPENDED FOR REVIEW SYSTEM
+  const [reviews, setReviews] = useState<ReviewRow[]>([])
+  const [reviewsLoading, setReviewsLoading] = useState(false)
+  const [reviewsSearch, setReviewsSearch] = useState('')
+
   // QR generator modal
   const [showQRModal, setShowQRModal] = useState(false)
   const [selectedProfile, setSelectedProfile] = useState<Row | null>(null)
@@ -176,8 +190,18 @@ export default function AdminPage() {
     setLoading(false)
   }, [])
 
+  const fetchReviews = async () => {
+    setReviewsLoading(true)
+    const { data, error } = await supabase.from('reviews').select('*').order('created_at', { ascending: false })
+    if (!error) setReviews((data as ReviewRow[]) || [])
+    setReviewsLoading(false)
+  }
+
   useEffect(() => {
-    if (isAuthed) fetchProfiles()
+    if (isAuthed) {
+      fetchProfiles()
+      fetchReviews()
+    }
   }, [isAuthed, fetchProfiles])
 
   const checkPassword = () => {
@@ -227,6 +251,31 @@ export default function AdminPage() {
     const withQR = profiles.filter((p) => p.gcash_qr_url || p.maya_qr_url).length
     return { total: profiles.length, thisMonth, withQR }
   }, [profiles])
+
+  // Reviews stats and filter - APPENDED FOR REVIEW SYSTEM
+  const reviewsStats = useMemo(() => {
+    const total = reviews.length
+    const avg = total > 0 ? reviews.reduce((s, r) => s + r.rating, 0) / total : 0
+    return { total, avg: Math.round(avg * 10) / 10, fiveStar: reviews.filter(r => r.rating === 5).length }
+  }, [reviews])
+
+  const filteredReviews = useMemo(() => {
+    const q = reviewsSearch.trim().toLowerCase()
+    if (!q) return reviews
+    return reviews.filter(r => 
+      r.name.toLowerCase().includes(q) || 
+      r.comment.toLowerCase().includes(q) ||
+      r.rating.toString().includes(q)
+    )
+  }, [reviews, reviewsSearch])
+
+  const handleDeleteReview = async (id: string) => {
+    if (!confirm('Delete this review? This cannot be undone.')) return
+    const { error } = await supabase.from('reviews').delete().eq('id', id)
+    if (error) return showToast('Delete failed: ' + error.message)
+    showToast('Review deleted')
+    fetchReviews()
+  }
 
   const toggleSort = (key: SortKey) => {
     if (key === sortKey) setSortAsc((v) => !v)
@@ -542,6 +591,85 @@ export default function AdminPage() {
                 )}
               </tbody>
             </table>
+          </div>
+        </div>
+
+        {/* ===== REVIEWS SECTION - APPENDED FOR REVIEW SYSTEM - APPLE LUXURY ===== */}
+        <div className="mt-12">
+          <div className="flex flex-wrap justify-between items-center gap-3 mb-6">
+            <div>
+              <h2 className="text-2xl font-bold">TapVinci Reviews</h2>
+              <p className="text-sm text-gray-400 mt-1">
+                {reviewsStats.total} total • {reviewsStats.avg} avg rating • {reviewsStats.fiveStar} five-star • <span className="text-[#D4AF37]">Premium social proof</span>
+              </p>
+            </div>
+            <div className="flex gap-2">
+              <button onClick={fetchReviews} className="h-10 px-4 rounded-full bg-[#2A2A2A] text-sm hover:bg-[#333]">Refresh Reviews</button>
+              <a href="/reviews" target="_blank" className="h-10 px-4 inline-flex items-center rounded-full bg-[#E8C766] text-black font-bold text-sm">View Reviews Page →</a>
+            </div>
+          </div>
+
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-6">
+            <div className="bg-[#121214] border border-[#2A2A2A] rounded-2xl p-4">
+              <p className="text-[11px] text-gray-400 uppercase tracking-widest">Total Reviews</p>
+              <p className="text-3xl font-bold text-[#D4AF37] mt-1">{reviewsStats.total}</p>
+            </div>
+            <div className="bg-[#121214] border border-[#2A2A2A] rounded-2xl p-4">
+              <p className="text-[11px] text-gray-400 uppercase tracking-widest">Average Rating</p>
+              <p className="text-3xl font-bold mt-1">{reviewsStats.avg} <span className="text-[#D4AF37] text-xl">★</span></p>
+            </div>
+            <div className="bg-[#121214] border border-[#2A2A2A] rounded-2xl p-4">
+              <p className="text-[11px] text-gray-400 uppercase tracking-widest">Five Stars</p>
+              <p className="text-3xl font-bold mt-1">{reviewsStats.fiveStar}</p>
+            </div>
+          </div>
+
+          <input
+            placeholder="Search reviews by name, comment, rating..."
+            value={reviewsSearch}
+            onChange={(e) => setReviewsSearch(e.target.value)}
+            className="w-full max-w-md h-11 bg-[#1E1E20] border border-[#2A2A2A] focus:border-[#D4AF37] outline-none rounded-xl px-3 text-sm mb-2"
+          />
+          <p className="text-[11px] text-gray-500 mb-4">Showing {filteredReviews.length} of {reviews.length} reviews. Gold stars = premium.</p>
+
+          <div className="bg-[#121214] border border-[#2A2A2A] rounded-2xl overflow-hidden">
+            <div className="overflow-x-auto">
+              <table className="admin-table">
+                <thead>
+                  <tr>
+                    <th>Name</th>
+                    <th>Rating</th>
+                    <th>Comment</th>
+                    <th>Date</th>
+                    <th>Actions</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {reviewsLoading ? (
+                    <tr><td colSpan={5} className="text-center text-gray-500 !py-8">Loading reviews...</td></tr>
+                  ) : filteredReviews.length === 0 ? (
+                    <tr><td colSpan={5} className="text-center text-gray-500 !py-8">{reviews.length ? 'No reviews match search.' : 'No reviews yet. Share /reviews to get first review.'}</td></tr>
+                  ) : (
+                    filteredReviews.map((r) => (
+                      <tr key={r.id}>
+                        <td className="font-bold text-white">{r.name}</td>
+                        <td>
+                          <span className="text-[#D4AF37]">
+                            {'★'.repeat(r.rating)}<span className="text-[#2A2A2A]">{'★'.repeat(5 - r.rating)}</span>
+                          </span>
+                          <span className="ml-2 text-xs text-gray-400">({r.rating})</span>
+                        </td>
+                        <td className="text-gray-300 max-w-xs truncate" title={r.comment}>{r.comment}</td>
+                        <td className="text-gray-500 whitespace-nowrap">{formatDate(r.created_at)}</td>
+                        <td>
+                          <button onClick={() => handleDeleteReview(r.id)} className="text-[11px] bg-[#1E1E20] border border-[#ef4444]/50 text-[#f87171] hover:bg-[#ef4444]/20 font-semibold px-2.5 py-1.5 rounded transition">Delete</button>
+                        </td>
+                      </tr>
+                    ))
+                  )}
+                </tbody>
+              </table>
+            </div>
           </div>
         </div>
       </div>

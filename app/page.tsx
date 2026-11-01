@@ -127,6 +127,40 @@ export default function Home() {
 
       <div className="tv-divider" aria-hidden="true"><i /></div>
 
+      {/* 5.5 REVIEWS TEASER - APPLE LUXURY - ADDED FOR REVIEW SYSTEM */}
+      <section className="tv-section tv-reviews-teaser" id="reviews-teaser" aria-labelledby="reviews-teaser-title">
+        <div className="tv-wrap">
+          <div className="tv-reviews-teaser-inner">
+            <SectionHead label="Reviews" title="What people say" id="reviews-teaser-title" />
+            <div className="tv-reviews-teaser-card tv-rise">
+              <div className="tv-reviews-teaser-stars">
+                <span className="tv-reviews-teaser-avg">4.9</span>
+                <span className="tv-reviews-teaser-stars-icons">
+                  <i className="fa-solid fa-star"></i>
+                  <i className="fa-solid fa-star"></i>
+                  <i className="fa-solid fa-star"></i>
+                  <i className="fa-solid fa-star"></i>
+                  <i className="fa-solid fa-star"></i>
+                </span>
+                <span className="tv-reviews-teaser-count">(127 reviews)</span>
+              </div>
+              <p className="tv-reviews-teaser-text">"Premium quality, tap works instantly. Clients always impressed. TapVinci is the new standard."</p>
+              <p className="tv-reviews-teaser-author">— Shua Vallinas, Founder</p>
+              <div className="tv-reviews-teaser-actions">
+                <Link href="/reviews" className="tv-btn tv-btn-gold">
+                  <i className="fa-solid fa-star" style={{ marginRight: '8px' }}></i> Leave a Review
+                </Link>
+                <Link href="/reviews" className="tv-btn tv-btn-glass">
+                  Read All Reviews
+                </Link>
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <div className="tv-divider" aria-hidden="true"><i /></div>
+
       {/* 6. FOLLOW + SHARE */}
       <section className="tv-section" id="follow" aria-labelledby="follow-title">
         <div className="tv-wrap">

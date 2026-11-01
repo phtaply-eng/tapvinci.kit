@@ -87,3 +87,28 @@ on conflict (username) do nothing;
 
 -- 7. Verify
 select username, theme, accent_color, socials_visible from profiles;
+
+-- 8. Reviews table for TapVinci review system - APPENDED - DO NOT DELETE ABOVE
+CREATE TABLE IF NOT EXISTS reviews (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  name TEXT NOT NULL,
+  rating INT NOT NULL CHECK (rating >=1 AND rating <=5),
+  comment TEXT NOT NULL,
+  created_at TIMESTAMPTZ DEFAULT NOW(),
+  approved BOOLEAN DEFAULT TRUE
+);
+
+-- RLS for reviews
+ALTER TABLE reviews ENABLE ROW LEVEL SECURITY;
+
+DROP POLICY IF EXISTS "Public read reviews" ON reviews;
+CREATE POLICY "Public read reviews" ON reviews FOR SELECT USING (approved = true);
+
+DROP POLICY IF EXISTS "Allow insert reviews" ON reviews;
+CREATE POLICY "Allow insert reviews" ON reviews FOR INSERT WITH CHECK (true);
+
+DROP POLICY IF EXISTS "Allow delete reviews" ON reviews;
+CREATE POLICY "Allow delete reviews" ON reviews FOR DELETE USING (true);
+
+DROP POLICY IF EXISTS "Allow update reviews" ON reviews;
+CREATE POLICY "Allow update reviews" ON reviews FOR UPDATE USING (true) WITH CHECK (true);
