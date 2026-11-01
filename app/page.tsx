@@ -1,5 +1,3 @@
-'use client'
-import { useEffect } from 'react'
 import Link from 'next/link'
 import Image from 'next/image'
 import { Fraunces, DM_Sans } from 'next/font/google'
@@ -18,7 +16,6 @@ const dmSans = DM_Sans({ subsets: ['latin'], variable: '--font-dmsans', display:
 const DEMO_USERNAME = (process.env.NEXT_PUBLIC_DEMO_USERNAME || 'shua').toLowerCase()
 const SITE_URL = (process.env.NEXT_PUBLIC_SITE_URL || 'https://tapvinci.vercel.app').replace(/\/+$/, '')
 const CONTACT_EMAIL = 'tapvinci@yahoo.com'
-const THEME_KEY = 'tapvinci-theme'
 const SOCIALS = [
   { key: 'facebook', label: 'Facebook', href: 'https://facebook.com/shua.vallinas', icon: 'fa-brands fa-facebook-f' },
   { key: 'instagram', label: 'Instagram', href: 'https://instagram.com/shuashushu', icon: 'fa-brands fa-instagram' },
@@ -36,16 +33,6 @@ function SectionHead({ label, title, id }: { label: string; title: string; id?: 
 }
 
 export default function Home() {
-  // Keep the homepage in sync with the theme chosen in HamburgerMenu.
-  useEffect(() => {
-    let theme = 'dark'
-    try {
-      const stored = localStorage.getItem(THEME_KEY)
-      if (stored === 'light' || stored === 'dark') theme = stored
-    } catch {}
-    document.documentElement.setAttribute('data-theme', theme)
-  }, [])
-
   return (
     <main className={`tv-home ${fraunces.variable} ${dmSans.variable}`}>
       <div className="tv-vignette" aria-hidden="true" />
