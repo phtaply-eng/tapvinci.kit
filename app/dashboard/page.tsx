@@ -150,23 +150,26 @@ export default function Dashboard() {
   const livePreviewRef = useRef<HTMLDivElement>(null)
   const editTopRef = useRef<HTMLDivElement>(null)
 
-  // FIX VOID: Set wrapper height to active panel only, not max of both
+  // FIX VOID: wrapper height follows the ACTIVE panel only, not the taller of the two.
+  // A ResizeObserver keeps it in sync when images load or the preview re-renders.
   useEffect(() => {
-    const updateHeight = () => {
-      if (!sliderWrapperRef.current) return
-      const activeEl = showLive ? livePreviewRef.current : editPanelRef.current
-      if (activeEl) {
-        const h = activeEl.scrollHeight
-        sliderWrapperRef.current.style.height = h + 'px'
-      }
-    }
+    const wrapper = sliderWrapperRef.current
+    const activeEl = showLive ? livePreviewRef.current : editPanelRef.current
+    if (!wrapper || !activeEl) return
+    const updateHeight = () => { wrapper.style.height = activeEl.scrollHeight + 'px' }
     updateHeight()
-    // Update after images load and on resize
     window.addEventListener('resize', updateHeight)
     const t = setTimeout(updateHeight, 300)
+    let ro: ResizeObserver | undefined
+    if (typeof ResizeObserver !== 'undefined') {
+      ro = new ResizeObserver(updateHeight)
+      ro.observe(activeEl)
+      if (activeEl.firstElementChild) ro.observe(activeEl.firstElementChild)
+    }
     return () => {
       window.removeEventListener('resize', updateHeight)
       clearTimeout(t)
+      ro?.disconnect()
     }
   }, [showLive, profile])
 
@@ -373,11 +376,11 @@ const { data } = await supabase.from('profiles').select('*').eq('username', DEFA
       <HamburgerMenu />
       <style jsx global>{`
         /* DASHBOARD ONLY - NO VOID FIX - Does not touch globals.css file, scoped to dashboard */
-        .dashboard-slider-wrapper { height:auto !important; min-height:auto !important; overflow:hidden !important; display:block !important; }
+        .dashboard-slider-wrapper { overflow:hidden !important; display:block !important; }
         .dashboard-slider { height:auto !important; min-height:auto !important; align-items:flex-start !important; }
         .edit-panel { height:auto !important; min-height:auto !important; padding-bottom:24px !important; margin-bottom:0 !important; }
-        .live-panel { height:auto !important; min-height:auto !important; padding-bottom:24px !important; margin-bottom:0 !important; }
-        .live-panel .taply-gold-wrapper { min-height:auto !important; height:auto !important; min-height:0 !important; padding-bottom:24px !important; }
+        .live-panel { height:auto !important; min-height:auto !important; padding-bottom:0 !important; margin-bottom:0 !important; }
+        .live-panel .taply-gold-wrapper { min-height:auto !important; height:auto !important; min-height:0 !important; padding-bottom:0 !important; }
       `}</style>
       {!showLive && (
         <button onClick={() => setShowLive(true)} className="fixed bottom-6 right-6 md:bottom-8 md:right-8 z-[9999] rounded-full px-6 py-3.5 text-[12px] font-extrabold tracking-[0.15em] uppercase shadow-[0_8px_32px_rgba(212,175,55,0.4)] transition-all duration-200 hover:scale-[1.02] active:scale-[0.98] border border-black/10" style={{ background: '#D4AF37', color: '#050505' }}>LIVE PREVIEW ↓</button>
@@ -387,7 +390,7 @@ const { data } = await supabase.from('profiles').select('*').eq('username', DEFA
       )}
 
       <div className="bg-[#050505] text-white p-4 h-auto min-h-0 pb-6" style={{ height: 'auto', minHeight: 0 }}>
-        <div className="dashboard-slider-wrapper overflow-hidden w-full h-auto min-h-0" ref={sliderWrapperRef} style={{ height: 'auto', minHeight: 0, transition: 'height 0.3s ease' }}>
+        <div className="dashboard-slider-wrapper overflow-hidden w-full h-auto min-h-0" ref={sliderWrapperRef} style={{ transition: 'height 0.3s ease' }}>
           <div className="dashboard-slider flex w-[200%] items-start will-change-transform" style={{ transform: showLive ? 'translateX(-50%) translate3d(0,0,0)' : 'translateX(0) translate3d(0,0,0)', transition: 'transform 0.5s cubic-bezier(0.4,0,0.2,1)' }}>
             <div ref={editPanelRef} className="w-[50%] flex-shrink-0 px-1 lg:px-3 h-auto min-h-0" style={{ height: 'auto', minHeight: 0 }}>
               <div className="max-w-7xl mx-auto h-auto min-h-0" style={{ height: 'auto', minHeight: 0 }}>
