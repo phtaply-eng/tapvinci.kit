@@ -111,7 +111,7 @@ export default function Dashboard() {
     phone: '+63 908 327 4971',
     email: 'tapvinci@yahoo.com',
     address: 'Quezon City, Philippines',
-    mapsLink: 'https://maps.app.goo.gl/9JxYrjC499aCfgxW7',
+    mapsLink: 'https://maps.app.goo.gl/Rz2wrV8uDwbg4qox7',
     accent_color: '#D4AF37',
     theme: 'gold',
     galleryTitle: 'Gallery',
@@ -144,6 +144,15 @@ export default function Dashboard() {
   const [liveUrl, setLiveUrl] = useState('')
   const [toast, setToast] = useState('')
   const toastTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
+  const livePreviewRef = useRef<HTMLDivElement>(null)
+  const editTopRef = useRef<HTMLDivElement>(null)
+
+  const scrollToLivePreview = () => {
+    document.getElementById('live-preview-section')?.scrollIntoView({ behavior: 'smooth', block: 'start' })
+  }
+  const scrollToEditTop = () => {
+    editTopRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' })
+  }
 
   const showToast = (msg: string) => {
     setToast(msg)
@@ -339,10 +348,39 @@ const { data } = await supabase.from('profiles').select('*').eq('username', DEFA
   return (
     <>
       <HamburgerMenu />
-      <div className="min-h-screen bg-black text-white p-4">
+
+      {/* Floating middle-outside - desktop circular gold */}
+      <button
+        onClick={scrollToLivePreview}
+        aria-label="View Live Preview"
+        className="hidden md:flex fixed right-4 top-1/2 -translate-y-1/2 z-40 w-[44px] h-[44px] rounded-full items-center justify-center transition-all hover:scale-110 active:scale-95 group"
+        style={{ background: 'rgba(18,18,20,0.9)', border: '1px solid #D4AF37', backdropFilter: 'blur(12px)', boxShadow: '0 4px 20px rgba(212,175,55,0.25)' }}
+      >
+        <i className="fa-solid fa-arrow-down text-[#D4AF37] group-hover:text-[#E8C766] text-[14px]"></i>
+      </button>
+
+      {/* Mobile floating pill */}
+      <button
+        onClick={scrollToLivePreview}
+        className="md:hidden fixed right-4 bottom-6 z-40 rounded-full px-5 py-3 text-[11px] font-bold tracking-[0.15em] uppercase shadow-xl transition-all active:scale-95"
+        style={{ background: '#D4AF37', color: '#050505' }}
+      >
+        Live Preview ↓
+      </button>
+
+      <div className="min-h-screen bg-[#050505] text-white p-4">
       <div className="max-w-7xl mx-auto grid grid-cols-1 lg:grid-cols-2 gap-8">
-        <div className="space-y-4 bg-zinc-900 p-6 rounded-2xl h-fit max-h-[95vh] overflow-y-auto">
-          <h1 className="text-xl font-bold">Edit Profile</h1>
+        <div ref={editTopRef} className="space-y-4 bg-zinc-900 p-6 rounded-2xl h-fit max-h-[95vh] overflow-y-auto scroll-mt-24">
+          <div className="flex items-center justify-between gap-3 mr-14">
+            <h1 className="text-xl font-bold">Edit Profile</h1>
+            <button
+              onClick={scrollToLivePreview}
+              className="rounded-full px-5 py-2 text-[11px] font-bold uppercase tracking-[0.15em] transition-all hover:brightness-110 active:scale-[0.98] shrink-0"
+              style={{ background: '#D4AF37', color: '#050505' }}
+            >
+              View Live Preview ↓
+            </button>
+          </div>
           
           {/* 1. USERNAME */}
           <label className="block text-[11px] tracking-widest text-zinc-400 uppercase">Username<input value={profile.username} onChange={e => setProfile({...profile, username: e.target.value.toLowerCase()})} className={inputCls} /></label>
@@ -584,11 +622,29 @@ const { data } = await supabase.from('profiles').select('*').eq('username', DEFA
             </div>
           </div>
 
+          <button
+            onClick={scrollToLivePreview}
+            type="button"
+            className="w-full py-3.5 rounded-xl font-bold border text-[11px] uppercase tracking-[0.15em] transition-all hover:border-[#D4AF37] hover:text-[#D4AF37]"
+            style={{ borderColor: '#2A2A2A', color: '#F5F1E8', background: 'transparent' }}
+          >
+            See Live Preview → Order Matches Edit Form ↓
+          </button>
+
           <button onClick={save} disabled={saving || heroUploading || galleryUploading || gcashUploading || mayaUploading} className="w-full py-3 rounded-xl font-bold hover:brightness-110 disabled:opacity-50" style={{background: profile.accent_color, color: 'black'}}>{saving ? 'Saving...' : 'Save Profile'}</button>
         </div>
 
-        <div className="lg:sticky lg:top-4">
-          <p className="mb-4 text-zinc-400 text-sm">Live Preview — Order Matches Edit Form:</p>
+        <div ref={livePreviewRef} id="live-preview-section" className="lg:sticky lg:top-4 scroll-mt-24">
+          <div className="flex items-center justify-between mb-4 gap-3">
+            <p className="text-zinc-400 text-sm">Live Preview — Order Matches Edit Form:</p>
+            <button
+              onClick={scrollToEditTop}
+              className="rounded-full px-4 py-1.5 text-[10px] font-bold uppercase tracking-[0.15em] border bg-[#121214] hover:border-[#D4AF37] hover:text-[#D4AF37] transition-all shrink-0"
+              style={{ borderColor: '#2A2A2A', color: '#F5F1E8' }}
+            >
+              ↑ Back to Edit
+            </button>
+          </div>
           <TaplyTemplate profile={profile} />
         </div>
       </div>
