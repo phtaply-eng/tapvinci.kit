@@ -348,27 +348,21 @@ const { data } = await supabase.from('profiles').select('*').eq('username', DEFA
   return (
     <>
       <HamburgerMenu />
-      <button onClick={() => setShowLive(!showLive)} className="hidden md:flex fixed right-4 top-1/2 -translate-y-1/2 z-40 w-[44px] h-[44px] rounded-full items-center justify-center transition-all hover:scale-110 active:scale-95 group" style={{ background: 'rgba(18,18,20,0.9)', border: '1px solid #D4AF37', backdropFilter: 'blur(12px)', boxShadow: '0 4px 20px rgba(212,175,55,0.25)' }}>
-        <i className={`fa-solid ${showLive ? 'fa-pen' : 'fa-arrow-down'} text-[#D4AF37] text-[14px]`}></i>
-      </button>
-      <button onClick={() => setShowLive(!showLive)} className="md:hidden fixed right-4 bottom-6 z-40 rounded-full px-5 py-3 text-[11px] font-bold tracking-[0.15em] uppercase shadow-xl" style={{ background: showLive ? '#1E1E20' : '#D4AF37', color: showLive ? '#F5F1E8' : '#050505' }}>
-        {showLive ? 'Edit ↑' : 'Preview ↓'}
-      </button>
+      {!showLive && (
+        <button onClick={() => setShowLive(true)} className="fixed bottom-6 right-6 md:bottom-8 md:right-8 z-[9999] rounded-full px-6 py-3.5 text-[12px] font-extrabold tracking-[0.15em] uppercase shadow-[0_8px_32px_rgba(212,175,55,0.4)] transition-all duration-200 hover:scale-[1.02] active:scale-[0.98] border border-black/10" style={{ background: '#D4AF37', color: '#050505' }}>LIVE PREVIEW ↓</button>
+      )}
+      {showLive && (
+        <button onClick={() => setShowLive(false)} className="fixed bottom-6 right-6 md:bottom-8 md:right-8 z-[9999] rounded-full px-6 py-3.5 text-[12px] font-extrabold tracking-[0.15em] uppercase shadow-[0_8px_32px_rgba(212,175,55,0.4)] transition-all duration-200 hover:scale-[1.02] active:scale-[0.98] border border-black/10" style={{ background: '#D4AF37', color: '#050505' }}>↑ BACK TO EDIT</button>
+      )}
+
       <div className="min-h-screen bg-[#050505] text-white p-4">
         <div className="dashboard-slider-wrapper overflow-hidden w-full">
-          <div className="dashboard-slider flex w-[200%] will-change-transform" style={{ transform: showLive ? 'translateX(-50%)' : 'translateX(0)', transition: 'transform 0.5s cubic-bezier(0.4,0,0.2,1)' }}>
+          <div className="dashboard-slider flex w-[200%] will-change-transform" style={{ transform: showLive ? 'translateX(-50%) translate3d(0,0,0)' : 'translateX(0) translate3d(0,0,0)', transition: 'transform 0.5s cubic-bezier(0.4,0,0.2,1)' }}>
             <div className="w-[50%] flex-shrink-0 px-1 lg:px-3">
               <div className="max-w-7xl mx-auto">
 <div ref={editTopRef} className="space-y-4 bg-zinc-900 p-6 rounded-2xl h-fit max-h-[95vh] overflow-y-auto scroll-mt-24 order-2 lg:order-2">
-          <div className="flex items-center justify-between gap-3 mr-14">
+          <div className="flex items-center justify-between gap-3">
             <h1 className="text-xl font-bold">Edit Profile</h1>
-            <button
-              onClick={() => setShowLive(true)}
-              className="rounded-full px-5 py-2 text-[11px] font-bold uppercase tracking-[0.15em] transition-all hover:brightness-110 active:scale-[0.98] shrink-0"
-              style={{ background: '#D4AF37', color: '#050505' }}
-            >
-              View Live Preview ↓
-            </button>
           </div>
           
           {/* 1. USERNAME */}
@@ -604,7 +598,7 @@ const { data } = await supabase.from('profiles').select('*').eq('username', DEFA
 
 
           <button
-            onClick={() => setShowLive(true)}
+            onClick={scrollToLivePreview}
             type="button"
             className="w-full py-3.5 rounded-xl font-bold border text-[11px] uppercase tracking-[0.15em] transition-all hover:border-[#D4AF37] hover:text-[#D4AF37]"
             style={{ borderColor: '#2A2A2A', color: '#F5F1E8', background: 'transparent' }}
@@ -619,10 +613,6 @@ const { data } = await supabase.from('profiles').select('*').eq('username', DEFA
             <div className="w-[50%] flex-shrink-0 px-1 lg:px-3">
               <div className="max-w-7xl mx-auto">
                 <div ref={livePreviewRef} id="live-preview-section" className="scroll-mt-24">
-                  <div className="flex items-center justify-between mb-4 gap-3">
-                    <p className="text-zinc-400 text-sm font-bold tracking-wide">Live Preview — Order Matches Edit Form: <span className="text-[#D4AF37] text-[11px]">DEFAULT</span></p>
-                    <button onClick={() => setShowLive(false)} className="rounded-full px-5 py-2 text-[11px] font-bold uppercase tracking-[0.15em] border bg-[#1E1E20]" style={{ borderColor: '#2A2A2A', color: '#F5F1E8' }}>↓ EDIT FORM</button>
-                  </div>
                   <TaplyTemplate profile={profile} />
                 </div>
               </div>
@@ -630,8 +620,22 @@ const { data } = await supabase.from('profiles').select('*').eq('username', DEFA
           </div>
         </div>
       </div>
-      {showSuccessModal && (<div className="success-modal-overlay" onClick={() => setShowSuccessModal(false)}><div className="success-modal" onClick={e => e.stopPropagation()}><div className="success-check">✓</div><h3>Profile Saved!</h3><div className="live-url-box"><span>{liveUrl}</span><button onClick={() => copyLink(liveUrl)}>Copy</button></div><a href={liveUrl} target="_blank">View Live</a><button onClick={() => setShowSuccessModal(false)}>Close</button></div></div>)}
-      {toast && <div className="success-toast">{toast}</div>}
+
+      {showSuccessModal && (
+        <div className="success-modal-overlay" onClick={() => setShowSuccessModal(false)} role="dialog" aria-modal="true" aria-label="Profile saved">
+          <div className="success-modal" onClick={e => e.stopPropagation()}>
+            <div className="success-check">✓</div>
+            <h3 className="success-title">Profile Saved!</h3>
+            <p className="success-sub">Your TapVinci is now live</p>
+            <div className="live-url-box"><span className="live-url-text">{liveUrl}</span><button onClick={() => copyLink(liveUrl)} className="live-url-copy">Copy</button></div>
+            <div className="mt-4 grid grid-cols-1 gap-3"><a href={liveUrl} target="_blank" rel="noopener noreferrer" className="success-primary-btn">View My Live Profile → /{profile.username.toLowerCase()}</a><div className="grid grid-cols-2 gap-3"><button onClick={() => copyLink(liveUrl)} className="success-secondary-btn">Copy Link</button><button onClick={() => downloadQR(liveUrl)} className="success-secondary-btn">Download QR of my link</button></div></div>
+            <div className="success-qr-box"><img src={`https://api.qrserver.com/v1/create-qr-code/?size=320x320&margin=0&format=png&data=${encodeURIComponent(liveUrl)}`} alt="QR code" width={136} height={136} /></div>
+            <p className="success-hint">Scan to view profile • Print this QR on your NFC card</p>
+            <button onClick={() => setShowSuccessModal(false)} className="success-close">Close</button>
+          </div>
+        </div>
+      )}
+      {toast && <div className="success-toast" role="status">{toast}</div>}
     </>
   )
 }
