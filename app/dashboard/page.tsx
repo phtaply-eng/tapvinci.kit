@@ -380,13 +380,16 @@ const { data } = await supabase.from('profiles').select('*').eq('username', DEFA
         .dashboard-slider { height:auto !important; min-height:auto !important; align-items:flex-start !important; }
         .edit-panel { height:auto !important; min-height:auto !important; padding-bottom:24px !important; margin-bottom:0 !important; }
         .live-panel { height:auto !important; min-height:auto !important; padding-bottom:0 !important; margin-bottom:0 !important; }
+        /* Floating buttons sit BELOW the hamburger overlay (z 40) and fade out while the menu is open */
+        .floating-toggle-btn { transition: opacity .3s ease, transform .3s ease; }
+        body:has(.menu-panel.open) .floating-toggle-btn { opacity:0 !important; transform:translateY(16px) !important; pointer-events:none !important; }
         .live-panel .taply-gold-wrapper { min-height:auto !important; height:auto !important; min-height:0 !important; padding-bottom:0 !important; }
       `}</style>
       {!showLive && (
-        <button onClick={() => setShowLive(true)} className="fixed bottom-6 right-6 md:bottom-8 md:right-8 z-[9999] rounded-full px-6 py-3.5 text-[12px] font-extrabold tracking-[0.15em] uppercase shadow-[0_8px_32px_rgba(212,175,55,0.4)] transition-all duration-200 hover:scale-[1.02] active:scale-[0.98] border border-black/10" style={{ background: '#D4AF37', color: '#050505' }}>LIVE PREVIEW ↓</button>
+        <button onClick={() => setShowLive(true)} className="floating-toggle-btn fixed bottom-6 right-6 md:bottom-8 md:right-8 z-[30] rounded-full px-6 py-3.5 text-[12px] font-extrabold tracking-[0.15em] uppercase shadow-[0_8px_32px_rgba(212,175,55,0.4)] transition-all duration-200 hover:scale-[1.02] active:scale-[0.98] border border-black/10" style={{ background: '#D4AF37', color: '#050505' }}>LIVE PREVIEW ↓</button>
       )}
       {showLive && (
-        <button onClick={() => setShowLive(false)} className="fixed bottom-6 right-6 md:bottom-8 md:right-8 z-[9999] rounded-full px-6 py-3.5 text-[12px] font-extrabold tracking-[0.15em] uppercase shadow-[0_8px_32px_rgba(212,175,55,0.4)] transition-all duration-200 hover:scale-[1.02] active:scale-[0.98] border border-black/10" style={{ background: '#D4AF37', color: '#050505' }}>↑ BACK TO EDIT</button>
+        <button onClick={() => setShowLive(false)} className="floating-toggle-btn fixed bottom-6 right-6 md:bottom-8 md:right-8 z-[30] rounded-full px-6 py-3.5 text-[12px] font-extrabold tracking-[0.15em] uppercase shadow-[0_8px_32px_rgba(212,175,55,0.4)] transition-all duration-200 hover:scale-[1.02] active:scale-[0.98] border border-black/10" style={{ background: '#D4AF37', color: '#050505' }}>↑ BACK TO EDIT</button>
       )}
 
       <div className="bg-[#050505] text-white p-4 h-auto min-h-0 pb-6" style={{ height: 'auto', minHeight: 0 }}>
