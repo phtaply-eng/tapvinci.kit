@@ -154,7 +154,7 @@ export default function Home() {
       <div className="tv-divider" aria-hidden="true"><i /></div>
 
       {/* 8. REVIEWS - MOVED TO VERY BOTTOM - TRUST ANCHOR BEFORE FOOTER - APPLE-LEVEL SOCIAL PROOF */}
-      <section className="tv-section tv-reviews-teaser" id="reviews-teaser" aria-labelledby="reviews-teaser-title">
+      <section className="tv-section tv-reviews-teaser" id="reviews-teaser" style={{ background: "#050505" }} aria-labelledby="reviews-teaser-title">
         <div className="tv-wrap">
           <div className="tv-reviews-teaser-inner">
             <SectionHead label="Reviews" title="What people say" id="reviews-teaser-title" />
@@ -184,6 +184,8 @@ export default function Home() {
           </div>
         </div>
       </section>
+
+      <div className="tv-divider" aria-hidden="true"><i /></div>
 
       {/* Footer - COPIED FROM MAIN SITE - EXACT SAME */}
       <SiteFooter copyright="© 2026 TapVinci • Philippines. All rights reserved." />

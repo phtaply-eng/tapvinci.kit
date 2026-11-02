@@ -296,6 +296,9 @@ export default function ReviewsPage() {
         </section>
       </div>
 
+      {/* Divider - pushed down 100px to not overlap review box */}
+      <div className="tv-divider" aria-hidden="true" style={{ marginTop: '50px', marginBottom: '20px' }}><i /></div>
+
       {/* Footer - COPIED FROM MAIN SITE - EXACT SAME */}
       <SiteFooter />
     </main>
