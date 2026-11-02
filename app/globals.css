@@ -1295,3 +1295,4 @@ html:has(.tv-home) { scroll-behavior: smooth; }
 
 .dashboard-slider-wrapper { overflow:hidden; width:100%; }
 .dashboard-slider { display:flex; width:200%; will-change:transform; transition: transform 0.5s cubic-bezier(0.4,0,0.2,1); }
+

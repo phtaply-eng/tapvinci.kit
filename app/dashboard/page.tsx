@@ -140,6 +140,8 @@ export default function Dashboard() {
   const [dragOverGcash, setDragOverGcash] = useState(false)
   const [dragOverMaya, setDragOverMaya] = useState(false)
   const [showLive, setShowLive] = useState(false)
+  const sliderWrapperRef = useRef<HTMLDivElement>(null)
+  const editPanelRef = useRef<HTMLDivElement>(null)
   // After-save UX
   const [showSuccessModal, setShowSuccessModal] = useState(false)
   const [liveUrl, setLiveUrl] = useState('')
@@ -147,6 +149,27 @@ export default function Dashboard() {
   const toastTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
   const livePreviewRef = useRef<HTMLDivElement>(null)
   const editTopRef = useRef<HTMLDivElement>(null)
+
+  // FIX VOID: Set wrapper height to active panel only, not max of both
+  useEffect(() => {
+    const updateHeight = () => {
+      if (!sliderWrapperRef.current) return
+      const activeEl = showLive ? livePreviewRef.current : editPanelRef.current
+      if (activeEl) {
+        const h = activeEl.scrollHeight
+        sliderWrapperRef.current.style.height = h + 'px'
+      }
+    }
+    updateHeight()
+    // Update after images load and on resize
+    window.addEventListener('resize', updateHeight)
+    const t = setTimeout(updateHeight, 300)
+    return () => {
+      window.removeEventListener('resize', updateHeight)
+      clearTimeout(t)
+    }
+  }, [showLive, profile])
+
 
   const scrollToLivePreview = () => {
     document.getElementById('live-preview-section')?.scrollIntoView({ behavior: 'smooth', block: 'start' })
@@ -348,6 +371,14 @@ const { data } = await supabase.from('profiles').select('*').eq('username', DEFA
   return (
     <>
       <HamburgerMenu />
+      <style jsx global>{`
+        /* DASHBOARD ONLY - NO VOID FIX - Does not touch globals.css file, scoped to dashboard */
+        .dashboard-slider-wrapper { height:auto !important; min-height:auto !important; overflow:hidden !important; display:block !important; }
+        .dashboard-slider { height:auto !important; min-height:auto !important; align-items:flex-start !important; }
+        .edit-panel { height:auto !important; min-height:auto !important; padding-bottom:24px !important; margin-bottom:0 !important; }
+        .live-panel { height:auto !important; min-height:auto !important; padding-bottom:24px !important; margin-bottom:0 !important; }
+        .live-panel .taply-gold-wrapper { min-height:auto !important; height:auto !important; min-height:0 !important; padding-bottom:24px !important; }
+      `}</style>
       {!showLive && (
         <button onClick={() => setShowLive(true)} className="fixed bottom-6 right-6 md:bottom-8 md:right-8 z-[9999] rounded-full px-6 py-3.5 text-[12px] font-extrabold tracking-[0.15em] uppercase shadow-[0_8px_32px_rgba(212,175,55,0.4)] transition-all duration-200 hover:scale-[1.02] active:scale-[0.98] border border-black/10" style={{ background: '#D4AF37', color: '#050505' }}>LIVE PREVIEW ↓</button>
       )}
@@ -355,12 +386,12 @@ const { data } = await supabase.from('profiles').select('*').eq('username', DEFA
         <button onClick={() => setShowLive(false)} className="fixed bottom-6 right-6 md:bottom-8 md:right-8 z-[9999] rounded-full px-6 py-3.5 text-[12px] font-extrabold tracking-[0.15em] uppercase shadow-[0_8px_32px_rgba(212,175,55,0.4)] transition-all duration-200 hover:scale-[1.02] active:scale-[0.98] border border-black/10" style={{ background: '#D4AF37', color: '#050505' }}>↑ BACK TO EDIT</button>
       )}
 
-      <div className="min-h-screen bg-[#050505] text-white p-4">
-        <div className="dashboard-slider-wrapper overflow-hidden w-full">
-          <div className="dashboard-slider flex w-[200%] will-change-transform" style={{ transform: showLive ? 'translateX(-50%) translate3d(0,0,0)' : 'translateX(0) translate3d(0,0,0)', transition: 'transform 0.5s cubic-bezier(0.4,0,0.2,1)' }}>
-            <div className="w-[50%] flex-shrink-0 px-1 lg:px-3">
-              <div className="max-w-7xl mx-auto">
-<div ref={editTopRef} className="space-y-4 bg-zinc-900 p-6 rounded-2xl h-fit max-h-[95vh] overflow-y-auto scroll-mt-24 order-2 lg:order-2">
+      <div className="bg-[#050505] text-white p-4 h-auto min-h-0 pb-6" style={{ height: 'auto', minHeight: 0 }}>
+        <div className="dashboard-slider-wrapper overflow-hidden w-full h-auto min-h-0" ref={sliderWrapperRef} style={{ height: 'auto', minHeight: 0, transition: 'height 0.3s ease' }}>
+          <div className="dashboard-slider flex w-[200%] items-start will-change-transform" style={{ transform: showLive ? 'translateX(-50%) translate3d(0,0,0)' : 'translateX(0) translate3d(0,0,0)', transition: 'transform 0.5s cubic-bezier(0.4,0,0.2,1)' }}>
+            <div ref={editPanelRef} className="w-[50%] flex-shrink-0 px-1 lg:px-3 h-auto min-h-0" style={{ height: 'auto', minHeight: 0 }}>
+              <div className="max-w-7xl mx-auto h-auto min-h-0" style={{ height: 'auto', minHeight: 0 }}>
+<div ref={editTopRef} className="edit-panel space-y-4 bg-zinc-900 p-6 rounded-2xl h-auto min-h-0 pb-6" style={{ height: 'auto', minHeight: 0 }}>
           <div className="flex items-center justify-between gap-3">
             <h1 className="text-xl font-bold">Edit Profile</h1>
           </div>
@@ -610,9 +641,9 @@ const { data } = await supabase.from('profiles').select('*').eq('username', DEFA
         </div>
               </div>
             </div>
-            <div className="w-[50%] flex-shrink-0 px-1 lg:px-3">
-              <div className="max-w-7xl mx-auto">
-                <div ref={livePreviewRef} id="live-preview-section" className="scroll-mt-24">
+            <div className="w-[50%] flex-shrink-0 px-1 lg:px-3 h-auto min-h-0">
+              <div className="max-w-7xl mx-auto h-auto min-h-0">
+                <div ref={livePreviewRef} id="live-preview-section" className="live-panel scroll-mt-24 h-auto min-h-0 pb-6">
                   <TaplyTemplate profile={profile} />
                 </div>
               </div>
