@@ -139,6 +139,7 @@ export default function Dashboard() {
   const [dragOverGallery, setDragOverGallery] = useState(false)
   const [dragOverGcash, setDragOverGcash] = useState(false)
   const [dragOverMaya, setDragOverMaya] = useState(false)
+  const [showLive, setShowLive] = useState(false)
   // After-save UX
   const [showSuccessModal, setShowSuccessModal] = useState(false)
   const [liveUrl, setLiveUrl] = useState('')
@@ -344,37 +345,25 @@ const { data } = await supabase.from('profiles').select('*').eq('username', DEFA
 
   const inputCls = "w-full mt-1 p-2.5 rounded-lg bg-zinc-800 border border-zinc-700 focus:border-[#D4AF37] outline-none text-sm"
   const activeSocialCount = SOCIALS_CONFIG.filter(s => profile.socials_visible[s.key] && profile.socials[s.key]?.trim()).length
-
   return (
     <>
       <HamburgerMenu />
-
-      {/* Floating middle-outside - desktop circular gold */}
-      <button
-        onClick={scrollToLivePreview}
-        aria-label="View Live Preview"
-        className="hidden md:flex fixed right-4 top-1/2 -translate-y-1/2 z-40 w-[44px] h-[44px] rounded-full items-center justify-center transition-all hover:scale-110 active:scale-95 group"
-        style={{ background: 'rgba(18,18,20,0.9)', border: '1px solid #D4AF37', backdropFilter: 'blur(12px)', boxShadow: '0 4px 20px rgba(212,175,55,0.25)' }}
-      >
-        <i className="fa-solid fa-arrow-down text-[#D4AF37] group-hover:text-[#E8C766] text-[14px]"></i>
+      <button onClick={() => setShowLive(!showLive)} className="hidden md:flex fixed right-4 top-1/2 -translate-y-1/2 z-40 w-[44px] h-[44px] rounded-full items-center justify-center transition-all hover:scale-110 active:scale-95 group" style={{ background: 'rgba(18,18,20,0.9)', border: '1px solid #D4AF37', backdropFilter: 'blur(12px)', boxShadow: '0 4px 20px rgba(212,175,55,0.25)' }}>
+        <i className={`fa-solid ${showLive ? 'fa-pen' : 'fa-arrow-down'} text-[#D4AF37] text-[14px]`}></i>
       </button>
-
-      {/* Mobile floating pill */}
-      <button
-        onClick={scrollToLivePreview}
-        className="md:hidden fixed right-4 bottom-6 z-40 rounded-full px-5 py-3 text-[11px] font-bold tracking-[0.15em] uppercase shadow-xl transition-all active:scale-95"
-        style={{ background: '#D4AF37', color: '#050505' }}
-      >
-        Live Preview ↓
+      <button onClick={() => setShowLive(!showLive)} className="md:hidden fixed right-4 bottom-6 z-40 rounded-full px-5 py-3 text-[11px] font-bold tracking-[0.15em] uppercase shadow-xl" style={{ background: showLive ? '#1E1E20' : '#D4AF37', color: showLive ? '#F5F1E8' : '#050505' }}>
+        {showLive ? 'Edit ↑' : 'Preview ↓'}
       </button>
-
       <div className="min-h-screen bg-[#050505] text-white p-4">
-      <div className="max-w-7xl mx-auto grid grid-cols-1 lg:grid-cols-2 gap-8">
-        <div ref={editTopRef} className="space-y-4 bg-zinc-900 p-6 rounded-2xl h-fit max-h-[95vh] overflow-y-auto scroll-mt-24">
+        <div className="dashboard-slider-wrapper overflow-hidden w-full">
+          <div className="dashboard-slider flex w-[200%] will-change-transform" style={{ transform: showLive ? 'translateX(-50%)' : 'translateX(0)', transition: 'transform 0.5s cubic-bezier(0.4,0,0.2,1)' }}>
+            <div className="w-[50%] flex-shrink-0 px-1 lg:px-3">
+              <div className="max-w-7xl mx-auto">
+<div ref={editTopRef} className="space-y-4 bg-zinc-900 p-6 rounded-2xl h-fit max-h-[95vh] overflow-y-auto scroll-mt-24 order-2 lg:order-2">
           <div className="flex items-center justify-between gap-3 mr-14">
             <h1 className="text-xl font-bold">Edit Profile</h1>
             <button
-              onClick={scrollToLivePreview}
+              onClick={() => setShowLive(true)}
               className="rounded-full px-5 py-2 text-[11px] font-bold uppercase tracking-[0.15em] transition-all hover:brightness-110 active:scale-[0.98] shrink-0"
               style={{ background: '#D4AF37', color: '#050505' }}
             >
@@ -456,11 +445,12 @@ const { data } = await supabase.from('profiles').select('*').eq('username', DEFA
               <p className="text-[11px] text-zinc-400">or click to pick from computer — multiple allowed</p>
             </div>
             {profile.gallery && profile.gallery.length > 0 && (
-              <div className="grid grid-cols-3 gap-2 mt-2">
+              <div className="space-y-1 mt-2">
+                <p className="text-[11px] text-[#D4AF37]">✓ {profile.gallery.length} image(s) saved - Visible in Live Preview</p>
                 {profile.gallery.map((item:any, idx:number) => (
-                  <div key={idx} className="relative group">
-                    <img src={typeof item === 'string' ? item : item.src} alt={`Gallery ${idx+1}`} className="w-full h-20 rounded-lg object-cover border border-zinc-700" />
-                    <button onClick={() => removeGalleryItem(idx)} className="absolute -top-2 -right-2 bg-red-500 text-white rounded-full w-5 h-5 flex items-center justify-center text-[10px] opacity-0 group-hover:opacity-100">×</button>
+                  <div key={idx} className="flex items-center justify-between bg-[#1A1A1C] rounded-[8px] px-3 py-2 border border-dashed border-[#3a3a3c]">
+                    <span className="text-[11px] text-zinc-400">/gallery-{idx+1}.webp</span>
+                    <button onClick={() => removeGalleryItem(idx)} className="text-[11px] text-zinc-500 hover:text-red-400">Remove</button>
                   </div>
                 ))}
               </div>
@@ -537,7 +527,7 @@ const { data } = await supabase.from('profiles').select('*').eq('username', DEFA
             </div>
           </div>
 
-          {/* 8. PAYMENT QR CODES - Put at very bottom, before Save */}
+          {/* 8. PAYMENT QR CODES - DESIRED: 2 drop zones */}
           <div className="space-y-4 border-t border-zinc-800 pt-6">
             <div>
               <div className="flex items-center justify-between">
@@ -552,78 +542,69 @@ const { data } = await supabase.from('profiles').select('*').eq('username', DEFA
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               {/* GCASH */}
               <div className="space-y-2">
-                <div className="flex items-center justify-between mb-2">
+                <div className="flex items-center justify-between">
                   <p className="text-[11px] uppercase tracking-widest text-zinc-400 font-bold">GCash QR {profile.socials_visible.gcash_qr !== false ? <span className="text-[9px] bg-green-500/20 px-1.5 py-0.5 rounded text-green-300 ml-2">VISIBLE</span> : <span className="text-[9px] bg-red-500/20 px-1.5 py-0.5 rounded text-red-300 ml-2">HIDDEN</span>}</p>
-                  <button onClick={() => toggleVisibility('gcash_qr')} className={`px-3 py-1.5 rounded-full text-[11px] font-bold flex items-center gap-1.5 ${profile.socials_visible.gcash_qr !== false ? 'bg-green-500/20 text-green-300 border border-green-500/30' : 'bg-red-500/20 text-red-300 border border-red-500/30'}`}><i className={`fa-solid ${profile.socials_visible.gcash_qr !== false ? 'fa-eye' : 'fa-eye-slash'}`}></i>{profile.socials_visible.gcash_qr !== false ? 'Show' : 'Hide'}</button>
+                  <button onClick={() => toggleVisibility('gcash_qr')} className={`px-3 py-1 rounded-full text-[11px] font-bold flex items-center gap-1.5 ${profile.socials_visible.gcash_qr !== false ? 'bg-green-500/20 text-green-300 border border-green-500/30' : 'bg-red-500/20 text-red-300 border border-red-500/30'}`}><i className={`fa-solid ${profile.socials_visible.gcash_qr !== false ? 'fa-eye' : 'fa-eye-slash'}`}></i>{profile.socials_visible.gcash_qr !== false ? 'Show' : 'Hide'}</button>
                 </div>
                 <div
                   onDragOver={(e) => { e.preventDefault(); setDragOverGcash(true) }}
                   onDragLeave={() => setDragOverGcash(false)}
                   onDrop={(e) => { e.preventDefault(); setDragOverGcash(false); handleGcashFiles(e.dataTransfer.files) }}
                   onClick={() => gcashInputRef.current?.click()}
-                  className={`group relative w-full rounded-[16px] border border-dashed p-4 cursor-pointer text-center transition-all h-[160px] flex flex-col items-center justify-center overflow-hidden ${dragOverGcash ? 'border-[#D4AF37]/50 bg-[#D4AF37]/10' : 'border-[#2A2A2A] bg-[#1E1E20] hover:border-[#D4AF37]/50'}`}
+                  className={`group w-full rounded-[12px] border border-dashed p-6 cursor-pointer text-center transition-all ${dragOverGcash ? 'border-[#D4AF37] bg-[#D4AF37]/10' : 'border-[#3a3a3c] bg-[#1A1A1C] hover:border-[#555]'}`}
                 >
                   <input ref={gcashInputRef} type="file" accept="image/png,image/jpeg,image/jpg,image/webp" className="hidden" onChange={(e) => handleGcashFiles(e.target.files)} />
-                  {profile.gcash_qr_url ? (
-                    <div className="relative w-full h-full flex items-center justify-center">
-                      <img src={profile.gcash_qr_url} alt="GCash QR" className="w-[120px] h-[120px] object-contain bg-white rounded-[12px] p-2 shadow-lg" />
-                      <div className="absolute inset-0 bg-black/0 group-hover:bg-black/40 rounded-[16px] transition-all flex items-center justify-center opacity-0 group-hover:opacity-100">
-                        <span className="text-[11px] font-bold text-white bg-black/60 px-3 py-1 rounded-full">Change</span>
+                  <div className="flex flex-col items-center">
+                    {profile.gcash_qr_url ? (
+                      <div className="relative">
+                        <img src={profile.gcash_qr_url} alt="GCash" className="w-12 h-12 rounded-[8px] object-contain bg-white p-1" />
+                        <div className="absolute inset-0 bg-black/60 rounded-[8px] opacity-0 group-hover:opacity-100 flex items-center justify-center transition-all"><span className="text-[10px] text-white font-bold">Change</span></div>
                       </div>
-                      <button onClick={(e) => { e.stopPropagation(); setProfile((p:any) => ({ ...p, gcash_qr_url: '' })) }} className="absolute top-2 right-2 w-6 h-6 rounded-full bg-black/60 text-white hover:bg-red-500 flex items-center justify-center text-xs">×</button>
-                    </div>
-                  ) : (
-                    <>
-                      <div className="w-8 h-8 rounded-full bg-[#2A2A2A] flex items-center justify-center mb-2">
-                        <i className="fa-solid fa-qrcode text-zinc-400"></i>
-                      </div>
-                      <p className="text-[12px] font-bold text-white">{gcashUploading ? 'Uploading...' : 'Drop GCash QR here'}</p>
-                      <p className="text-[10px] text-[#6B7280] mt-1">GCash QR will show in Payment modal</p>
-                    </>
-                  )}
+                    ) : (
+                      <div className="w-8 h-8 rounded-full bg-[#2A2A2A] flex items-center justify-center mb-2"><i className="fa-solid fa-qrcode text-zinc-400 text-[12px]"></i></div>
+                    )}
+                    <p className="text-[13px] font-semibold text-white mt-2">{gcashUploading ? 'Uploading...' : 'Drop GCash QR here'}</p>
+                    <p className="text-[11px] text-[#8a8a8e] mt-1">GCash QR will show in Payment modal</p>
+                  </div>
                 </div>
-                <p className="text-[9px] text-zinc-500">/gcash-qr.png (Upload your GCash QR)</p>
+                <p className="text-[11px] text-zinc-500">/gcash-qr.png (Upload your GCash QR)</p>
               </div>
 
               {/* MAYA */}
               <div className="space-y-2">
-                <div className="flex items-center justify-between mb-2">
+                <div className="flex items-center justify-between">
                   <p className="text-[11px] uppercase tracking-widest text-zinc-400 font-bold">Maya QR {profile.socials_visible.maya_qr !== false ? <span className="text-[9px] bg-green-500/20 px-1.5 py-0.5 rounded text-green-300 ml-2">VISIBLE</span> : <span className="text-[9px] bg-red-500/20 px-1.5 py-0.5 rounded text-red-300 ml-2">HIDDEN</span>}</p>
-                  <button onClick={() => toggleVisibility('maya_qr')} className={`px-3 py-1.5 rounded-full text-[11px] font-bold flex items-center gap-1.5 ${profile.socials_visible.maya_qr !== false ? 'bg-green-500/20 text-green-300 border border-green-500/30' : 'bg-red-500/20 text-red-300 border border-red-500/30'}`}><i className={`fa-solid ${profile.socials_visible.maya_qr !== false ? 'fa-eye' : 'fa-eye-slash'}`}></i>{profile.socials_visible.maya_qr !== false ? 'Show' : 'Hide'}</button>
+                  <button onClick={() => toggleVisibility('maya_qr')} className={`px-3 py-1 rounded-full text-[11px] font-bold flex items-center gap-1.5 ${profile.socials_visible.maya_qr !== false ? 'bg-green-500/20 text-green-300 border border-green-500/30' : 'bg-red-500/20 text-red-300 border border-red-500/30'}`}><i className={`fa-solid ${profile.socials_visible.maya_qr !== false ? 'fa-eye' : 'fa-eye-slash'}`}></i>{profile.socials_visible.maya_qr !== false ? 'Show' : 'Hide'}</button>
                 </div>
                 <div
                   onDragOver={(e) => { e.preventDefault(); setDragOverMaya(true) }}
                   onDragLeave={() => setDragOverMaya(false)}
                   onDrop={(e) => { e.preventDefault(); setDragOverMaya(false); handleMayaFiles(e.dataTransfer.files) }}
                   onClick={() => mayaInputRef.current?.click()}
-                  className={`group relative w-full rounded-[16px] border border-dashed p-4 cursor-pointer text-center transition-all h-[160px] flex flex-col items-center justify-center overflow-hidden ${dragOverMaya ? 'border-[#D4AF37]/50 bg-[#D4AF37]/10' : 'border-[#2A2A2A] bg-[#1E1E20] hover:border-[#D4AF37]/50'}`}
+                  className={`group w-full rounded-[12px] border border-dashed p-6 cursor-pointer text-center transition-all ${dragOverMaya ? 'border-[#D4AF37] bg-[#D4AF37]/10' : 'border-[#3a3a3c] bg-[#1A1A1C] hover:border-[#555]'}`}
                 >
                   <input ref={mayaInputRef} type="file" accept="image/png,image/jpeg,image/jpg,image/webp" className="hidden" onChange={(e) => handleMayaFiles(e.target.files)} />
-                  {profile.maya_qr_url ? (
-                    <div className="relative w-full h-full flex items-center justify-center">
-                      <img src={profile.maya_qr_url} alt="Maya QR" className="w-[120px] h-[120px] object-contain bg-white rounded-[12px] p-2 shadow-lg" />
-                      <div className="absolute inset-0 bg-black/0 group-hover:bg-black/40 rounded-[16px] transition-all flex items-center justify-center opacity-0 group-hover:opacity-100">
-                        <span className="text-[11px] font-bold text-white bg-black/60 px-3 py-1 rounded-full">Change</span>
+                  <div className="flex flex-col items-center">
+                    {profile.maya_qr_url ? (
+                      <div className="relative">
+                        <img src={profile.maya_qr_url} alt="Maya" className="w-12 h-12 rounded-[8px] object-contain bg-white p-1" />
+                        <div className="absolute inset-0 bg-black/60 rounded-[8px] opacity-0 group-hover:opacity-100 flex items-center justify-center transition-all"><span className="text-[10px] text-white font-bold">Change</span></div>
                       </div>
-                      <button onClick={(e) => { e.stopPropagation(); setProfile((p:any) => ({ ...p, maya_qr_url: '' })) }} className="absolute top-2 right-2 w-6 h-6 rounded-full bg-black/60 text-white hover:bg-red-500 flex items-center justify-center text-xs">×</button>
-                    </div>
-                  ) : (
-                    <>
-                      <div className="w-8 h-8 rounded-full bg-[#2A2A2A] flex items-center justify-center mb-2">
-                        <i className="fa-solid fa-qrcode text-zinc-400"></i>
-                      </div>
-                      <p className="text-[12px] font-bold text-white">{mayaUploading ? 'Uploading...' : 'Drop Maya QR here'}</p>
-                      <p className="text-[10px] text-[#6B7280] mt-1">Maya QR will show when swiped</p>
-                    </>
-                  )}
+                    ) : (
+                      <div className="w-8 h-8 rounded-full bg-[#2A2A2A] flex items-center justify-center mb-2"><i className="fa-solid fa-qrcode text-zinc-400 text-[12px]"></i></div>
+                    )}
+                    <p className="text-[13px] font-semibold text-white mt-2">{mayaUploading ? 'Uploading...' : 'Drop Maya QR here'}</p>
+                    <p className="text-[11px] text-[#8a8a8e] mt-1">Maya QR will show when swiped</p>
+                  </div>
                 </div>
-                <p className="text-[9px] text-zinc-500">/maya-qr.png (Upload your Maya QR)</p>
+                <p className="text-[11px] text-zinc-500">/maya-qr.png (Upload your Maya QR)</p>
               </div>
             </div>
           </div>
 
+
           <button
-            onClick={scrollToLivePreview}
+            onClick={() => setShowLive(true)}
             type="button"
             className="w-full py-3.5 rounded-xl font-bold border text-[11px] uppercase tracking-[0.15em] transition-all hover:border-[#D4AF37] hover:text-[#D4AF37]"
             style={{ borderColor: '#2A2A2A', color: '#F5F1E8', background: 'transparent' }}
@@ -633,56 +614,24 @@ const { data } = await supabase.from('profiles').select('*').eq('username', DEFA
 
           <button onClick={save} disabled={saving || heroUploading || galleryUploading || gcashUploading || mayaUploading} className="w-full py-3 rounded-xl font-bold hover:brightness-110 disabled:opacity-50" style={{background: profile.accent_color, color: 'black'}}>{saving ? 'Saving...' : 'Save Profile'}</button>
         </div>
-
-        <div ref={livePreviewRef} id="live-preview-section" className="lg:sticky lg:top-4 scroll-mt-24">
-          <div className="flex items-center justify-between mb-4 gap-3">
-            <p className="text-zinc-400 text-sm">Live Preview — Order Matches Edit Form:</p>
-            <button
-              onClick={scrollToEditTop}
-              className="rounded-full px-4 py-1.5 text-[10px] font-bold uppercase tracking-[0.15em] border bg-[#121214] hover:border-[#D4AF37] hover:text-[#D4AF37] transition-all shrink-0"
-              style={{ borderColor: '#2A2A2A', color: '#F5F1E8' }}
-            >
-              ↑ Back to Edit
-            </button>
-          </div>
-          <TaplyTemplate profile={profile} />
-        </div>
-      </div>
-      {/* ===== AFTER SAVE SUCCESS MODAL ===== */}
-      {showSuccessModal && (
-        <div className="success-modal-overlay" onClick={() => setShowSuccessModal(false)} role="dialog" aria-modal="true" aria-label="Profile saved">
-          <div className="success-modal" onClick={e => e.stopPropagation()}>
-            <div className="success-check">✓</div>
-            <h3 className="success-title">Profile Saved!</h3>
-            <p className="success-sub">Your TapVinci is now live</p>
-
-            <div className="live-url-box">
-              <span className="live-url-text">{liveUrl}</span>
-              <button onClick={() => copyLink(liveUrl)} className="live-url-copy">Copy</button>
-            </div>
-
-            <div className="mt-4 grid grid-cols-1 gap-3">
-              <a href={liveUrl} target="_blank" rel="noopener noreferrer" className="success-primary-btn">
-                View My Live Profile → /{profile.username.toLowerCase()}
-              </a>
-              <div className="grid grid-cols-2 gap-3">
-                <button onClick={() => copyLink(liveUrl)} className="success-secondary-btn">Copy Link</button>
-                <button onClick={() => downloadQR(liveUrl)} className="success-secondary-btn">Download QR of my link</button>
               </div>
             </div>
-
-            <div className="success-qr-box">
-              <img src={`https://api.qrserver.com/v1/create-qr-code/?size=320x320&margin=0&format=png&data=${encodeURIComponent(liveUrl)}`} alt="QR code for your profile link" width={136} height={136} />
+            <div className="w-[50%] flex-shrink-0 px-1 lg:px-3">
+              <div className="max-w-7xl mx-auto">
+                <div ref={livePreviewRef} id="live-preview-section" className="scroll-mt-24">
+                  <div className="flex items-center justify-between mb-4 gap-3">
+                    <p className="text-zinc-400 text-sm font-bold tracking-wide">Live Preview — Order Matches Edit Form: <span className="text-[#D4AF37] text-[11px]">DEFAULT</span></p>
+                    <button onClick={() => setShowLive(false)} className="rounded-full px-5 py-2 text-[11px] font-bold uppercase tracking-[0.15em] border bg-[#1E1E20]" style={{ borderColor: '#2A2A2A', color: '#F5F1E8' }}>↓ EDIT FORM</button>
+                  </div>
+                  <TaplyTemplate profile={profile} />
+                </div>
+              </div>
             </div>
-            <p className="success-hint">Scan to view profile • Print this QR on your NFC card</p>
-
-            <button onClick={() => setShowSuccessModal(false)} className="success-close">Close</button>
           </div>
         </div>
-      )}
-
-      {toast && <div className="success-toast" role="status">{toast}</div>}
-    </div>
+      </div>
+      {showSuccessModal && (<div className="success-modal-overlay" onClick={() => setShowSuccessModal(false)}><div className="success-modal" onClick={e => e.stopPropagation()}><div className="success-check">✓</div><h3>Profile Saved!</h3><div className="live-url-box"><span>{liveUrl}</span><button onClick={() => copyLink(liveUrl)}>Copy</button></div><a href={liveUrl} target="_blank">View Live</a><button onClick={() => setShowSuccessModal(false)}>Close</button></div></div>)}
+      {toast && <div className="success-toast">{toast}</div>}
     </>
   )
 }
