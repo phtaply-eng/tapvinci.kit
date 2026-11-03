@@ -1,158 +1,289 @@
 'use client'
-import Link from 'next/link'
 
-export default function Pricing({ contactEmail }: { contactEmail: string }) {
+const FONT_CSS = `
+@import url('https://fonts.googleapis.com/css2?family=Playfair+Display:ital,wght@0,400;0,600;0,700;1,400&family=Montserrat:wght@400;500;600;700&display=swap');
+
+.pv-serif {
+  font-family: 'Playfair Display', Georgia, 'Times New Roman', serif;
+}
+
+.pv-serif-italic {
+  font-family: 'Playfair Display', Georgia, 'Times New Roman', serif;
+  font-style: italic;
+}
+
+.pv-mont {
+  font-family: 'Montserrat', -apple-system, BlinkMacSystemFont, 'SF Pro Text', 'Segoe UI', sans-serif;
+}
+`
+
+type PlanFeature = { key: string; desc?: string }
+
+const DIGITAL_FEATURES: PlanFeature[] = [
+  { key: 'Profile', desc: 'tapvinci.kit/username' },
+  { key: 'All 6 themes', desc: 'Black Gold, Midnight Purple, Ocean Blue, Forest Green, Sunset Pink, Sunrise Orange' },
+  { key: 'Social links', desc: 'unlimited' },
+  { key: 'Gallery, Contact', desc: '+ Google Maps' },
+  { key: 'GCash / Maya QR', desc: 'accept payments instantly' },
+  { key: 'QR code', desc: 'to print or share' },
+  { key: 'Self-service edit', desc: 'anytime' },
+  { key: 'Live Preview', desc: 'see changes before saving' },
+]
+
+const CARD_FEATURES: PlanFeature[] = [
+  { key: 'Premium NFC card', desc: 'Black or White + QR on the back' },
+  { key: '1 Year hosting', desc: 'unlimited self-edits' },
+  { key: 'Tap + Scan', desc: 'works on all phones' },
+  { key: 'No app needed', desc: 'nothing to install' },
+  { key: 'Ships anywhere PH', desc: 'free delivery' },
+  { key: 'Instant activation', desc: 'tap-ready in minutes' },
+]
+
+type ComparisonRow = { name: string; digital: boolean; card: boolean }
+
+const COMPARISON: ComparisonRow[] = [
+  { name: 'Profile on tapvinci.kit/username', digital: true, card: true },
+  { name: 'All 6 themes', digital: true, card: true },
+  { name: 'Social links — unlimited', digital: true, card: true },
+  { name: 'Gallery, Contact + Google Maps', digital: true, card: true },
+  { name: 'GCash / Maya QR', digital: true, card: true },
+  { name: 'QR code to print', digital: true, card: true },
+  { name: 'Self-service edit — anytime', digital: true, card: true },
+  { name: 'Live Preview', digital: true, card: true },
+  { name: 'Premium NFC card', digital: false, card: true },
+  { name: '1 Year hosting — unlimited edits', digital: false, card: true },
+  { name: 'Tap + Scan — all phones', digital: false, card: true },
+  { name: 'No app needed', digital: true, card: true },
+  { name: 'Ships anywhere PH', digital: false, card: true },
+]
+
+function FeatureList({ features }: { features: PlanFeature[] }) {
   return (
-    <section id="pricing" className="bg-[#050505] py-24 px-6">
-      <div className="max-w-[1100px] mx-auto">
-        {/* Header - exact from Image 1 */}
-        <div className="text-center mb-16">
-          <p className="text-[10px] tracking-[0.3em] text-[#D4AF37]/60 mb-6 flex items-center justify-center gap-3">
-            <span className="w-8 h-[1px] bg-[#2A2A2C]"></span> PRICING <span className="w-8 h-[1px] bg-[#2A2A2C]"></span>
+    <ul className="flex flex-1 flex-col gap-y-3.5">
+      {features.map((feature) => (
+        <li key={feature.key} className="flex items-start gap-3">
+          <span className="mt-[9px] h-1 w-1 shrink-0 rounded-full bg-[#D4AF37]" aria-hidden="true" />
+          <p className="text-[13px] leading-6 text-white/45">
+            <span className="font-semibold text-white">{feature.key}</span>
+            {feature.desc ? ` — ${feature.desc}` : ''}
           </p>
-          <h2 className="text-[40px] md:text-[48px] font-bold text-white leading-[0.95] tracking-tight" style={{fontFamily: 'Fraunces, serif'}}>
-            Simple, premium,<br />
-            <span className="italic font-light">no monthly.</span>
-          </h2>
-          <p className="mt-6 text-[12px] leading-[1.6] text-zinc-500 max-w-[320px] mx-auto">
-            One tap. Lifetime profile. No subscriptions.<br />
-            Built for those who value permanence.
-          </p>
+        </li>
+      ))}
+    </ul>
+  )
+}
+
+function Check({ on, tone }: { on: boolean; tone: 'muted' | 'gold' }) {
+  if (!on) {
+    return (
+      <span className="text-[13px] leading-none text-white/20" aria-label="Not included">
+        —
+      </span>
+    )
+  }
+
+  return (
+    <span
+      className={`flex h-6 w-6 items-center justify-center rounded-full text-[11px] font-semibold ${
+        tone === 'gold' ? 'bg-[#D4AF37]/15 text-[#D4AF37]' : 'bg-white/[0.04] text-white/35'
+      }`}
+      aria-label="Included"
+    >
+      ✓
+    </span>
+  )
+}
+
+export default function Pricing({ contactEmail = 'tapvinci@yahoo.com' }: { contactEmail?: string }) {
+  return (
+    <section id="pricing" className="pv-mont bg-[#050505] px-6 py-24">
+      <style>{FONT_CSS}</style>
+
+      {/* Header */}
+      <div className="text-center">
+        <div className="flex items-center justify-center gap-3">
+          <span className="h-px w-5 bg-[#D4AF37]/30" aria-hidden="true" />
+          <span className="text-[10px] font-semibold uppercase tracking-[3px] text-[#D4AF37]">Pricing</span>
+          <span className="h-px w-5 bg-[#D4AF37]/30" aria-hidden="true" />
         </div>
 
-        {/* Cards grid - 2 cols, gap-6, max-w 700px centered like Image 1 */}
-        <div className="grid md:grid-cols-2 gap-6 max-w-[700px] mx-auto">
-          {/* LEFT - Digital Only ₱299 */}
-          <div className="bg-[#121212] border border-[#1E1E1E] rounded-[20px] p-8 flex flex-col">
-            <div className="flex items-start justify-between mb-6">
-              <div>
-                <h3 className="text-[15px] font-semibold text-white">Digital Only</h3>
-                <p className="text-[9px] tracking-[0.15em] text-zinc-500 mt-1">START WITH DIGITAL</p>
-              </div>
-              <div className="w-5 h-5 rounded-full bg-[#1A1A1A] border border-[#2A2A2C] flex items-center justify-center">
-                <div className="w-1 h-1 rounded-full bg-zinc-600"></div>
-              </div>
-            </div>
+        <h2 className="pv-serif mt-6 text-[36px] font-normal leading-tight text-[#F5F1E8] md:text-[48px]">
+          Simple, premium,
+          <br />
+          <span className="pv-serif-italic">no monthly.</span>
+        </h2>
 
-            <div className="mb-8">
-              <div className="flex items-baseline gap-2">
-                <span className="text-[28px] font-bold text-white tracking-tight">₱299</span>
-                <span className="text-[10px] text-zinc-500 leading-[1.1]">one-year<br/></span>
-              </div>
-            </div>
+        <p className="mt-5 text-[14px] font-normal leading-[1.7] text-[#F5F1E8]/60">
+          One tap. Lifetime profile. No subscriptions.
+          <br />
+          Built for those who value permanence.
+        </p>
+      </div>
 
-            <div className="space-y-[10px] mb-8 flex-1">
-              <div className="flex gap-2 text-[12px] leading-[1.4]">
-                <span className="text-[#D4AF37] text-[8px] mt-[5px]">●</span>
-                <span className="text-white">Profile on <span className="text-[#D4AF37]">tapvinci.vercel.app/username</span></span>
-              </div>
-              <div className="flex gap-2 text-[12px] leading-[1.4]">
-                <span className="text-[#D4AF37] text-[8px] mt-[5px]">●</span>
+      {/* Cards */}
+      <div className="mx-auto mt-16 grid max-w-[900px] justify-center gap-8 md:grid-cols-2">
+        {/* Card 1 — Digital Only */}
+        <div className="relative mx-auto w-full max-w-[380px]">
+          <article className="pricing-card-tall relative flex min-h-[720px] w-full max-w-[380px] flex-col justify-between rounded-[28px] border border-[#1E1E1E] bg-[#121212] p-10 pb-10 pt-12 shadow-[0_20px_60px_rgba(0,0,0,0.5)] backdrop-blur-xl transition-all duration-500 hover:-translate-y-1.5 hover:border-white/20">
+            <div>
+              <div className="flex items-start justify-between gap-4">
                 <div>
-                  <span className="text-white font-medium">All 6 themes</span>
-                  <span className="text-zinc-400"> — Black Gold, Midnight Purple, Ocean Blue, Forest Green, Sunset Pink, Sunrise Orange</span>
-                  <div className="text-[10px] text-zinc-500 opacity-50 mt-1 leading-[1.3]">Black Gold, Midnight Purple, Ocean Blue, Forest Green, Sunset Pink, Sunrise Orange</div>
+                  <h3 className="pv-serif text-[22px] font-semibold leading-tight text-white">Digital Only</h3>
+                  <p className="mt-2 text-[10px] font-medium uppercase tracking-[0.2em] text-[#D4AF37]">
+                    Starter Profile
+                  </p>
+                </div>
+                <span
+                  className="mt-1 flex h-5 w-5 shrink-0 items-center justify-center rounded-full border border-[#2A2A2C]"
+                  aria-hidden="true"
+                >
+                  <span className="h-1.5 w-1.5 rounded-full bg-white/25" />
+                </span>
+              </div>
+
+              <div className="mt-8 flex items-end justify-between gap-4">
+                <span className="pv-serif text-[42px] font-bold leading-none text-white">₱299</span>
+                <span className="pb-1 text-right text-[11px] font-normal leading-[1.4] text-white/40">
+                  one-time
+                  <br />
+                  lifetime
+                </span>
+              </div>
+
+              <div
+                className="my-6 h-px w-full bg-gradient-to-r from-[#D4AF37]/10 via-[#222] to-[#222]"
+                aria-hidden="true"
+              />
+
+              <FeatureList features={DIGITAL_FEATURES} />
+            </div>
+
+            <div className="mt-auto pt-8">
+              <a
+                href={`mailto:${contactEmail}?subject=TapVinci%20Digital%20Only%20%E2%80%94%20Starter%20Profile`}
+                className="block w-full rounded-full border border-white/20 py-4 text-center text-[12px] font-bold uppercase tracking-[0.15em] text-white transition-colors hover:border-white/35 hover:bg-white/5"
+              >
+                Start with Digital
+              </a>
+              <p className="mt-3 text-center text-[10px] font-normal text-white/30">Instant activation</p>
+            </div>
+          </article>
+        </div>
+
+        {/* Card 2 — Card + Digital */}
+        <div className="relative mx-auto w-full max-w-[380px]">
+          <div
+            className="pointer-events-none absolute -inset-[1px] rounded-[28px] bg-gradient-to-b from-[#D4AF37]/20 to-transparent blur-[1px]"
+            aria-hidden="true"
+          />
+
+          <article className="card-glow pricing-card-tall relative flex min-h-[720px] w-full max-w-[380px] flex-col justify-between rounded-[28px] border border-[#D4AF37]/40 bg-[#131313] p-10 pb-10 pt-12 shadow-[0_20px_60px_rgba(0,0,0,0.5),0_0_60px_rgba(212,175,55,0.18),0_0_100px_rgba(212,175,55,0.08),inset_0_1px_0_rgba(212,175,55,0.1)] backdrop-blur-xl transition-all duration-500 hover:-translate-y-1.5 hover:border-[#D4AF37]/60 hover:shadow-[0_30px_80px_rgba(0,0,0,0.6),0_0_80px_rgba(212,175,55,0.28),0_0_140px_rgba(212,175,55,0.12),inset_0_1px_0_rgba(212,175,55,0.18)]">
+            <span className="absolute -top-3 right-6 rounded-full bg-[#D4AF37] px-4 py-1.5 text-[10px] font-bold uppercase tracking-widest text-black shadow-[0_8px_24px_rgba(212,175,55,0.45)]">
+              Best Seller
+            </span>
+
+            <div>
+              <div className="flex items-start justify-between gap-4">
+                <div>
+                  <h3 className="pv-serif text-[22px] font-semibold leading-tight text-white">Card + Digital</h3>
+                  <p className="mt-2 text-[10px] font-medium uppercase tracking-[0.2em] text-[#D4AF37]">
+                    Complete Studio
+                  </p>
+                </div>
+                <span
+                  className="mt-1 flex h-5 w-5 shrink-0 items-center justify-center rounded-full border border-[#2A2A2C]"
+                  aria-hidden="true"
+                >
+                  <span className="h-1.5 w-1.5 animate-pulse rounded-full bg-[#D4AF37] shadow-[0_0_8px_rgba(212,175,55,0.9)]" />
+                </span>
+              </div>
+
+              <div className="mt-8 flex items-end justify-between gap-4">
+                <span className="pv-serif text-[42px] font-bold leading-none text-white">₱799</span>
+                <span className="pb-1 text-right text-[11px] font-normal leading-[1.4] text-white/40">
+                  one-time
+                  <br />
+                  lifetime
+                </span>
+              </div>
+
+              <div
+                className="my-6 h-px w-full bg-gradient-to-r from-[#D4AF37]/40 via-[#D4AF37]/15 to-transparent"
+                aria-hidden="true"
+              />
+
+              <p className="mb-5 text-[9px] font-semibold uppercase tracking-[0.18em] text-[#D4AF37]/60">
+                Everything in Digital Only, plus
+              </p>
+
+              <FeatureList features={CARD_FEATURES} />
+            </div>
+
+            <div className="mt-auto pt-8">
+              <a
+                href={`mailto:${contactEmail}?subject=TapVinci%20Card%20%2B%20Digital%20%E2%80%94%20Complete%20Studio`}
+                className="block w-full rounded-full bg-[#D4AF37] py-4 text-center text-[12px] font-bold uppercase tracking-[0.15em] text-black shadow-[0_8px_32px_rgba(212,175,55,0.4)] transition-all hover:bg-[#E8C155] hover:shadow-[0_12px_40px_rgba(212,175,55,0.55)]"
+              >
+                Get Card + Digital
+              </a>
+              <p className="mt-3 text-center text-[10px] font-normal text-white/30">
+                Ships within 2–3 days · Free delivery
+              </p>
+            </div>
+          </article>
+        </div>
+      </div>
+
+      {/* Comparison table */}
+      <div className="comparison-table mx-auto mt-24 max-w-[900px] overflow-hidden rounded-[24px] border border-[#1E1E1E] bg-[#121212]/50 backdrop-blur">
+        <div className="overflow-x-auto">
+          <div className="min-w-[560px]">
+            {/* Header row */}
+            <div className="grid grid-cols-[1.5fr_1fr_1fr] items-center gap-4 border-b border-[#1E1E1E] bg-[#0F0F0F] px-6 py-6">
+              <span className="text-[11px] font-semibold uppercase tracking-[0.2em] text-white/35">Feature</span>
+              <span className="text-center text-[11px] font-semibold uppercase tracking-[0.2em] text-white/40">
+                Digital Only
+              </span>
+              <span className="text-center text-[11px] font-semibold uppercase tracking-[0.2em] text-[#D4AF37]">
+                Card + Digital
+              </span>
+            </div>
+
+            {/* Feature rows */}
+            {COMPARISON.map((row, index) => (
+              <div
+                key={row.name}
+                className={`grid grid-cols-[1.5fr_1fr_1fr] items-center gap-4 px-6 py-4 transition-colors hover:bg-[#151515] ${
+                  index !== COMPARISON.length - 1 ? 'border-b border-[#1A1A1A]' : ''
+                }`}
+              >
+                <div className="flex items-center gap-3">
+                  <span className="h-1 w-1 shrink-0 rounded-full bg-[#D4AF37]/70" aria-hidden="true" />
+                  <span className="text-[13px] leading-6 text-white/55">{row.name}</span>
+                </div>
+                <div className="flex justify-center">
+                  <Check on={row.digital} tone="muted" />
+                </div>
+                <div className="flex justify-center">
+                  <Check on={row.card} tone="gold" />
                 </div>
               </div>
-              <div className="flex gap-2 text-[12px]">
-                <span className="text-[#D4AF37] text-[8px] mt-[5px]">●</span>
-                <span><span className="text-white font-medium">Social links</span> <span className="text-zinc-400"></span></span>
-              </div>
-              <div className="flex gap-2 text-[12px]">
-                <span className="text-[#D4AF37] text-[8px] mt-[5px]">●</span>
-                <span className="text-white font-medium">Gallery, Contact + Google Maps</span>
-              </div>
-              <div className="flex gap-2 text-[12px]">
-                <span className="text-[#D4AF37] text-[8px] mt-[5px]">●</span>
-                <span className="text-white font-medium">GCash / Maya QR</span>
-              </div>
-              <div className="flex gap-2 text-[12px]">
-                <span className="text-[#D4AF37] text-[8px] mt-[5px]">●</span>
-                <span className="text-white font-medium">QR code to print</span>
-              </div>
-              <div className="flex gap-2 text-[12px]">
-                <span className="text-[#D4AF37] text-[8px] mt-[5px]">●</span>
-                <span><span className="text-white font-medium">Self-service edit</span> <span className="text-zinc-500">— anytime</span></span>
-              </div>
-              <div className="flex gap-2 text-[12px]">
-                <span className="text-[#D4AF37] text-[8px] mt-[5px]">●</span>
-                <span className="text-white font-medium">Live Preview</span>
-              </div>
-            </div>
-
-            <button className="w-full py-3.5 px-6 rounded-full border border-[#2A2A2C] text-[10px] font-bold tracking-[0.15em] text-white hover:bg-white hover:text-black transition-all">START WITH DIGITAL</button>
-            <p className="text-[9px] text-[#D4AF37]/40 text-center mt-3 tracking-wide">Instant activation</p>
-          </div>
-
-          {/* RIGHT - Card + Digital ₱799 - GLOWING */}
-          <div className="bg-[#121212] border border-[#D4AF37]/30 rounded-[20px] p-8 flex flex-col relative overflow-hidden shadow-[0_0_60px_rgba(212,175,55,0.15),_0_0_100px_rgba(212,175,55,0.08),_inset_0_1px_0_rgba(212,175,55,0.15)]">
-            {/* Glow aura */}
-            <div className="absolute -inset-[1px] rounded-[20px] bg-gradient-to-b from-[#D4AF37]/20 via-[#D4AF37]/5 to-transparent opacity-60 blur-[0.5px] pointer-events-none" />
-            <div className="absolute top-0 left-1/2 -translate-x-1/2 w-[300px] h-[200px] bg-[radial-gradient(ellipse_at_top,_rgba(212,175,55,0.18)_0%,_transparent_70%)] blur-[20px] pointer-events-none" />
-            <div className="absolute top-4 right-4 bg-[#D4AF37] text-black text-[8px] font-bold tracking-widest px-2.5 py-1 rounded-full shadow-[0_0_20px_rgba(212,175,55,0.5)]">MOST POPULAR</div>
-            <div className="flex items-start justify-between mb-6">
-              <div>
-                <h3 className="text-[15px] font-semibold text-white">Card + Digital</h3>
-                <p className="text-[9px] tracking-[0.15em] text-[#D4AF37]/70 mt-1">COMPLETE STUDIO</p>
-              </div>
-              <div className="w-5 h-5 rounded-full bg-[#1A1A1A] border border-[#D4AF37]/40 flex items-center justify-center shadow-[0_0_12px_rgba(212,175,55,0.4)]">
-                <div className="w-1 h-1 rounded-full bg-[#D4AF37] shadow-[0_0_8px_#D4AF37] animate-pulse"></div>
-              </div>
-            </div>
-
-            <div className="mb-2">
-              <div className="flex items-baseline gap-2">
-                <span className="text-[28px] font-bold text-white tracking-tight drop-shadow-[0_0_10px_rgba(212,175,55,0.15)]">₱799</span>
-                <span className="text-[10px] text-zinc-500 leading-[1.1]">one-time<br/>with card</span>
-              </div>
-            </div>
-
-            <div className="flex items-center justify-center gap-3 my-6">
-              <div className="h-[1px] flex-1 bg-gradient-to-r from-transparent via-[#D4AF37]/20 to-[#222]"></div>
-              <p className="text-[8px] tracking-[0.2em] text-[#D4AF37]/70 whitespace-nowrap font-semibold">EVERYTHING IN DIGITAL ONLY PLUS</p>
-              <div className="h-[1px] flex-1 bg-gradient-to-l from-transparent via-[#D4AF37]/20 to-[#222]"></div>
-            </div>
-
-            <div className="space-y-[10px] mb-8 flex-1">
-              <div className="flex gap-2 text-[12px] leading-[1.4]">
-                <span className="text-[#D4AF37] text-[8px] mt-[5px] drop-shadow-[0_0_6px_#D4AF37]">●</span>
-                <span><span className="text-white font-medium">Premium NFC card</span> <span className="text-zinc-400">— Black or White + QR printed on back for non-NFC phones</span></span>
-              </div>
-              <div className="flex gap-2 text-[12px]">
-                <span className="text-[#D4AF37] text-[8px] mt-[5px] drop-shadow-[0_0_6px_#D4AF37]">●</span>
-                <span><span className="text-white font-medium">1 Year hosting</span> <span className="text-zinc-400">— unlimited self-edits</span></span>
-              </div>
-              <div className="flex gap-2 text-[12px]">
-                <span className="text-[#D4AF37] text-[8px] mt-[5px] drop-shadow-[0_0_6px_#D4AF37]">●</span>
-                <span><span className="text-white font-medium">Tap + Scan</span> <span className="text-zinc-400">— works on NFC-enabled phones</span></span>
-              </div>
-              <div className="flex gap-2 text-[12px]">
-                <span className="text-[#D4AF37] text-[8px] mt-[5px] drop-shadow-[0_0_6px_#D4AF37]">●</span>
-                <span className="text-white font-medium">No app needed</span>
-              </div>
-              <div className="flex gap-2 text-[12px]">
-                <span className="text-[#D4AF37] text-[8px] mt-[5px] drop-shadow-[0_0_6px_#D4AF37]">●</span>
-                <span className="text-white font-medium">Ships anywhere PH</span>
-              </div>
-            </div>
-
-            <button className="w-full py-3.5 px-6 rounded-full bg-[#D4AF37] text-black text-[10px] font-bold tracking-[0.15em] shadow-[0_0_30px_rgba(212,175,55,0.4),_0_8px_24px_rgba(212,175,55,0.3),_inset_0_1px_0_rgba(255,255,255,0.3)] hover:shadow-[0_0_40px_rgba(212,175,55,0.6)] hover:brightness-110 hover:scale-[1.02] active:scale-[0.98] transition-all duration-300">GET CARD + DIGITAL</button>
-            <p className="text-[9px] text-[#D4AF37]/40 text-center mt-3 tracking-wide">Ships within 2-3 days - Free delivery</p>
+            ))}
           </div>
         </div>
+      </div>
 
-        {/* After year one bar */}
-        <div className="mt-8 max-w-[700px] mx-auto bg-[#151515] border border-[#222] rounded-[16px] p-4 flex gap-3 items-start">
-          <div className="flex items-center gap-2 text-[9px] text-zinc-500 bg-[#1A1A1A] border border-[#2A2A2C] rounded-full px-3 py-1.5 whitespace-nowrap shrink-0">
-            <span className="text-[10px]">ⓘ</span> AFTER YEAR ONE
-          </div>
-          <p className="text-[11px] leading-[1.5] text-zinc-400">
-            After 1 year, <span className="text-white font-semibold">₱299/year</span> to keep profile live or <span className="text-white font-semibold">₱1,299 lifetime</span>. Optional lifetime upgrade. No lock-in. Your data stays yours.
-          </p>
+      {/* After year one */}
+      <div className="mx-auto mt-8 flex max-w-[900px] flex-col gap-4 rounded-[12px] border border-white/5 bg-[#121212]/60 px-6 py-4 sm:flex-row sm:items-center">
+        <div className="flex shrink-0 items-center gap-2 text-[9px] font-semibold uppercase tracking-[1px] text-white/40">
+          <span className="h-1 w-1 rounded-full bg-[#D4AF37]/60" aria-hidden="true" />
+          After Year One
         </div>
-
-        {/* Footer */}
-        <p className="text-[9px] tracking-[0.2em] text-zinc-600 text-center mt-16">SECURE · PRIVATE · NO APP</p>
+        <p className="text-[11px] font-normal leading-relaxed text-white/50">
+          After 1 year, <span className="font-semibold text-white">₱299/year</span> to keep profile live or{' '}
+          <span className="font-semibold text-white">₱1,299 lifetime</span>. Optional lifetime upgrade. No lock-in. Your
+          data stays yours.
+        </p>
       </div>
     </section>
   )
