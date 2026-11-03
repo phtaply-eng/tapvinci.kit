@@ -1,22 +1,5 @@
 'use client'
 
-const FONT_CSS = `
-@import url('https://fonts.googleapis.com/css2?family=Playfair+Display:ital,wght@0,400;0,600;0,700;1,400&family=Montserrat:wght@400;500;600;700&display=swap');
-
-.pv-serif {
-  font-family: 'Playfair Display', Georgia, 'Times New Roman', serif;
-}
-
-.pv-serif-italic {
-  font-family: 'Playfair Display', Georgia, 'Times New Roman', serif;
-  font-style: italic;
-}
-
-.pv-mont {
-  font-family: 'Montserrat', -apple-system, BlinkMacSystemFont, 'SF Pro Text', 'Segoe UI', sans-serif;
-}
-`
-
 type PlanFeature = { key: string; desc?: string }
 
 const DIGITAL_FEATURES: PlanFeature[] = [
@@ -97,8 +80,6 @@ function Check({ on, tone }: { on: boolean; tone: 'muted' | 'gold' }) {
 export default function Pricing({ contactEmail = 'tapvinci@yahoo.com' }: { contactEmail?: string }) {
   return (
     <section id="pricing" className="pv-mont bg-[#050505] px-6 py-24">
-      <style>{FONT_CSS}</style>
-
       {/* Header */}
       <div className="text-center">
         <div className="flex items-center justify-center gap-3">
