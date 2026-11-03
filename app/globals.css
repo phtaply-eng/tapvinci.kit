@@ -1,11 +1,12 @@
 @import url('https://fonts.googleapis.com/css2?family=Playfair+Display:wght@600;700&family=Montserrat:wght@600&display=swap');
 @import url('https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css');
+@import url('https://fonts.googleapis.com/css2?family=Playfair+Display:wght@400;600&family=Montserrat:wght@400;500;600&display=swap');
 
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
 
-/* ============ TapVinci design tokens — black / gold luxury ============ */
+/* ============ TapVinci design tokens â€” black / gold luxury ============ */
 :root {
   --sg: #D4AF37;
   --sg-ink: #000000;
@@ -1295,4 +1296,3 @@ html:has(.tv-home) { scroll-behavior: smooth; }
 
 .dashboard-slider-wrapper { overflow:hidden; width:100%; }
 .dashboard-slider { display:flex; width:200%; will-change:transform; transition: transform 0.5s cubic-bezier(0.4,0,0.2,1); }
-

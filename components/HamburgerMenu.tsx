@@ -2,6 +2,7 @@
 import { useState, useEffect } from 'react'
 import Link from 'next/link'
 import Image from 'next/image'
+import { usePathname } from 'next/navigation'
 import Dial from './Dial'
 
 const SOCIALS = [
@@ -9,6 +10,24 @@ const SOCIALS = [
   { key: 'instagram', label: 'Instagram', href: 'https://instagram.com/shuashushu', icon: 'fa-brands fa-instagram' },
   { key: 'tiktok', label: 'TikTok', href: 'https://www.tiktok.com/@shuashushu5', icon: 'fa-brands fa-tiktok' },
 ]
+
+const links = [
+  { label: "Home", href: "#top" },
+  { label: "How It Works", href: "#how-it-works" },
+  { label: "Pricing", href: "#pricing" },
+  { label: "FAQ", href: "#faq" },
+  { label: "Contact", href: "#follow" },
+  { label: "Reviews", href: "#reviews-teaser" },
+]
+
+const linkIcons: Record<string, string> = {
+  Home: 'fa-solid fa-house',
+  'How It Works': 'fa-solid fa-layer-group',
+  Pricing: 'fa-solid fa-tag',
+  FAQ: 'fa-solid fa-circle-question',
+  Contact: 'fa-solid fa-envelope',
+  Reviews: 'fa-solid fa-star',
+}
 
 export default function HamburgerMenu() {
   const [isOpen, setIsOpen] = useState(false)
@@ -34,6 +53,11 @@ export default function HamburgerMenu() {
   }, [isOpen])
 
   const close = () => setIsOpen(false)
+
+  const pathname = usePathname()
+  // On the homepage, use hash-only links for smooth in-page scrolling.
+  // From other routes, prefix "/" so the link returns home and reaches the section.
+  const resolveHref = (href: string) => (pathname === '/' ? href : `/${href}`)
 
   return (
     <>
@@ -68,57 +92,26 @@ export default function HamburgerMenu() {
             <span className="menu-gold-line" aria-hidden="true" />
           </div>
 
-          {/* ===== MIDDLE: REQUIRED ORDER LOCKED ===== */}
-          {/* 1. Home (home icon, subtle) */}
-          {/* 2. Contact (mail icon, RIGHT AFTER HOME, subtle, 14px Montserrat) */}
+          {/* ===== MIDDLE: Home, How It Works, Pricing, FAQ, Contact, Reviews ===== */}
           <nav className="menu-nav" aria-label="Primary">
-            <Link
-              href="/"
-              className="menu-link menu-anim"
-              onClick={close}
-              style={{ ['--i' as any]: 0 }}
-            >
-              <span className="menu-link-main">
-                <span className="menu-link-icon"><i className="fa-solid fa-house" aria-hidden="true"></i></span>
-                Home
-              </span>
-              <span className="menu-link-end">
-                <span className="menu-link-tag">01</span>
-                <span className="menu-link-arrow"><i className="fa-solid fa-arrow-right" aria-hidden="true"></i></span>
-              </span>
-            </Link>
-
-            <Link
-              href="mailto:tapvinci@yahoo.com"
-              className="menu-link menu-anim"
-              onClick={close}
-              style={{ ['--i' as any]: 1 }}
-            >
-              <span className="menu-link-main">
-                <span className="menu-link-icon"><i className="fa-solid fa-envelope" aria-hidden="true"></i></span>
-                Contact
-              </span>
-              <span className="menu-link-end">
-                <span className="menu-link-tag">02</span>
-                <span className="menu-link-arrow"><i className="fa-solid fa-arrow-right" aria-hidden="true"></i></span>
-              </span>
-            </Link>
-
-            <Link
-              href="/reviews"
-              className="menu-link menu-anim"
-              onClick={close}
-              style={{ ['--i' as any]: 2 }}
-            >
-              <span className="menu-link-main">
-                <span className="menu-link-icon"><i className="fa-solid fa-star" aria-hidden="true"></i></span>
-                Reviews
-              </span>
-              <span className="menu-link-end">
-                <span className="menu-link-tag">03</span>
-                <span className="menu-link-arrow"><i className="fa-solid fa-arrow-right" aria-hidden="true"></i></span>
-              </span>
-            </Link>
+            {links.map((item, i) => (
+              <Link
+                key={item.label}
+                href={resolveHref(item.href)}
+                className="menu-link menu-anim"
+                onClick={() => setIsOpen(false)}
+                style={{ ['--i' as any]: i }}
+              >
+                <span className="menu-link-main">
+                  <span className="menu-link-icon"><i className={linkIcons[item.label]} aria-hidden="true"></i></span>
+                  {item.label}
+                </span>
+                <span className="menu-link-end">
+                  <span className="menu-link-tag">{String(i + 1).padStart(2, '0')}</span>
+                  <span className="menu-link-arrow"><i className="fa-solid fa-arrow-right" aria-hidden="true"></i></span>
+                </span>
+              </Link>
+            ))}
           </nav>
 
           {/* 3. [24px spacer] */}
@@ -130,7 +123,7 @@ export default function HamburgerMenu() {
               href="/dashboard"
               className="menu-btn menu-btn-gold menu-anim"
               onClick={close}
-              style={{ ['--i' as any]: 4, borderRadius: '24px' }}
+              style={{ ['--i' as any]: 6, borderRadius: '24px' }}
             >
               Open Dashboard
             </Link>
@@ -138,7 +131,7 @@ export default function HamburgerMenu() {
               href="/shua"
               className="menu-btn menu-btn-dark menu-anim"
               onClick={close}
-              style={{ ['--i' as any]: 4, borderRadius: '24px' }}
+              style={{ ['--i' as any]: 6, borderRadius: '24px' }}
             >
               View Demo
             </Link>

@@ -9,6 +9,7 @@ import { ICONS } from '../components/home/icons'
 import SiteFooter from '../components/SiteFooter'
 import Dial from '../components/Dial'
 import HamburgerMenu from '../components/HamburgerMenu'
+import Pricing from '../components/Pricing'
 
 const fraunces = Fraunces({ subsets: ['latin'], style: ['normal', 'italic'], variable: '--font-fraunces', display: 'swap' })
 const dmSans = DM_Sans({ subsets: ['latin'], variable: '--font-dmsans', display: 'swap' })
@@ -56,7 +57,7 @@ export default function Home() {
           </h1>
           <p className="tv-hero-sub tv-in" style={{ ['--d' as string]: '.4s' }}></p>
           <div className="tv-hero-actions tv-in" style={{ ['--d' as string]: '.52s' }}>
-            <Link href="/dashboard" className="tv-btn tv-btn-gold">Open Dashboard</Link>
+            <Link href="/dashboard" className="tv-btn tv-btn-gold">Create a profile</Link>
             <Link href={`/${DEMO_USERNAME}`} className="tv-btn tv-btn-glass">View Demo</Link>
           </div>
           <p className="tv-tagline tv-in" style={{ ['--d' as string]: '.66s' }}>A NEW STANDARD OF INTRODUCTION • MADE TO CONNECT • PHILIPPINES 2026</p>
@@ -97,27 +98,6 @@ export default function Home() {
 
       <div className="tv-divider" aria-hidden="true"><i /></div>
 
-      {/* 5. GALLERY */}
-      <section className="tv-section" id="gallery" aria-labelledby="gallery-title">
-        <div className="tv-wrap">
-          <SectionHead label="Gallery" title="Our work" id="gallery-title" />
-          <div className="tv-grid3">
-            {['Landing page project 1', 'NFC card project 2', 'NFC chip project 3'].map((t) => (
-              <div className="tv-gallery tv-rise" key={t} role="img" aria-label={`Placeholder: ${t}`}>
-                <span className="tv-g-bg" aria-hidden="true" />
-                <span className="tv-crop tl" /><span className="tv-crop tr" /><span className="tv-crop bl" /><span className="tv-crop br" />
-                <div className="tv-g-center">{ICONS.image}</div>
-                <p className="tv-g-cap">[PLACEHOLDER] {t}</p>
-              </div>
-            ))}
-          </div>
-        </div>
-      </section>
-
-      <div className="tv-divider" aria-hidden="true"><i /></div>
-
-
-
       {/* 6. FOLLOW + SHARE */}
       <section className="tv-section" id="follow" aria-labelledby="follow-title">
         <div className="tv-wrap">
@@ -150,6 +130,11 @@ export default function Home() {
           <FaqAccordion />
         </div>
       </section>
+
+      <div className="tv-divider" aria-hidden="true"><i /></div>
+
+       {/* 4b. PRICING (components/Pricing.tsx) */}
+      <Pricing contactEmail={CONTACT_EMAIL} />
 
       <div className="tv-divider" aria-hidden="true"><i /></div>
 
