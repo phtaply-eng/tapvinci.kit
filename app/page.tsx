@@ -1,278 +1,179 @@
-'use client'
-import { useCallback, useEffect, useMemo, useState, type CSSProperties } from 'react'
 import Link from 'next/link'
-import { supabase } from '../lib/supabase'
+import Image from 'next/image'
+import { Fraunces, DM_Sans } from 'next/font/google'
+import FaqAccordion from '../components/home/FaqAccordion'
+import ShareCard from '../components/home/ShareCard'
+import FlowSections from '../components/home/FlowSections'
+import FlipCard from '../components/home/FlipCard'
+import { ICONS } from '../components/home/icons'
+import SiteFooter from '../components/SiteFooter'
+import Dial from '../components/Dial'
+import HamburgerMenu from '../components/HamburgerMenu'
+import Pricing from '../components/Pricing'
 
-// TapVinci Admin - Overview: revenue, what needs doing today, recent orders. Read-only (edits happen in Orders & Sales).
-// Package / payment / fulfillment fields come from supabase-orders.sql; rows without them use the same defaults as Orders & Sales.
+const fraunces = Fraunces({ subsets: ['latin'], style: ['normal', 'italic'], variable: '--font-fraunces', display: 'swap' })
+const dmSans = DM_Sans({ subsets: ['latin'], variable: '--font-dmsans', display: 'swap' })
 
-const AUTH_KEY = 'tapvinci_admin_ok'
-const PRICES = { card: 799, digital: 299 } as const
-const FUL = ['pending', 'printing', 'shipped', 'completed'] as const
-type Ful = (typeof FUL)[number]
-type Row = { username: string; name?: string | null; business?: string | null; email?: string | null; phone?: string | null; created_at?: string | null; paid_at?: string | null; is_active?: boolean | null; gcash_qr_url?: string | null; maya_qr_url?: string | null; [k: string]: any }
-type Review = { rating: number }
+// ---- Edit these in one place ----
+const DEMO_USERNAME = (process.env.NEXT_PUBLIC_DEMO_USERNAME || 'shua').toLowerCase()
+const SITE_URL = (process.env.NEXT_PUBLIC_SITE_URL || 'https://tapvinci.vercel.app').replace(/\/+$/, '')
+const CONTACT_EMAIL = 'tapvinci@yahoo.com'
+const SOCIALS = [
+  { key: 'facebook', label: 'Facebook', href: 'https://facebook.com/shua.vallinas', icon: 'fa-brands fa-facebook-f' },
+  { key: 'instagram', label: 'Instagram', href: 'https://instagram.com/shuashushu', icon: 'fa-brands fa-instagram' },
+  { key: 'tiktok', label: 'TikTok', href: 'https://www.tiktok.com/@shuashushu5', icon: 'fa-brands fa-tiktok' },
+  { key: 'messenger', label: 'Messenger', href: 'https://m.me/shua.vallinas', icon: 'fa-brands fa-facebook-messenger' },
+]
 
-// Demo / test accounts: same rule as Orders & Sales (app/admin/page.tsx). They stay live and editable
-// but never count toward sales, the print queue, the pipeline or the to-do list.
-const DEMO_USERNAMES = ['shua', 'tapvinci', 'robert']
-const DEMO_EMAILS = ['tapvinci@yahoo.com', 'shuarmav@gmail.com']
-const isDemo = (p: Row) =>
-  p.is_demo === true ||
-  DEMO_USERNAMES.includes((p.username || '').toString().toLowerCase()) ||
-  DEMO_EMAILS.includes((p.email || '').toString().trim().toLowerCase())
-const DEMO_BADGE_STYLE = { background: 'rgba(255,194,28,0.2)', color: '#FFC21C' } as const
-const DEMO_PAY_STYLE = { background: '#1E1E1E', color: '#A1A1A1', borderColor: '#2A2A2A' } as const
-
-const isCard = (p: Row) => p.package !== 'digital'
-const priceOf = (p: Row) => (isCard(p) ? PRICES.card : PRICES.digital)
-const payOf = (p: Row) => (p.payment_status === 'pending' || p.payment_status === 'failed' ? (p.payment_status as string) : 'paid')
-const fulOf = (p: Row): Ful => ((FUL as readonly string[]).includes(p.fulfillment) ? p.fulfillment : 'pending')
-const nameOf = (p: Row) => (p.name || p.business || p.username).toString()
-const money = (n: number) => '₱' + n.toLocaleString('en-PH', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
-const when = (v?: string | null) => { const d = v ? new Date(v) : null; return d && !Number.isNaN(d.getTime()) ? d : null }
-const dateText = (v?: string | null) => { const d = when(v); return d ? d.toLocaleDateString('en-US', { month: 'short', day: '2-digit', year: 'numeric' }) : '-' }
-function orderNo(p: Row) {
-  let h = 0
-  const s = `${p.username}|${p.created_at || ''}`
-  for (let i = 0; i < s.length; i++) h = (h * 31 + s.charCodeAt(i)) >>> 0
-  return `TV-${p.username.toUpperCase()}-${String(h % 1000000).padStart(6, '0')}` // same format as Orders & Sales
+function SectionHead({ label, title, id }: { label: string; title: string; id?: string }) {
+  return (
+    <div className="tv-head tv-rise">
+      <p className="tv-label"><span className="tv-label-line" aria-hidden="true" />{label}</p>
+      <h2 id={id} className="tv-h2">{title}</h2>
+    </div>
+  )
 }
 
-export default function AdminOverview() {
-  const [authed, setAuthed] = useState<boolean | null>(null)
-  const [profiles, setProfiles] = useState<Row[]>([])
-  const [reviews, setReviews] = useState<Review[]>([])
-  const [loading, setLoading] = useState(false)
-  const [error, setError] = useState('')
-
-  useEffect(() => {
-    const sync = () => { try { setAuthed(sessionStorage.getItem(AUTH_KEY) === '1') } catch { setAuthed(false) } }
-    sync()
-    window.addEventListener('tv-admin-auth', sync)
-    return () => window.removeEventListener('tv-admin-auth', sync)
-  }, [])
-
-  const load = useCallback(async () => {
-    setLoading(true)
-    setError('')
-    let { data, error: err } = await supabase.from('profiles').select('*').order('created_at', { ascending: false })
-    if (err) { const retry = await supabase.from('profiles').select('*'); data = retry.data; err = retry.error }
-    if (err) setError(err.message)
-    setProfiles((data as Row[]) || [])
-    const rv = await supabase.from('reviews').select('rating')
-    if (!rv.error) setReviews((rv.data as Review[]) || [])
-    setLoading(false)
-  }, [])
-  useEffect(() => { if (authed) load() }, [authed, load])
-
-  const d = useMemo(() => {
-    const active = profiles.filter((p) => p.is_active !== false)
-    // every number below uses real clients only; demo accounts are just counted for the notes
-    const demo = active.filter(isDemo)
-    const real = active.filter((p) => !isDemo(p))
-    const paid = real.filter((p) => payOf(p) === 'paid')
-    const now = new Date()
-    const sameMonth = (v?: string | null, back = 0) => { const x = when(v); const t = new Date(now.getFullYear(), now.getMonth() - back, 1); return !!x && x.getFullYear() === t.getFullYear() && x.getMonth() === t.getMonth() }
-    const months = Array.from({ length: 6 }, (_, i) => {
-      const back = 5 - i
-      const label = new Date(now.getFullYear(), now.getMonth() - back, 1).toLocaleDateString('en-US', { month: 'short' })
-      const rows = paid.filter((p) => sameMonth(p.created_at, back))
-      return { label, orders: rows.length, revenue: rows.reduce((s, p) => s + priceOf(p), 0) }
-    })
-    const byFul: Record<Ful, number> = { pending: 0, printing: 0, shipped: 0, completed: 0 }
-    real.forEach((p) => { byFul[fulOf(p)] += 1 })
-    const toPrint = paid.filter((p) => isCard(p) && fulOf(p) === 'pending').length
-    return {
-      active, real, demo, months, byFul,
-      demoToPrint: demo.filter((p) => payOf(p) === 'paid' && isCard(p) && fulOf(p) === 'pending').length,
-      revenue: paid.reduce((s, p) => s + priceOf(p), 0),
-      monthRevenue: months[5].revenue, monthOrders: months[5].orders,
-      avgOrder: paid.length ? paid.reduce((s, p) => s + priceOf(p), 0) / paid.length : 0,
-      awaitingPay: real.filter((p) => payOf(p) === 'pending').length,
-      failedPay: real.filter((p) => payOf(p) === 'failed').length,
-      toPrint,
-      printing: paid.filter((p) => isCard(p) && fulOf(p) === 'printing').length,
-      toDeliver: paid.filter((p) => isCard(p) && fulOf(p) === 'shipped').length,
-      noQr: real.filter((p) => !p.gcash_qr_url && !p.maya_qr_url).length,
-      noEmail: real.filter((p) => !p.email).length,
-      recent: active.slice(0, 5),
-    }
-  }, [profiles])
-
-  const reviewAvg = reviews.length ? Math.round((reviews.reduce((s, r) => s + r.rating, 0) / reviews.length) * 10) / 10 : 0
-  const maxRev = Math.max(1, ...d.months.map((m) => m.revenue))
-
-  if (authed === null) return <div className="min-h-screen bg-[#050505]" />
-  if (!authed) {
-    return (
-      <div className="min-h-screen bg-[#050505] text-white flex items-center justify-center p-4">
-        <div className="w-full max-w-sm bg-[#121214] border border-[#2A2A2A] rounded-3xl p-6 text-center space-y-4">
-          <h1 className="text-xl font-bold">TapVinci Admin</h1>
-          <p className="text-xs text-gray-500">Please log in first.</p>
-          <Link href="/admin" className="block h-11 leading-[44px] rounded-xl bg-[#E8C766] hover:bg-[#D4AF37] text-black font-bold text-sm">Go to admin login</Link>
-        </div>
-      </div>
-    )
-  }
-
-  const todo = [
-    { n: d.awaitingPay, text: 'orders waiting for GCash/Maya payment confirmation', icon: 'fa-hourglass-half', tone: '#FFC21C', cta: 'Review payments' },
-    { n: d.failedPay, text: 'failed payments to follow up', icon: 'fa-triangle-exclamation', tone: '#f87171', cta: 'Review payments' },
-    { n: d.toPrint, text: 'paid cards ready to print', icon: 'fa-print', tone: '#D4AF37', cta: 'Start printing' },
-    { n: d.printing, text: 'cards being printed - ready to ship', icon: 'fa-box', tone: '#c084fc', cta: 'Mark shipped' },
-    { n: d.toDeliver, text: 'shipped cards - mark completed once delivered', icon: 'fa-truck', tone: '#4da3ff', cta: 'Mark completed' },
-    { n: d.noQr, text: 'clients without a GCash/Maya QR uploaded', icon: 'fa-qrcode', tone: '#A1A1A1', cta: 'Open profiles', href: '/admin#profiles' },
-    { n: d.noEmail, text: 'clients without an email (cannot send their link)', icon: 'fa-envelope', tone: '#A1A1A1', cta: 'Open profiles', href: '/admin#profiles' },
-  ].filter((t) => t.n > 0)
-
-  const badge = (cls: string, text: string, style?: CSSProperties) => <span className={`ac-badge ${cls} !cursor-default`} style={style}>{text}</span>
-  const demoCount = d.demo.length
-  const demoWord = `${demoCount} demo account${demoCount === 1 ? '' : 's'}`
-  const demoNames = d.demo.map((p) => p.username).join(', ')
-  const hasRevenue = d.months.some((m) => m.revenue > 0)
-
+export default function Home() {
   return (
-    <div className="min-h-screen bg-[#050505] text-white p-4 md:p-8">
-      <div className="max-w-[1400px] mx-auto">
-        <div className="flex flex-wrap justify-between items-start gap-4 mb-6">
-          <div>
-            <h1 className="ac-title text-2xl md:text-[28px] font-bold">Overview</h1>
-            <p className="text-[12px] text-[#A1A1A1] mt-1">Revenue, what needs doing today, and your latest orders at a glance</p>
+    <main className={`tv-home ${fraunces.variable} ${dmSans.variable}`}>
+      <HamburgerMenu />
+      <div className="tv-vignette" aria-hidden="true" />
+
+      {/* 1. HERO */}
+      <section className="tv-hero" id="top">
+        <div className="tv-hero-art" aria-hidden="true">
+          <span className="tv-orb" />
+          <span className="tv-ripple" /><span className="tv-ripple" /><span className="tv-ripple" />
+          <Dial className="tv-bezel" withTicks />
+        </div>
+        <div className="tv-wrap tv-hero-inner">
+          <p className="tv-est tv-in" style={{ ['--d' as string]: '0s' }}></p>
+         <div className="tv-logo tv-in" style={{ ['--d' as string]: '.15s', marginBottom: '12px' } as any} aria-label="TapVinci">
+            <Image src="/logo.png" alt="TapVinci" width={400} height={100} className="h-20 md:h-24 w-auto object-contain mx-auto" priority />
           </div>
-          <div className="flex flex-wrap gap-2">
-            <Link href="/admin" className="ac-pill">Orders &amp; Sales</Link>
-            <button onClick={load} className="ac-pill">{loading ? 'Refreshing...' : 'Refresh'}</button>
+          <h1 className="tv-hero-h1 tv-in whitespace-nowrap" style={{ ['--d' as string]: '.26s', fontSize: 'clamp(69px, 6vw, 48px)' }}>
+          <span>Tap.</span> <span>Connect.</span> <em>Remember.</em>
+          </h1>
+          <p className="tv-hero-sub tv-in" style={{ ['--d' as string]: '.4s' }}></p>
+          <div className="tv-hero-actions tv-in" style={{ ['--d' as string]: '.52s' }}>
+            <Link href="/dashboard" className="tv-btn tv-btn-gold">Create a profile</Link>
+            <Link href={`/${DEMO_USERNAME}`} className="tv-btn tv-btn-glass">View Demo</Link>
+          </div>
+          <p className="tv-tagline tv-in" style={{ ['--d' as string]: '.66s' }}>A NEW STANDARD OF INTRODUCTION • MADE TO CONNECT • PHILIPPINES 2026</p>
+        </div>
+      </section>
+
+      {/* 3. ABOUT */}
+      <section className="tv-section" id="about" aria-labelledby="about-title">
+        <div className="tv-wrap tv-about">
+          <div className="tv-about-copy">
+            <SectionHead label="About TapVinci" title="A better way to make an introduction." id="about-title" />
+            <p className="tv-lead tv-rise">TapVinci is a Philippines-based. It offers digital calling card with landing pages, so people can share contact details and links with a single tap.</p>
+            <p className="tv-p tv-rise">We help professionals and local businesses get noticed — Our goal is simple: make it personal, modern, and easy to share.</p>
+            <p className="tv-sign tv-rise"><span>Shua Vallinas</span><small>Founder, TapVinci</small></p>
+          </div>
+          <figure className="tv-codex tv-rise" aria-hidden="true">
+            <svg viewBox="-12 -12 634 401" fill="none">
+              <g stroke="#D4AF37" strokeOpacity="0.16" strokeWidth="0.8">
+                <rect x="0" y="0" width="610" height="377" />
+                <rect x="0" y="0" width="377" height="377"/><rect x="377" y="0" width="233" height="233"/><rect x="466" y="233" width="144" height="144"/><rect x="377" y="288" width="89" height="89"/><rect x="377" y="233" width="55" height="55"/><rect x="432" y="233" width="34" height="34"/><rect x="445" y="267" width="21" height="21"/><rect x="432" y="275" width="13" height="13"/><rect x="432" y="267" width="8" height="8"/>
+              </g>
+              <g stroke="#D4AF37" strokeOpacity="0.12" strokeWidth="0.6" strokeDasharray="3 5">
+                <circle cx="188.5" cy="188.5" r="188.5" />
+                <path d="M0 0 L610 377 M0 377 L610 0" />
+              </g>
+              <path className="tv-spiral" pathLength="1" d="M0 377 A377 377 0 0 1 377 0 A233 233 0 0 1 610 233 A144 144 0 0 1 466 377 A89 89 0 0 1 377 288 A55 55 0 0 1 432 233 A34 34 0 0 1 466 267 A21 21 0 0 1 445 288 A13 13 0 0 1 432 275 A8 8 0 0 1 440 267" stroke="#E8C766" strokeWidth="1.6" strokeLinecap="round" />
+              <circle cx="440" cy="267" r="3" fill="#FFC21C" />
+            </svg>
+            <figcaption>φ&nbsp;1.618 · Tap for tech, Vinci for craft</figcaption>
+          </figure>
+        </div>
+      </section>
+
+      <div className="tv-divider" aria-hidden="true"><i /></div>
+
+      {/* 4. WHAT WE OFFER -> HOW IT WORKS (one connected flow) */}
+      <FlowSections />
+
+      <div className="tv-divider" aria-hidden="true"><i /></div>
+
+      {/* 6. FOLLOW + SHARE */}
+      <section className="tv-section" id="follow" aria-labelledby="follow-title">
+        <div className="tv-wrap">
+          <SectionHead label="Follow" title="Social media" id="follow-title" />
+          <div className="tv-social-grid">
+            {SOCIALS.map((s) => (
+              <a key={s.key} href={s.href} target="_blank" rel="noopener noreferrer" className={`tv-social tv-social-${s.key} tv-rise`}>
+                <span className="tv-social-chip"><i className={s.icon} aria-hidden="true" /></span>
+                <span className="tv-social-name">{s.label}</span>
+                <i className="fa-solid fa-arrow-up-right-from-square tv-social-go" aria-hidden="true" />
+              </a>
+            ))}
+          </div>
+
+          <div className="tv-share-grid">
+            <ShareCard url={`${SITE_URL}/`} />
+            <div className="tv-cardviz tv-rise">
+              <FlipCard />
+            </div>
           </div>
         </div>
+      </section>
 
-        {error && <div className="mb-4 rounded-xl border border-red-500/30 bg-red-500/10 text-red-300 text-sm px-4 py-3" role="alert">Could not load profiles: {error}</div>}
+      <div className="tv-divider" aria-hidden="true"><i /></div>
 
-        <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-4 mb-6">
-          {[
-            { label: 'Total Sales Revenue', value: money(d.revenue), sub: d.real.length === 0 ? `No real sales yet - ${demoWord} excluded` : `Average order ${money(d.avgOrder)}${demoCount ? ` - ${demoCount} demo excluded` : ''}`, icon: 'fa-wallet', tone: '#D4AF37' },
-            { label: 'This Month', value: money(d.monthRevenue), sub: `${d.monthOrders} paid order${d.monthOrders === 1 ? '' : 's'} this month - demos excluded`, icon: 'fa-calendar-check', tone: '#00D632' },
-            { label: 'Cards To Print', value: String(d.toPrint), sub: `${d.printing} printing now${d.demoToPrint ? ` - ${d.demoToPrint} demo card${d.demoToPrint === 1 ? '' : 's'} not counted` : ''}`, icon: 'fa-print', tone: '#FFC21C' },
-            { label: 'Awaiting Payment', value: String(d.awaitingPay), sub: d.failedPay ? `${d.failedPay} failed` : 'No failed payments', icon: 'fa-hourglass-half', tone: '#007DFE' },
-          ].map((c) => (
-            <div key={c.label} className="ac-stat">
-              <div className="flex items-start justify-between gap-3">
-                <p className="text-[10px] uppercase tracking-[1.5px] text-[#A1A1A1] font-bold">{c.label}</p>
-                <span className="w-8 h-8 rounded-full flex items-center justify-center text-[13px] shrink-0" style={{ background: `${c.tone}1F`, color: c.tone }}><i className={`fa-solid ${c.icon}`} aria-hidden="true" /></span>
+      {/* 7. NFC HELP */}
+      <section className="tv-section" id="faq" aria-labelledby="faq-title">
+        <div className="tv-wrap tv-faq-wrap">
+          <SectionHead label="NFC help" title="Quick answers" id="faq-title" />
+          <FaqAccordion />
+        </div>
+      </section>
+
+      <div className="tv-divider" aria-hidden="true"><i /></div>
+
+       {/* 4b. PRICING (components/Pricing.tsx) */}
+      <Pricing contactEmail={CONTACT_EMAIL} />
+
+      <div className="tv-divider" aria-hidden="true"><i /></div>
+
+      {/* 8. REVIEWS - MOVED TO VERY BOTTOM - TRUST ANCHOR BEFORE FOOTER - APPLE-LEVEL SOCIAL PROOF */}
+      <section className="tv-section tv-reviews-teaser" id="reviews-teaser" aria-labelledby="reviews-teaser-title">
+        <div className="tv-wrap">
+          <div className="tv-reviews-teaser-inner">
+            <SectionHead label="Reviews" title="What people say" id="reviews-teaser-title" />
+            <div className="tv-reviews-teaser-card tv-rise">
+              <div className="tv-reviews-teaser-stars">
+                <span className="tv-reviews-teaser-avg">4.9</span>
+                <span className="tv-reviews-teaser-stars-icons">
+                  <i className="fa-solid fa-star"></i>
+                  <i className="fa-solid fa-star"></i>
+                  <i className="fa-solid fa-star"></i>
+                  <i className="fa-solid fa-star"></i>
+                  <i className="fa-solid fa-star"></i>
+                </span>
+                <span className="tv-reviews-teaser-count">(127 reviews)</span>
               </div>
-              <p className="ac-title text-[28px] font-bold text-white mt-2 leading-none">{c.value}</p>
-              <p className="text-[11px] text-[#A1A1A1] mt-2">{c.sub}</p>
-            </div>
-          ))}
-        </div>
-
-        <div className="grid grid-cols-1 xl:grid-cols-3 gap-4 mb-6">
-          {/* needs attention */}
-          <section className="xl:col-span-2 bg-[#121214] border border-[#1E1E1E] rounded-2xl p-5">
-            <h2 className="ac-title text-lg font-bold">Needs your attention</h2>
-            <p className="text-[11px] text-[#A1A1A1] mt-0.5 mb-4">Your to-do list, built from the current orders</p>
-            {todo.length === 0 ? (
-              <p className="rounded-xl border border-dashed border-[#2A2A2A] p-6 text-center text-sm text-[#A1A1A1]"><i className="fa-solid fa-circle-check text-[#00D632] mr-2" aria-hidden="true" />All caught up - nothing waiting.</p>
-            ) : (
-              <ul className="space-y-2">
-                {todo.map((t) => (
-                  <li key={t.text} className="flex items-center gap-3 rounded-xl bg-[#0A0A0A] border border-[#1E1E1E] px-3 py-2.5">
-                    <span className="w-8 h-8 rounded-full flex items-center justify-center text-[12px] shrink-0" style={{ background: `${t.tone}1F`, color: t.tone }}><i className={`fa-solid ${t.icon}`} aria-hidden="true" /></span>
-                    <p className="text-[13px] flex-1"><b className="text-white">{t.n}</b> <span className="text-[#A1A1A1]">{t.text}</span></p>
-                    <Link href={t.href || '/admin'} className="ac-mini ac-mini-gold !inline-flex items-center">{t.cta} →</Link>
-                  </li>
-                ))}
-              </ul>
-            )}
-            {demoCount > 0 && (
-              <p className="text-[11px] text-[#A1A1A1] mt-3">
-                <span className="demo-badge text-[9px] font-bold px-1.5 py-0.5 rounded-full mr-2 align-middle" style={DEMO_BADGE_STYLE}>DEMO</span>
-                {demoWord} ({demoNames}) excluded from this list{d.demoToPrint ? ` - ${d.demoToPrint} demo card${d.demoToPrint === 1 ? '' : 's'} pending, not counted as real` : ''}.
-              </p>
-            )}
-          </section>
-
-          {/* fulfillment pipeline + reviews */}
-          <section className="bg-[#121214] border border-[#1E1E1E] rounded-2xl p-5">
-            <h2 className="ac-title text-lg font-bold">Fulfillment pipeline</h2>
-            <p className="text-[11px] text-[#A1A1A1] mt-0.5 mb-4">{d.real.length} active real orders</p>
-            <div className="space-y-3">
-              {FUL.map((f) => (
-                <div key={f}>
-                  <div className="flex justify-between text-[11px] mb-1"><span className="uppercase tracking-[1.2px] text-[#A1A1A1] font-bold">{f}</span><b>{d.byFul[f]}</b></div>
-                  <div className="h-2 rounded-full bg-[#1E1E20] overflow-hidden"><div className="h-full rounded-full bg-[#D4AF37]" style={{ width: `${d.real.length ? (d.byFul[f] / d.real.length) * 100 : 0}%` }} /></div>
-                </div>
-              ))}
-            </div>
-            {demoCount > 0 && <p className="text-[10px] text-[#6B7280] mt-3">{demoCount} demo order{demoCount === 1 ? '' : 's'} hidden from pipeline</p>}
-            <div className="mt-5 pt-4 border-t border-[#1E1E1E] flex items-center justify-between">
-              <div>
-                <p className="text-[10px] uppercase tracking-[1.5px] text-[#A1A1A1] font-bold">Reviews</p>
-                <p className="ac-title text-xl font-bold mt-0.5">{reviews.length ? reviewAvg : '-'} <span className="text-[#D4AF37] text-base">★</span> <span className="text-[11px] text-[#A1A1A1] font-normal">({reviews.length})</span></p>
+              <p className="tv-reviews-teaser-text">"Premium quality, tap works instantly. Clients always impressed. TapVinci is the new standard."</p>
+              <p className="tv-reviews-teaser-author">— Shua Vallinas, Founder</p>
+              <div className="tv-reviews-teaser-actions">
+                <Link href="/reviews" className="tv-btn tv-btn-gold">
+                  <i className="fa-solid fa-star" style={{ marginRight: '8px' }}></i> Leave a Review
+                </Link>
+                <Link href="/reviews" className="tv-btn tv-btn-glass">
+                  Read All Reviews
+                </Link>
               </div>
-              <a href="/reviews" target="_blank" rel="noopener noreferrer" className="ac-mini ac-mini-gold !inline-flex items-center">View page →</a>
             </div>
-          </section>
+          </div>
         </div>
+      </section>
 
-        <div className="grid grid-cols-1 xl:grid-cols-3 gap-4">
-          {/* revenue chart */}
-          <section className="bg-[#121214] border border-[#1E1E1E] rounded-2xl p-5">
-            <h2 className="ac-title text-lg font-bold">Revenue - last 6 months</h2>
-            <p className="text-[11px] text-[#A1A1A1] mt-0.5 mb-4">Paid real orders (demos excluded), by the month the client signed up</p>
-            <div className="flex items-end gap-3 h-40" role="img" aria-label="Revenue by month">
-              {d.months.map((m) => (
-                <div key={m.label} className="flex-1 flex flex-col items-center justify-end h-full gap-1" title={`${m.label}: ${money(m.revenue)} (${m.orders} orders)`}>
-                  <span className="text-[9px] text-[#A1A1A1]">{m.revenue ? '₱' + m.revenue.toLocaleString('en-PH') : ''}</span>
-                  <div className="w-full rounded-t-md bg-gradient-to-t from-[#D4AF37]/40 to-[#FFC21C]" style={{ height: `${Math.max(m.revenue ? 6 : 2, (m.revenue / maxRev) * 100)}%`, opacity: m.revenue ? 1 : 0.25 }} />
-                  <span className="text-[10px] uppercase tracking-[1px] text-[#A1A1A1]">{m.label}</span>
-                </div>
-              ))}
-            </div>
-            {!hasRevenue && <p className="text-[11px] text-[#A1A1A1] text-center mt-3">No real revenue yet</p>}
-          </section>
+      <div className="tv-divider" aria-hidden="true"><i /></div>
 
-          {/* recent orders */}
-          <section className="xl:col-span-2 bg-[#121214] border border-[#1E1E1E] rounded-2xl p-5">
-            <div className="flex items-center justify-between mb-4">
-              <div>
-                <h2 className="ac-title text-lg font-bold">Recent orders</h2>
-                <p className="text-[11px] text-[#A1A1A1] mt-0.5">Your 5 newest clients - demo accounts are tagged and not counted in sales</p>
-              </div>
-              <Link href="/admin" className="ac-mini ac-mini-gold !inline-flex items-center">All orders →</Link>
-            </div>
-            <div className="overflow-x-auto">
-              <table className="admin-table ac-orders">
-                <thead><tr><th scope="col">Order #</th><th scope="col">Customer</th><th scope="col">Amount</th><th scope="col">Payment</th><th scope="col">Fulfillment</th></tr></thead>
-                <tbody>
-                  {loading ? (
-                    <tr><td colSpan={5} className="text-center text-gray-500 !py-8">Loading...</td></tr>
-                  ) : d.recent.length === 0 ? (
-                    <tr><td colSpan={5} className="text-center text-gray-500 !py-8">No orders yet.</td></tr>
-                  ) : d.recent.map((p) => (
-                    <tr key={p.username} className="ac-row">
-                      <td><p className="font-bold text-[#D4AF37] text-[12px] whitespace-nowrap">{orderNo(p)}{isDemo(p) && <span className="demo-badge ml-2 text-[9px] font-bold px-1.5 py-0.5 rounded-full align-middle" style={DEMO_BADGE_STYLE}>DEMO</span>}</p><p className="text-[10px] text-[#A1A1A1]">{dateText(p.created_at)}</p></td>
-                      <td><p className="font-bold">{nameOf(p)}</p><Link href={`/${p.username}`} target="_blank" rel="noopener noreferrer" className="text-[11px] text-[#D4AF37] hover:underline">/{p.username} →</Link></td>
-                      <td className={`font-bold whitespace-nowrap ${isDemo(p) ? 'text-[#A1A1A1]' : ''}`}>{money(priceOf(p))}</td>
-                      <td>
-                        {isDemo(p)
-                          ? <>{badge(`ac-pay-${payOf(p)}`, `DEMO (${payOf(p).toUpperCase()})`, DEMO_PAY_STYLE)}<p className="text-[10px] text-[#A1A1A1] mt-1 whitespace-nowrap">Demo - not counted in sales</p></>
-                          : badge(`ac-pay-${payOf(p)}`, payOf(p).toUpperCase())}
-                      </td>
-                      <td>{badge(`ac-ful-${fulOf(p)}`, fulOf(p).toUpperCase())}</td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          </section>
-        </div>
-
-        <div className="flex flex-wrap gap-2 mt-6">
-          <Link href="/dashboard" className="h-11 px-5 inline-flex items-center rounded-xl bg-[#FFC21C] text-black font-bold text-sm shadow-[0_8px_28px_rgba(255,194,28,0.35)] hover:brightness-105"><i className="fa-solid fa-plus mr-2" aria-hidden="true" />New client profile</Link>
-          <Link href="/admin#profiles" className="ac-pill !h-11 !px-5 !rounded-xl">Business Profiles</Link>
-        </div>
-      </div>
-    </div>
+      {/* Footer - COPIED FROM MAIN SITE - EXACT SAME */}
+      <SiteFooter copyright="© 2026 TapVinci • Philippines. All rights reserved." />
+    </main>
   )
 }
