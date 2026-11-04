@@ -129,6 +129,88 @@ function csvCell(v: unknown) {
   return `"${s}"`
 }
 
+// ---------------------------------------------------------------------------
+// Orders & Sales: every client profile = one order. Package / payment / fulfillment live on the
+// profiles row (run supabase-orders.sql once). Rows without those columns fall back to the defaults below.
+// ---------------------------------------------------------------------------
+const ORDER_PREFIX = 'TV' // order numbers look like TV-USERNAME-123456 (change here if you want another prefix)
+const PACKAGES = {
+  card: { label: 'Card + Digital', price: 799, note: 'Includes NFC card' },
+  digital: { label: 'Digital Only', price: 299, note: 'Landing page only' },
+} as const
+type PackageId = keyof typeof PACKAGES
+const PAY_OPTIONS = ['paid', 'pending', 'failed'] as const
+type PayStatus = (typeof PAY_OPTIONS)[number]
+const FUL_OPTIONS = ['pending', 'printing', 'shipped', 'completed'] as const
+type FulStatus = (typeof FUL_OPTIONS)[number]
+const FUL_NEXT: Record<FulStatus, FulStatus | null> = { pending: 'printing', printing: 'shipped', shipped: 'completed', completed: null }
+const MISSING_COLS = /package|payment_status|paid_at|fulfillment|fulfilled_at|is_active|deactivated_at/
+
+const pkgOf = (p: Row): PackageId => (p.package === 'digital' ? 'digital' : 'card')
+const payOf = (p: Row): PayStatus => (p.payment_status === 'pending' || p.payment_status === 'failed' ? p.payment_status : 'paid')
+const fulOf = (p: Row): FulStatus => (FUL_OPTIONS as readonly string[]).includes(p.fulfillment as string) ? (p.fulfillment as FulStatus) : 'pending'
+const amountOf = (p: Row) => PACKAGES[pkgOf(p)].price
+
+// Demo / test accounts: still live and editable, but never counted in sales stats.
+// Works with no migration (username list). If the profiles table also has an `is_demo` boolean, that counts too.
+const DEMO_USERNAMES = ['shua', 'tapvinci', 'robert']
+// never permanently deletable from admin (they power /shua demo and the /tapvinci template) - deactivate instead
+const PROTECTED_USERNAMES = ['shua', 'tapvinci']
+const DEMO_EMAILS = ['tapvinci@yahoo.com', 'shuarmav@gmail.com'] // keep in sync with app/admin/overview/page.tsx
+const isDemo = (p: Row) =>
+  p.is_demo === true ||
+  DEMO_USERNAMES.includes((p.username || '').toString().toLowerCase()) ||
+  DEMO_EMAILS.includes((p.email || '').toString().trim().toLowerCase())
+type DemoFilter = 'all' | 'real' | 'demo'
+const DEMO_BADGE_STYLE = { background: 'rgba(255,194,28,0.2)', color: '#FFC21C' } as const
+const DEMO_PAY_STYLE = { background: '#1E1E1E', color: '#A1A1A1', borderColor: '#2A2A2A' } as const
+
+function orderNo(p: Row) {
+  // stable (same every render): derived from username + creation time
+  let h = 0
+  const s = `${p.username}|${p.created_at || ''}`
+  for (let i = 0; i < s.length; i++) h = (h * 31 + s.charCodeAt(i)) >>> 0
+  return `${ORDER_PREFIX}-${p.username.toUpperCase()}-${String(h % 1000000).padStart(6, '0')}`
+}
+
+function money(n: number) {
+  return '₱' + n.toLocaleString('en-PH', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
+}
+
+function formatDateTime(v?: string | null) {
+  const d = parseDate(v)
+  if (!d) return '-'
+  const day = d.toLocaleDateString('en-US', { month: 'short', day: '2-digit', year: 'numeric' })
+  const time = d.toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' })
+  return `${day} ${time}`
+}
+
+function escapeHtml(v: unknown) {
+  return (v ?? '').toString().replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c] as string))
+}
+
+// printable invoice in a new tab: use the browser's Print -> Save as PDF
+function openInvoice(p: Row) {
+  const pkg = PACKAGES[pkgOf(p)]
+  const w = window.open('', '_blank')
+  if (!w) return false
+  w.document.write(`<!doctype html><html><head><meta charset="utf-8"><title>Invoice ${escapeHtml(orderNo(p))}</title>
+<style>body{font-family:Arial,Helvetica,sans-serif;color:#111;max-width:680px;margin:40px auto;padding:0 24px}h1{font-size:22px;margin:0}small{color:#666}
+table{width:100%;border-collapse:collapse;margin-top:28px}td,th{padding:10px 8px;border-bottom:1px solid #ddd;text-align:left;font-size:14px}th{font-size:11px;text-transform:uppercase;color:#666}
+.r{text-align:right}.tot{font-size:18px;font-weight:700}.gold{color:#9a7b1e}@media print{button{display:none}}</style></head><body>
+<h1>Tap<span class="gold">Vinci</span> <small>INVOICE</small></h1><p><small>${escapeHtml(SITE_URL)} &bull; Philippines</small></p>
+<p><b>Order #</b> ${escapeHtml(orderNo(p))}<br><b>Date</b> ${escapeHtml(formatDateTime(p.created_at))}<br><b>Payment</b> ${escapeHtml(payOf(p).toUpperCase())} &bull; GCash/Maya QR Ph</p>
+<p><b>Bill to</b><br>${escapeHtml(displayName(p) || p.username)}<br>${escapeHtml(p.email || '')}<br>${escapeHtml(p.phone || '')}</p>
+<table><tr><th>Item</th><th>Link</th><th class="r">Amount</th></tr>
+<tr><td>${escapeHtml(pkg.label)}<br><small>${escapeHtml(pkg.note)}</small></td><td>${escapeHtml(SITE_URL + '/' + p.username)}</td><td class="r">${escapeHtml(money(pkg.price))}</td></tr>
+<tr><td colspan="2" class="r tot">Total</td><td class="r tot">${escapeHtml(money(pkg.price))}</td></tr></table>
+<p><small>Thank you for choosing TapVinci.</small></p><button onclick="window.print()">Print / Save as PDF</button></body></html>`)
+  w.document.close()
+  w.focus()
+  setTimeout(() => w.print(), 400)
+  return true
+}
+
 export default function AdminPage() {
   const [isAuthed, setIsAuthed] = useState(false)
   const [checked, setChecked] = useState(false)
@@ -161,12 +243,36 @@ export default function AdminPage() {
   const [deleteText, setDeleteText] = useState('')
   const [busyAction, setBusyAction] = useState(false)
 
+  // Orders & Sales view (the Business Profiles view below is the original client table + reviews)
+  const [view, setView] = useState<'orders' | 'profiles'>('orders')
+  const [oDraft, setODraft] = useState('')
+  const [oQuery, setOQuery] = useState('')
+  const [payFilter, setPayFilter] = useState<'all' | 'paid' | 'pending' | 'completed' | 'deleted'>('all')
+  const [demoFilter, setDemoFilter] = useState<DemoFilter>('all')
+  const [fulFilter, setFulFilter] = useState<'all' | FulStatus>('all')
+  const [oSort, setOSort] = useState<'date' | 'amount'>('date')
+  const [oAsc, setOAsc] = useState(false)
+  const [selected, setSelected] = useState<Set<string>>(new Set())
+  const [genOpen, setGenOpen] = useState(false)
+
   // restore a previous login for this browser tab
   useEffect(() => {
     try {
       if (sessionStorage.getItem(AUTH_KEY) === '1') setIsAuthed(true)
     } catch {}
     setChecked(true)
+  }, [])
+
+  // sidebar (admin/layout.tsx) switches the view with the URL hash and logs out through an event
+  useEffect(() => {
+    const onHash = () => setView(window.location.hash === '#profiles' ? 'profiles' : 'orders')
+    const onAuth = () => {
+      try { if (sessionStorage.getItem(AUTH_KEY) !== '1') { setIsAuthed(false); setProfiles([]) } } catch {}
+    }
+    onHash()
+    window.addEventListener('hashchange', onHash)
+    window.addEventListener('tv-admin-auth', onAuth)
+    return () => { window.removeEventListener('hashchange', onHash); window.removeEventListener('tv-admin-auth', onAuth) }
   }, [])
 
   const showToast = (msg: string) => {
@@ -214,6 +320,7 @@ export default function AdminPage() {
       setAuthError('')
       setPassword('')
       try { sessionStorage.setItem(AUTH_KEY, '1') } catch {}
+      window.dispatchEvent(new Event('tv-admin-auth'))
     } else {
       setAuthError('Wrong password.')
     }
@@ -223,6 +330,7 @@ export default function AdminPage() {
     setIsAuthed(false)
     setProfiles([])
     try { sessionStorage.removeItem(AUTH_KEY) } catch {}
+    window.dispatchEvent(new Event('tv-admin-auth'))
   }
 
   const filtered = useMemo(() => {
@@ -383,6 +491,9 @@ export default function AdminPage() {
   }
 
   async function handleDelete(profile: Row) {
+    if (PROTECTED_USERNAMES.includes((profile.username || '').toString().toLowerCase())) {
+      return showToast(`${profile.username} is a protected demo account - use Deactivate instead`)
+    }
     setBusyAction(true)
     const username = profile.username
     // 1) work out which stored files belong to this client
@@ -441,21 +552,117 @@ export default function AdminPage() {
     return () => window.removeEventListener('keydown', onKey)
   }, [editingProfile, deleteConfirm])
 
+    // ---------- Orders & Sales ----------
+  const activeProfiles = useMemo(() => profiles.filter((p) => p.is_active !== false), [profiles])
+
+  // sales numbers only ever use real (non-demo) active clients
+  const realClients = useMemo(() => activeProfiles.filter((p) => !isDemo(p)), [activeProfiles])
+  const demoCount = useMemo(() => activeProfiles.filter(isDemo).length, [activeProfiles])
+
+  const orderStats = useMemo(() => {
+    const paid = realClients.filter((p) => payOf(p) === 'paid')
+    // stage chips follow the Real / Demo filter so their counts match the table
+    const scope = demoFilter === 'real' ? realClients : demoFilter === 'demo' ? activeProfiles.filter(isDemo) : activeProfiles
+    const byFul: Record<FulStatus, number> = { pending: 0, printing: 0, shipped: 0, completed: 0 }
+    scope.forEach((p) => { byFul[fulOf(p)] += 1 })
+    return {
+      revenue: paid.reduce((sum, p) => sum + amountOf(p), 0),
+      completed: paid.length,
+      sessions: realClients.length,
+      pendingPay: realClients.filter((p) => payOf(p) === 'pending').length,
+      deleted: profiles.length - activeProfiles.length,
+      scopeCount: scope.length,
+      byFul,
+    }
+  }, [profiles, activeProfiles, realClients, demoFilter])
+
+  const orders = useMemo(() => {
+    const q = oQuery.trim().toLowerCase()
+    const list = profiles.filter((p) => {
+      const inactive = p.is_active === false
+      if (payFilter === 'deleted' ? !inactive : inactive) return false
+      if (demoFilter === 'real' && isDemo(p)) return false
+      if (demoFilter === 'demo' && !isDemo(p)) return false
+      if (payFilter === 'paid' && payOf(p) !== 'paid') return false
+      if (payFilter === 'pending' && payOf(p) !== 'pending') return false
+      if (payFilter === 'completed' && fulOf(p) !== 'completed') return false
+      if (fulFilter !== 'all' && fulOf(p) !== fulFilter) return false
+      if (!q) return true
+      return [orderNo(p), p.username, displayName(p), p.email, p.phone, `${SITE_URL}/${p.username}`].some((v) => (v || '').toString().toLowerCase().includes(q))
+    })
+    const dir = oAsc ? 1 : -1
+    return list.sort((a, b) =>
+      oSort === 'amount'
+        ? (amountOf(a) - amountOf(b)) * dir
+        : ((parseDate(a.created_at)?.getTime() || 0) - (parseDate(b.created_at)?.getTime() || 0)) * dir
+    )
+  }, [profiles, oQuery, payFilter, demoFilter, fulFilter, oSort, oAsc])
+
+  const selectedList = useMemo(() => orders.filter((p) => selected.has(p.username)), [orders, selected])
+  const allVisibleSelected = orders.length > 0 && selectedList.length === orders.length
+
+  const toggleOrderSort = (key: 'date' | 'amount') => {
+    if (key === oSort) setOAsc((v) => !v)
+    else { setOSort(key); setOAsc(false) }
+  }
+  const toggleSelected = (username: string) =>
+    setSelected((prev) => { const next = new Set(prev); if (next.has(username)) next.delete(username); else next.add(username); return next })
+
+  // one place for every order write; rows keep their existing data, only the changed fields are sent
+  async function updateOrder(profile: Row, patch: Record<string, unknown>, okMsg?: string) {
+    const { data, error } = await supabase.from('profiles').update(patch).eq('username', profile.username).select()
+    if (error) return showToast(MISSING_COLS.test(error.message) ? 'Run supabase-orders.sql in Supabase first' : 'Failed: ' + error.message)
+    if (!data || data.length === 0) return showToast('Nothing was updated - check the Supabase update policy')
+    setProfiles((list) => list.map((r) => (r.username === profile.username ? { ...r, ...(data[0] as Row) } : r)))
+    if (okMsg) showToast(okMsg)
+  }
+  const setPayment = (p: Row, v: PayStatus) => updateOrder(p, { payment_status: v, paid_at: v === 'paid' ? new Date().toISOString() : null }, `Payment: ${v.toUpperCase()}`)
+  const setFulfillment = (p: Row, v: FulStatus) => updateOrder(p, { fulfillment: v, fulfilled_at: new Date().toISOString() }, `Fulfillment: ${v.toUpperCase()}`)
+  const setPackage = (p: Row, v: PackageId) => updateOrder(p, { package: v }, `Package: ${PACKAGES[v].label}`)
+
+  // "Deleted History" = deactivated (profile hidden, all data kept). Restore brings it back.
+  async function setSelectedActive(active: boolean) {
+    if (selectedList.length === 0) return
+    setBusyAction(true)
+    const names = selectedList.map((p) => p.username)
+    const { data, error } = await supabase
+      .from('profiles')
+      .update({ is_active: active, deactivated_at: active ? null : new Date().toISOString() })
+      .in('username', names)
+      .select()
+    setBusyAction(false)
+    if (error) return showToast(MISSING_COLS.test(error.message) ? 'Run supabase-admin.sql in Supabase first' : 'Failed: ' + error.message)
+    if (!data || data.length === 0) return showToast('Nothing was updated - check the Supabase update policy')
+    setSelected(new Set())
+    showToast(active ? `Restored ${data.length} order${data.length > 1 ? 's' : ''}` : `Moved ${data.length} to Deleted History (profiles hidden, data kept)`)
+    fetchProfiles()
+  }
+
+  const sendLink = (p: Row) => {
+    if (!p.email) return showToast('This client has no email')
+    const url = `${SITE_URL}/${p.username}`
+    const body = `Hi ${displayName(p) || p.username},\n\nYour TapVinci profile is live: ${url}\n\nOrder ${orderNo(p)}\n\nThank you!`
+    window.location.href = `mailto:${encodeURIComponent(p.email)}?subject=${encodeURIComponent('Your TapVinci link')}&body=${encodeURIComponent(body)}`
+  }
+
   const exportCsv = () => {
-    const header = ['username', 'name', 'phone', 'email', 'theme', 'created_at', 'link']
-    const lines = filtered.map((p) =>
-      [p.username, displayName(p), p.phone, p.email, themeLabel(p), p.created_at, `${SITE_URL}/${p.username}`].map(csvCell).join(',')
+    const ordersView = view === 'orders'
+    const rows = ordersView ? orders : filtered
+    const header = ['username', 'name', 'phone', 'email', 'theme', 'created_at', 'link', ...(ordersView ? ['order_no', 'package', 'amount_php', 'payment_status', 'fulfillment'] : [])]
+    const lines = rows.map((p) =>
+      [p.username, displayName(p), p.phone, p.email, themeLabel(p), p.created_at, `${SITE_URL}/${p.username}`,
+        ...(ordersView ? [orderNo(p), PACKAGES[pkgOf(p)].label, amountOf(p), payOf(p), fulOf(p)] : [])].map(csvCell).join(',')
     )
     const blob = new Blob([[header.join(','), ...lines].join('\r\n')], { type: 'text/csv;charset=utf-8' })
     const url = URL.createObjectURL(blob)
     const a = document.createElement('a')
     a.href = url
-    a.download = `tapvinci-clients-${new Date().toISOString().slice(0, 10)}.csv`
+    a.download = `tapvinci-${ordersView ? 'orders' : 'clients'}-${new Date().toISOString().slice(0, 10)}.csv`
     document.body.appendChild(a)
     a.click()
     a.remove()
     URL.revokeObjectURL(url)
-    showToast(`Exported ${filtered.length} clients`)
+    showToast(`Exported ${rows.length} ${ordersView ? 'orders' : 'clients'}`)
   }
 
   // ---------- password gate ----------
@@ -494,8 +701,214 @@ export default function AdminPage() {
 
   // ---------- admin panel ----------
   return (
-    <div className="min-h-screen bg-[#050505] text-white p-4 md:p-6">
-      <div className="max-w-7xl mx-auto">
+    <div className="min-h-screen bg-[#050505] text-white p-4 md:p-8">
+      <div className="max-w-[1400px] mx-auto">
+        {view === 'orders' ? (
+        <>
+          {/* ===== ORDERS & SALES MANAGEMENT ===== */}
+          <div className="flex flex-wrap justify-between items-start gap-4 mb-6">
+            <div>
+              <h1 className="ac-title text-2xl md:text-[28px] font-bold">Orders &amp; Sales Management Dashboard</h1>
+              <p className="text-[12px] text-[#A1A1A1] mt-1">Real-time tracking of online GCash/Maya QR Ph transactions, NFC card fulfillment, and revenue</p>
+            </div>
+            <div className="flex flex-wrap gap-2">
+              <Link href="/dashboard" className="ac-pill">Dashboard</Link>
+              <button onClick={fetchProfiles} className="ac-pill">{loading ? 'Refreshing...' : 'Refresh'}</button>
+              <button onClick={exportCsv} disabled={!orders.length} className="ac-pill disabled:opacity-40">Export CSV</button>
+              <button onClick={logout} className="ac-pill">Log out</button>
+            </div>
+          </div>
+
+          <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-4 mb-6">
+            {[
+              { label: 'Total Sales Revenue', value: money(orderStats.revenue), sub: realClients.length === 0 ? 'No real sales yet - demo accounts excluded' : 'Verified paid orders (demo accounts excluded)', icon: 'fa-wallet', tone: '#D4AF37' },
+              { label: 'Completed Purchases', value: String(orderStats.completed), sub: 'Active paid and provisioned sites', icon: 'fa-circle-check', tone: '#00D632' },
+              { label: 'Total Checkout Sessions', value: String(orderStats.sessions), sub: 'Active orders & buy now sessions', icon: 'fa-cart-shopping', tone: '#007DFE' },
+              { label: 'Pending QR Scans', value: String(orderStats.pendingPay), sub: 'Awaiting GCash/Maya confirmation', icon: 'fa-qrcode', tone: '#FFC21C' },
+            ].map((c) => (
+              <div key={c.label} className="ac-stat">
+                <div className="flex items-start justify-between gap-3">
+                  <p className="text-[10px] uppercase tracking-[1.5px] text-[#A1A1A1] font-bold">{c.label}</p>
+                  <span className="w-8 h-8 rounded-full flex items-center justify-center text-[13px] shrink-0" style={{ background: `${c.tone}1F`, color: c.tone }}><i className={`fa-solid ${c.icon}`} aria-hidden="true" /></span>
+                </div>
+                <p className="ac-title text-[28px] font-bold text-white mt-2 leading-none">{c.value}</p>
+                <p className="text-[11px] text-[#A1A1A1] mt-2">{c.sub}</p>
+              </div>
+            ))}
+          </div>
+
+          <form onSubmit={(e) => { e.preventDefault(); setOQuery(oDraft) }} className="flex flex-wrap gap-2 mb-3">
+            <input
+              value={oDraft}
+              onChange={(e) => { setODraft(e.target.value); setOQuery(e.target.value) }}
+              placeholder="Search Order #, Customer Name, Email, or Custom URL..."
+              aria-label="Search orders"
+              className="flex-1 min-w-[240px] h-11 bg-[#121214] border border-[#1E1E1E] focus:border-[#D4AF37] outline-none rounded-xl px-4 text-sm"
+            />
+            <button type="submit" className="h-11 px-5 rounded-xl bg-[#D4AF37] hover:bg-[#E8C766] text-black font-bold text-sm transition">Search</button>
+            <select value={payFilter} onChange={(e) => setPayFilter(e.target.value as typeof payFilter)} aria-label="Filter orders" className="ac-select h-11 px-3 rounded-xl">
+              <option value="all">All</option>
+              <option value="paid">Paid</option>
+              <option value="pending">Pending</option>
+              <option value="completed">Completed</option>
+              <option value="deleted">Deleted History ({orderStats.deleted})</option>
+            </select>
+            <select value={demoFilter} onChange={(e) => setDemoFilter(e.target.value as DemoFilter)} aria-label="Filter real or demo accounts" className="ac-select h-11 px-3 rounded-xl">
+              <option value="all">All accounts</option>
+              <option value="real">Real Clients</option>
+              <option value="demo">Demo/Test ({demoCount})</option>
+            </select>
+            <div className="relative">
+              <button type="button" onClick={() => setGenOpen((v) => !v)} aria-expanded={genOpen} className="h-11 px-5 rounded-xl bg-[#FFC21C] text-black font-bold text-sm shadow-[0_8px_28px_rgba(255,194,28,0.35)] hover:brightness-105 transition">
+                <i className="fa-solid fa-plus mr-2" aria-hidden="true" />Generate Order <i className="fa-solid fa-chevron-down ml-2 text-[10px]" aria-hidden="true" />
+              </button>
+              {genOpen && (
+                <div className="absolute right-0 top-12 z-20 w-60 rounded-xl border border-[#2A2A2A] bg-[#121214] p-1.5 shadow-2xl">
+                  <Link href="/dashboard" onClick={() => setGenOpen(false)} className="block rounded-lg px-3 py-2.5 text-sm hover:bg-[#1E1E20]">Single order<span className="block text-[10px] text-[#A1A1A1]">Create one client profile</span></Link>
+                  <div className="rounded-lg px-3 py-2.5 text-sm text-[#6B7280] cursor-not-allowed" aria-disabled="true">Bulk orders <em className="not-italic text-[9px] ml-1 text-[#D4AF37]">SOON</em></div>
+                </div>
+              )}
+            </div>
+          </form>
+
+          {/* fulfillment filter: click a stage to see only those orders */}
+          <div className="flex flex-wrap gap-2 mb-3" role="group" aria-label="Fulfillment filter">
+            {(['all', ...FUL_OPTIONS] as const).map((f) => (
+              <button key={f} onClick={() => setFulFilter(f)} className={`ac-chip ${fulFilter === f ? 'on' : ''}`}>
+                {f === 'all' ? 'All stages' : f.toUpperCase()}<b>{f === 'all' ? orderStats.scopeCount : orderStats.byFul[f]}</b>
+              </button>
+            ))}
+          </div>
+
+          <div className="flex flex-wrap items-center gap-2 mb-4 text-[12px]">
+            <label className="inline-flex items-center gap-2 text-[#A1A1A1]">
+              <input type="checkbox" checked={allVisibleSelected} onChange={() => setSelected(allVisibleSelected ? new Set() : new Set(orders.map((p) => p.username)))} className="accent-[#D4AF37]" />
+              Select All Visible
+            </label>
+            <button onClick={() => setSelected(new Set(orders.map((p) => p.username)))} className="ac-mini">Select All</button>
+            <button onClick={() => setSelected(new Set())} className="ac-mini">Deselect</button>
+            <span className="text-[#A1A1A1]">({selectedList.length} selected)</span>
+            {payFilter === 'deleted' ? (
+              <button onClick={() => setSelectedActive(true)} disabled={!selectedList.length || busyAction} className="ac-mini ac-mini-gold disabled:opacity-40">Restore Selected</button>
+            ) : (
+              <button onClick={() => setSelectedActive(false)} disabled={!selectedList.length || busyAction} className="ac-mini ac-mini-red disabled:opacity-40">Move Selected to Deleted History</button>
+            )}
+            <span className="ml-auto text-[11px] text-[#6B7280]">Showing {orders.length} of {profiles.length}</span>
+          </div>
+
+          {loadError && (
+            <div className="mb-4 rounded-xl border border-red-500/30 bg-red-500/10 text-red-300 text-sm px-4 py-3" role="alert">Could not load profiles: {loadError}</div>
+          )}
+
+          <div className="bg-[#121214] border border-[#1E1E1E] rounded-2xl overflow-hidden">
+            <div className="overflow-x-auto">
+              <table className="admin-table ac-orders">
+                <thead>
+                  <tr>
+                    <th scope="col" className="admin-th-sort" onClick={() => toggleOrderSort('date')}>Order #{oSort === 'date' ? (oAsc ? ' ▲' : ' ▼') : ''}</th>
+                    <th scope="col">Customer Info</th>
+                    <th scope="col">Website Link / Bulk</th>
+                    <th scope="col" className="admin-th-sort" onClick={() => toggleOrderSort('amount')}>Amount{oSort === 'amount' ? (oAsc ? ' ▲' : ' ▼') : ''}</th>
+                    <th scope="col">Payment Status</th>
+                    <th scope="col">Fulfillment</th>
+                    <th scope="col">Actions</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {loading ? (
+                    <tr><td colSpan={7} className="text-center text-gray-500 !py-8">Loading...</td></tr>
+                  ) : orders.length === 0 ? (
+                    <tr><td colSpan={7} className="text-center text-gray-500 !py-8">{demoFilter === 'real' && payFilter !== 'deleted' && !oQuery.trim() && fulFilter === 'all'
+                      ? 'No real orders yet. Demo accounts (shua, tapvinci) hidden from sales.'
+                      : profiles.length ? 'No orders match this search / filter.' : 'No orders yet.'}</td></tr>
+                  ) : (
+                    orders.map((p) => {
+                      const pay = payOf(p)
+                      const ful = fulOf(p)
+                      const pkg = PACKAGES[pkgOf(p)]
+                      const next = FUL_NEXT[ful]
+                      const url = `${SITE_URL}/${p.username}`
+                      return (
+                        <tr key={p.username} className="ac-row">
+                          <td>
+                            <div className="flex items-start gap-3">
+                              <input type="checkbox" checked={selected.has(p.username)} onChange={() => toggleSelected(p.username)} aria-label={`Select ${p.username}`} className="mt-1 accent-[#D4AF37]" />
+                              <div>
+                                <p className="font-bold text-[#D4AF37] text-[12px] whitespace-nowrap">{orderNo(p)}{isDemo(p) && <span className="demo-badge ml-2 text-[9px] font-bold px-1.5 py-0.5 rounded-full align-middle" style={DEMO_BADGE_STYLE}>DEMO</span>}{p.is_active === false && <span className="ml-2 text-[9px] font-semibold bg-[#f59e0b]/20 text-[#f59e0b] px-1.5 py-0.5 rounded align-middle">DELETED</span>}</p>
+                                <p className="text-[10px] text-[#A1A1A1] mt-0.5 whitespace-nowrap">{formatDateTime(p.created_at)} • Via GCash/Maya QR Ph</p>
+                              </div>
+                            </div>
+                          </td>
+                          <td>
+                            <div className="ac-pop-wrap" tabIndex={0}>
+                              <p className="font-bold text-white">{displayName(p) || '-'}</p>
+                              <p className="text-[11px] text-[#A1A1A1]">{p.email || '-'}</p>
+                              <p className="text-[11px] text-[#A1A1A1]"><i className="fa-solid fa-phone mr-1 text-[9px]" aria-hidden="true" />{p.phone || '-'}</p>
+                              <div className="ac-pop" role="tooltip">
+                                <p className="text-[9px] uppercase tracking-[1.5px] text-[#D4AF37] font-bold mb-1.5">Onboarding checklist</p>
+                                {[
+                                  ['Profile Done', !!(displayName(p) && p.phone)],
+                                  ['QR Uploaded', !!(p.gcash_qr_url || p.maya_qr_url)],
+                                  ['Card Printed', pkgOf(p) === 'digital' ? null : ful === 'shipped' || ful === 'completed'],
+                                ].map(([label, ok]) => (
+                                  <p key={label as string} className="text-[11px] flex items-center gap-2">
+                                    <span className={ok === null ? 'text-[#6B7280]' : ok ? 'text-[#00D632]' : 'text-[#FFC21C]'}>{ok === null ? '–' : ok ? '✓' : '?'}</span>
+                                    <span className="text-white/80">{label as string}{ok === null ? ' (digital only)' : ''}</span>
+                                  </p>
+                                ))}
+                              </div>
+                            </div>
+                          </td>
+                          <td>
+                            <Link href={`/${p.username}`} target="_blank" rel="noopener noreferrer" className="text-[#D4AF37] hover:underline text-[13px] font-semibold whitespace-nowrap">/{p.username} →</Link>
+                            <p className="text-[10px] text-[#6B7280] mt-0.5 break-all max-w-[220px]">{url}</p>
+                          </td>
+                          <td>
+                            <p className="font-bold text-white whitespace-nowrap">{money(pkg.price)}</p>
+                            <select value={pkgOf(p)} onChange={(e) => setPackage(p, e.target.value as PackageId)} aria-label="Package" className="ac-select ac-select-sm mt-1">
+                              {(Object.keys(PACKAGES) as PackageId[]).map((k) => <option key={k} value={k}>{PACKAGES[k].label}</option>)}
+                            </select>
+                            <p className="text-[10px] text-[#A1A1A1] mt-0.5">{pkg.note}</p>
+                          </td>
+                          <td>
+                            <select value={pay} onChange={(e) => setPayment(p, e.target.value as PayStatus)} aria-label="Payment status" className={`ac-badge ac-pay-${pay}`} style={isDemo(p) ? DEMO_PAY_STYLE : undefined}>
+                              {PAY_OPTIONS.map((o) => <option key={o} value={o}>{isDemo(p) && o === pay ? `DEMO (${o.toUpperCase()})` : o.toUpperCase()}</option>)}
+                            </select>
+                            <p className="text-[10px] text-[#A1A1A1] mt-1 whitespace-nowrap">{isDemo(p) ? 'Demo - not counted in sales' : pay === 'paid' ? formatDateTime(p.paid_at || p.created_at) : pay === 'pending' ? 'Awaiting confirmation' : 'Payment failed'}</p>
+                          </td>
+                          <td>
+                            <select value={ful} onChange={(e) => setFulfillment(p, e.target.value as FulStatus)} aria-label="Fulfillment" className={`ac-badge ac-ful-${ful}`}>
+                              {FUL_OPTIONS.map((o) => <option key={o} value={o}>{o.toUpperCase()}</option>)}
+                            </select>
+                            <p className="text-[10px] text-[#A1A1A1] mt-1 whitespace-nowrap">{p.fulfilled_at ? `Updated ${formatDateTime(p.fulfilled_at)}` : pkgOf(p) === 'digital' ? 'No card to print' : 'Not started'}</p>
+                          </td>
+                          <td>
+                            <div className="flex gap-1.5 flex-wrap max-w-[250px]">
+                              <button onClick={() => copyLink(p.username)} title="Copy link" aria-label="Copy link" className="ac-icon"><i className="fa-regular fa-copy" /></button>
+                              <button onClick={() => window.open(`/${p.username}`, '_blank', 'noopener')} title="Open live profile" aria-label="Open live profile" className="ac-icon ac-icon-open"><i className="fa-solid fa-arrow-up-right-from-square" /></button>
+                              <button onClick={() => handleEdit(p)} title="Edit client" aria-label="Edit client" className="ac-icon ac-icon-blue"><i className="fa-solid fa-pen" /></button>
+                              <button onClick={() => handleDeleteConfirm(p)} title="Delete or deactivate client" aria-label="Delete client" className="ac-icon ac-icon-red"><i className="fa-solid fa-trash" /></button>
+                              <button onClick={() => handleGenerateQR(p)} title="Generate QR" aria-label="Generate QR" className="ac-icon ac-icon-gold"><i className="fa-solid fa-qrcode" /></button>
+                              <button onClick={() => { if (!openInvoice(p)) showToast('Allow pop-ups to open the invoice') }} title="Download PDF invoice" aria-label="Download PDF invoice" className="ac-icon"><i className="fa-solid fa-file-pdf" /></button>
+                              <button onClick={() => sendLink(p)} title="Send link by email" aria-label="Send link by email" className="ac-icon"><i className="fa-solid fa-paper-plane" /></button>
+                              {p.is_active === false ? (
+                                <button onClick={() => handleSetActive(p, true)} className="ac-mini ac-mini-gold">Restore</button>
+                              ) : next && (
+                                <button onClick={() => setFulfillment(p, next)} className="ac-mini ac-mini-gold">Mark {next.toUpperCase()} →</button>
+                              )}
+                            </div>
+                          </td>
+                        </tr>
+                      )
+                    })
+                  )}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </>
+        ) : (
+        <>
         <div className="flex flex-wrap justify-between items-center gap-3 mb-6">
           <div>
             <h1 className="text-2xl font-bold">TapVinci Admin - All Clients</h1>
@@ -672,6 +1085,8 @@ export default function AdminPage() {
             </div>
           </div>
         </div>
+        </>
+        )}
       </div>
 
       {/* ===== ADMIN EDIT MODAL ===== */}
@@ -724,6 +1139,9 @@ export default function AdminPage() {
               <p className="text-gray-400">{deleteConfirm.email || '-'} • {deleteConfirm.phone || '-'}</p>
               <p className="text-gray-500 text-[10px] mt-1">Created: {formatDate(deleteConfirm.created_at)}</p>
             </div>
+            {PROTECTED_USERNAMES.includes((deleteConfirm.username || '').toString().toLowerCase()) && (
+              <p className="text-[11px] text-[#FFC21C] mt-3">Protected demo account: permanent delete is blocked. Use Deactivate below if you need to hide it.</p>
+            )}
             <label className="block text-left text-[10px] uppercase tracking-widest text-gray-500 mt-4">
               Type <span className="text-white font-bold normal-case tracking-normal">{deleteConfirm.username}</span> to confirm
               <input

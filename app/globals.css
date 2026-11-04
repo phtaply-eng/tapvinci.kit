@@ -1304,3 +1304,62 @@ html:has(.tv-home) { scroll-behavior: smooth; }
 /* ===== Seamless background: Pricing -> Reviews use the same .tv-home backdrop as the hero (no solid block) - ADDED ===== */
 .tv-home .tv-reviews-teaser { background: transparent; }
 .tv-home #pricing { background: transparent !important; }
+
+/* ===== TapVinci ADMIN CONSOLE (sidebar + Orders & Sales) - ADDED ===== */
+.ac-root { font-family: var(--font-inter), Inter, system-ui, sans-serif; background: #050505; color: #FFFBF7; }
+.ac-title { font-family: var(--font-grotesk), 'Space Grotesk', Inter, sans-serif; letter-spacing: -.01em; }
+.ac-sidebar { position: fixed; top: 0; bottom: 0; left: 0; width: 280px; z-index: 40; flex-direction: column; background: #0A0A0A; border-right: 1px solid #1E1E1E; }
+.ac-link { display: flex; align-items: center; gap: 12px; height: 44px; padding: 0 14px; border-radius: 10px; border-left: 2px solid transparent; color: #A1A1A1; font-size: 13px; font-weight: 500; cursor: pointer; transition: background .2s, color .2s, border-color .2s; }
+.ac-link i { width: 16px; text-align: center; font-size: 13px; }
+.ac-link:hover { background: #121214; color: #FFFBF7; }
+.ac-link.active { background: #121214; border-left-color: #D4AF37; color: #D4AF37; font-weight: 700; }
+.ac-link.soon { opacity: .45; cursor: not-allowed; }
+.ac-link.soon:hover { background: transparent; color: #A1A1A1; }
+.ac-link em { margin-left: auto; font-style: normal; font-size: 8px; letter-spacing: 1.5px; color: #D4AF37; border: 1px solid rgba(212,175,55,.35); border-radius: 999px; padding: 1px 6px; }
+.ac-link.danger { color: #f87171; }
+.ac-link.danger:hover { background: rgba(239,68,68,.1); color: #fca5a5; }
+.ac-overlay { position: fixed; inset: 0; z-index: 50; background: rgba(0,0,0,.7); -webkit-backdrop-filter: blur(6px); backdrop-filter: blur(6px); animation: acFade .2s ease; }
+.ac-drawer { z-index: 51; max-width: 86vw; animation: acSlide .3s cubic-bezier(.16,1,.3,1); }
+.ac-pill { height: 40px; padding: 0 16px; display: inline-flex; align-items: center; border-radius: 999px; border: 1px solid rgba(212,175,55,.45); background: transparent; color: #D4AF37; font-size: 13px; font-weight: 600; transition: background .2s, color .2s; }
+.ac-pill:hover:not(:disabled) { background: #D4AF37; color: #000; }
+.ac-stat { background: #121214; border: 1px solid #1E1E1E; border-radius: 16px; padding: 20px; transition: border-color .2s, transform .2s; }
+.ac-stat:hover { border-color: rgba(212,175,55,.3); transform: translateY(-2px); }
+.ac-select { background: #121214; border: 1px solid #1E1E1E; color: #FFFBF7; font-size: 13px; outline: none; cursor: pointer; }
+.ac-select:focus { border-color: #D4AF37; }
+.ac-select-sm { height: 26px; padding: 0 6px; border-radius: 8px; font-size: 11px; color: #A1A1A1; }
+.ac-chip { display: inline-flex; align-items: center; gap: 8px; height: 32px; padding: 0 14px; border-radius: 999px; background: #121214; border: 1px solid #1E1E1E; color: #A1A1A1; font-size: 10px; font-weight: 700; letter-spacing: 1.2px; transition: all .2s; }
+.ac-chip b { font-weight: 700; color: #FFFBF7; background: #1E1E20; border-radius: 999px; padding: 1px 7px; font-size: 10px; }
+.ac-chip:hover { border-color: rgba(212,175,55,.5); color: #FFFBF7; }
+.ac-chip.on { background: rgba(212,175,55,.12); border-color: #D4AF37; color: #D4AF37; }
+.ac-mini { height: 28px; padding: 0 12px; border-radius: 8px; border: 1px solid #2A2A2A; background: #121214; color: #FFFBF7; font-size: 11px; font-weight: 600; white-space: nowrap; transition: all .2s; }
+.ac-mini:hover:not(:disabled) { border-color: #D4AF37; }
+.ac-mini-gold { border-color: rgba(212,175,55,.5); color: #D4AF37; }
+.ac-mini-gold:hover:not(:disabled) { background: #D4AF37; color: #000; }
+.ac-mini-red { border-color: rgba(239,68,68,.5); color: #f87171; }
+.ac-mini-red:hover:not(:disabled) { background: rgba(239,68,68,.15); border-color: #ef4444; }
+.ac-badge { appearance: none; -webkit-appearance: none; border-radius: 999px; padding: 4px 12px; font-size: 10px; font-weight: 800; letter-spacing: 1.2px; border: 1px solid; cursor: pointer; outline: none; text-align: center; }
+.ac-badge option { background: #121214; color: #FFFBF7; }
+.ac-pay-paid { background: rgba(0,214,50,.2); color: #00D632; border-color: rgba(0,214,50,.4); }
+.ac-pay-pending { background: rgba(255,194,28,.2); color: #FFC21C; border-color: rgba(255,194,28,.4); }
+.ac-pay-failed { background: rgba(239,68,68,.2); color: #f87171; border-color: rgba(239,68,68,.4); }
+.ac-ful-completed { background: rgba(0,125,254,.2); color: #4da3ff; border-color: rgba(0,125,254,.45); }
+.ac-ful-printing { background: rgba(212,175,55,.2); color: #D4AF37; border-color: rgba(212,175,55,.45); }
+.ac-ful-pending { background: rgba(161,161,161,.15); color: #A1A1A1; border-color: rgba(161,161,161,.3); }
+.ac-ful-shipped { background: rgba(168,85,247,.2); color: #c084fc; border-color: rgba(168,85,247,.45); }
+.ac-icon { width: 30px; height: 30px; border-radius: 8px; display: inline-flex; align-items: center; justify-content: center; font-size: 12px; background: #1E1E20; border: 1px solid #2A2A2A; color: #FFFBF7; transition: all .2s; }
+.ac-icon:hover { border-color: #D4AF37; color: #D4AF37; }
+.ac-icon-open { background: #FFFBF7; color: #9A7B1E; border-color: #FFFBF7; }
+.ac-icon-open:hover { background: #E8C766; color: #000; border-color: #E8C766; }
+.ac-icon-blue { border-color: rgba(37,99,235,.5); color: #60a5fa; background: #121214; }
+.ac-icon-blue:hover { background: rgba(37,99,235,.2); color: #93c5fd; border-color: #2563eb; }
+.ac-icon-red { border-color: rgba(239,68,68,.5); color: #f87171; background: #121214; }
+.ac-icon-red:hover { background: rgba(239,68,68,.2); color: #fca5a5; border-color: #ef4444; }
+.ac-icon-gold { border-color: rgba(212,175,55,.5); color: #D4AF37; background: #121214; }
+.ac-icon-gold:hover { background: #D4AF37; color: #000; }
+.ac-orders tbody tr.ac-row:hover { background: #1A1A1A; }
+.ac-pop-wrap { position: relative; outline: none; }
+.ac-pop { position: absolute; left: 0; top: calc(100% + 6px); z-index: 15; min-width: 190px; padding: 10px 12px; border-radius: 12px; background: #0A0A0A; border: 1px solid rgba(212,175,55,.3); box-shadow: 0 18px 40px -10px #000; opacity: 0; transform: translateY(4px); pointer-events: none; transition: opacity .18s, transform .18s; }
+.ac-pop-wrap:hover .ac-pop, .ac-pop-wrap:focus-within .ac-pop { opacity: 1; transform: none; }
+@keyframes acFade { from { opacity: 0; } to { opacity: 1; } }
+@keyframes acSlide { from { transform: translateX(-100%); } to { transform: translateX(0); } }
+@media (prefers-reduced-motion: reduce) { .ac-drawer, .ac-overlay { animation: none; } .ac-stat:hover { transform: none; } }
