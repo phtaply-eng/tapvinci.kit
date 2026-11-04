@@ -1,0 +1,10 @@
+[33m0de40b3[m[33m ([m[1;36mHEAD[m[33m -> [m[1;32mmain[m[33m, [m[1;31morigin/main[m[33m)[m fix: require payment proof in checkout, fix admin pending_verification filter, premium floating inputs
+[33m1b291ba[m fix: Payment button before Share My Card, update footer
+[33ma0d3a24[m feat: founders club 399/899 lifetime, fix pricing copy, update reviews and flow sections
+[33mc91c1a1[m Fix: restore landing page - Overview was overwriting home
+[33m3ce3dad[m Admin v2: Orders TV prefix, globals.css, main page, section route
+[33mba11fcf[m Fix: Overview demo filter bulletproof - is_demo=true, revenue now 0.00, transparent logo
+[33m9c5502e[m fix: seamless background pricing -> reviews same as hero main bg, remove black block, dashboard slider transparent
+[33m4f15b34[m feat: glowing pricing 159 lines savepoint - 28/25 divs balanced
+[33m269b520[m feat: glowing pricing best seller 159 lines, bg #050505 seamless, savepoint before comparison table - Pricing.tsx: Right card Card+Digital now glowing like image_092db6.png - border-[#D4AF37]/30 shadow-[0_0_60px_rgba(212,175,55,0.15)] aura gradients, MOST POPULAR pill shadow-[0_0_20px], dot pulse, button gold glow - Keep bg-[#050505] same as main hero, not pure black block - Keep 155-line structure, now 159 lines with glow layers - Hamburger links, pricing above reviews, no gallery
+[33m05744e5[m fix: remove black void below live preview, hide floating buttons behind hamburger menu
