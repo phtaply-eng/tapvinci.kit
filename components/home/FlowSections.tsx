@@ -4,12 +4,12 @@ import GlowCard from './GlowCard'
 import { ICONS } from './icons'
 
 const OFFERS = [
-  { r: '', t: 'Digital landing pages', i: ICONS.page, p: 'A personalized digital profile for your professional details, contact information, and important links\u2014all in one place.' },
-  { r: '', t: 'NFC cards', i: ICONS.card, p: 'A premium physical card with built-in NFC technology, giving others access to your digital profile with a single tap.' },
+  { r: '', t: 'Digital landing pages', i: ICONS.page, p: 'A personalized digital profile for your professional details, contact information, payment QRs and important links\u2014all in one place.' },
+  { r: '', t: 'NFC cards', i: ICONS.card, p: 'A premium physical card with built-in NFC chip technology, giving others access to your digital profile with a single tap.' },
 ]
 const STEPS = [
-  { n: '', t: 'Tap', i: ICONS.tap, d: 8, p: 'Tap or hold your TapVinci card in front or back of the compatible phone.' },
-  { n: '', t: 'Open', i: ICONS.open, d: 13, p: 'Your phone opens the digital profile, bringing contact details and links together in one place. No app is needed on most recent phones.' },
+  { n: '', t: 'Tap', i: ICONS.tap, d: 8, p: 'Tap or hold your TapVinci card near any phone — front or back.' },
+  { n: '', t: 'Open', i: ICONS.open, d: 13, p: 'Your profile opens instantly in the browser. No app needed on most recent phones.' },
   { n: '', t: 'Connect', i: ICONS.connect, d: 18, p: 'Call, message, follow, or save the contact straight from the page.' },
 ]
 
@@ -78,7 +78,7 @@ export default function FlowSections() {
         <div className="tv-wrap">
           <div className="tv-head tv-rise">
             <p className="tv-label"><span className="tv-label-line" aria-hidden="true" />What we offer</p>
-            <h2 id="offer-title" className="tv-h2">Two ways to get shared</h2>
+            <h2 id="offer-title" className="tv-h2">Two ways to be remembered</h2>
           </div>
           <div className="tv-flow-grid is-2">
             <div className="tv-tl-line" aria-hidden="true" />

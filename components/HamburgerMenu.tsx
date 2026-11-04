@@ -125,7 +125,7 @@ export default function HamburgerMenu() {
               onClick={close}
               style={{ ['--i' as any]: 6, borderRadius: '24px' }}
             >
-              Open Dashboard
+              Create a Profile
             </Link>
             <Link
               href="/shua"

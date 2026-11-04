@@ -57,7 +57,7 @@ export default function Home() {
           </h1>
           <p className="tv-hero-sub tv-in" style={{ ['--d' as string]: '.4s' }}></p>
           <div className="tv-hero-actions tv-in" style={{ ['--d' as string]: '.52s' }}>
-            <Link href="/dashboard" className="tv-btn tv-btn-gold">Create a profile</Link>
+            <Link href="/dashboard" className="tv-btn tv-btn-gold">Create a Profile</Link>
             <Link href={`/${DEMO_USERNAME}`} className="tv-btn tv-btn-glass">View Demo</Link>
           </div>
           <p className="tv-tagline tv-in" style={{ ['--d' as string]: '.66s' }}>A NEW STANDARD OF INTRODUCTION • MADE TO CONNECT • PHILIPPINES 2026</p>
@@ -69,7 +69,7 @@ export default function Home() {
         <div className="tv-wrap tv-about">
           <div className="tv-about-copy">
             <SectionHead label="About TapVinci" title="A better way to make an introduction." id="about-title" />
-            <p className="tv-lead tv-rise">TapVinci is a Philippines-based. It offers digital calling card with landing pages, so people can share contact details and links with a single tap.</p>
+            <p className="tv-lead tv-rise">TapVinci is a Philippines-based brand. <br/> It offers digital calling card with landing pages, so people can share contact details <br/> and links with a single tap.</p>
             <p className="tv-p tv-rise">We help professionals and local businesses get noticed — Our goal is simple: make it personal, modern, and easy to share.</p>
             <p className="tv-sign tv-rise"><span>Shua Vallinas</span><small>Founder, TapVinci</small></p>
           </div>
@@ -145,7 +145,7 @@ export default function Home() {
             <SectionHead label="Reviews" title="What people say" id="reviews-teaser-title" />
             <div className="tv-reviews-teaser-card tv-rise">
               <div className="tv-reviews-teaser-stars">
-                <span className="tv-reviews-teaser-avg">4.9</span>
+                <span className="tv-reviews-teaser-avg"></span>
                 <span className="tv-reviews-teaser-stars-icons">
                   <i className="fa-solid fa-star"></i>
                   <i className="fa-solid fa-star"></i>
@@ -153,10 +153,10 @@ export default function Home() {
                   <i className="fa-solid fa-star"></i>
                   <i className="fa-solid fa-star"></i>
                 </span>
-                <span className="tv-reviews-teaser-count">(127 reviews)</span>
+                <span className="tv-reviews-teaser-count"></span>
               </div>
-              <p className="tv-reviews-teaser-text">"Premium quality, tap works instantly. Clients always impressed. TapVinci is the new standard."</p>
-              <p className="tv-reviews-teaser-author">— Shua Vallinas, Founder</p>
+              <p className="tv-reviews-teaser-text">"We're just launching TapVinci's Founders Club. First 200 Members get lifetime access and their review will be featured here."</p>
+              <p className="tv-reviews-teaser-author"></p>
               <div className="tv-reviews-teaser-actions">
                 <Link href="/reviews" className="tv-btn tv-btn-gold">
                   <i className="fa-solid fa-star" style={{ marginRight: '8px' }}></i> Leave a Review

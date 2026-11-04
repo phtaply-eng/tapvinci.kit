@@ -2,7 +2,7 @@
 import { useState } from 'react'
 
 const FAQS = [
-  { q: "My phone didn't open the page. What now?", a: "Make sure NFC is switched on and the screen is unlocked. Hold the back of the phone flat against the card or chip, moving it slightly if nothing happens. Thick or metal cases can block the signal. If it still doesn't open, use the share link or QR code instead." },
+  { q: "My phone didn't open the page. What now?", a: "Make sure NFC is switched on and the screen is unlocked. Tap or hold the front or back of the phone flat against the card, moving it slightly if nothing happens. Thick or metal cases can block the signal. If it still doesn't open, use the share link or QR code instead." },
   { q: 'Do I need an app to open it?', a: 'Most recent iPhones and Android phones can read NFC without an extra app. Some older phones may need a tag-reading setting switched on.' },
   { q: 'Does the card or chip need a battery?', a: 'No. It is passive and powered briefly by the phone when you tap, so there is nothing to charge or replace.' },
   { q: 'What if my phone has no NFC?', a: 'You can still open the same page from the link or the QR code.' },

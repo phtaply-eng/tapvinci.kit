@@ -3,7 +3,7 @@
 type PlanFeature = { key: string; desc?: string }
 
 const DIGITAL_FEATURES: PlanFeature[] = [
-  { key: 'Profile', desc: 'tapvinci.kit/username' },
+  { key: 'Profile', desc: 'tapvinci.vercel.app/username' },
   { key: 'All 6 themes', desc: 'Black Gold, Midnight Purple, Ocean Blue, Forest Green, Sunset Pink, Sunrise Orange' },
   { key: 'Social links', desc: 'unlimited' },
   { key: 'Gallery, Contact', desc: '+ Google Maps' },
@@ -14,27 +14,34 @@ const DIGITAL_FEATURES: PlanFeature[] = [
 ]
 
 const CARD_FEATURES: PlanFeature[] = [
+  { key: 'Profile — tapvinci.vercel.app/username' },
+  { key: 'Lifetime profile', desc: 'Founders Club, no renewal' },
   { key: 'Premium NFC card', desc: 'Black or White + QR on the back' },
-  { key: '1 Year hosting', desc: 'unlimited self-edits' },
+  { key: 'All 6 themes', desc: 'Black Gold, Midnight Purple, Ocean Blue, Forest Green, Sunset Pink, Sunrise Orange' },
+  { key: 'Social links', desc: 'unlimited' },
+  { key: 'Gallery, Contact', desc: '+ Google Maps' },
+  { key: 'GCash / Maya QR', desc: 'accept payments instantly' },
+  { key: 'QR code', desc: 'to print or share' },
+  { key: 'Self-service edit', desc: 'anytime' },
+  { key: 'Live Preview', desc: 'see changes before saving' },
   { key: 'Tap + Scan', desc: 'works on all phones' },
   { key: 'No app needed', desc: 'nothing to install' },
-  { key: 'Ships anywhere PH', desc: 'free delivery' },
+  { key: 'Ships anywhere PH', desc: 'Lalamove / J&T / LBC (calculated at checkout)' },
   { key: 'Instant activation', desc: 'tap-ready in minutes' },
 ]
 
 type ComparisonRow = { name: string; digital: boolean; card: boolean }
 
 const COMPARISON: ComparisonRow[] = [
-  { name: 'Profile on tapvinci.kit/username', digital: true, card: true },
+  { name: 'Profile on tapvinci.vercel.app/username', digital: true, card: true },
   { name: 'All 6 themes', digital: true, card: true },
   { name: 'Social links — unlimited', digital: true, card: true },
   { name: 'Gallery, Contact + Google Maps', digital: true, card: true },
   { name: 'GCash / Maya QR', digital: true, card: true },
   { name: 'QR code to print', digital: true, card: true },
-  { name: 'Self-service edit — anytime', digital: true, card: true },
-  { name: 'Live Preview', digital: true, card: true },
+  { name: 'Self-edit anytime + Live Preview', digital: true, card: true },
   { name: 'Premium NFC card', digital: false, card: true },
-  { name: '1 Year hosting — unlimited edits', digital: false, card: true },
+  { name: 'Lifetime profile — Founders Club, no renewal', digital: true, card: true },
   { name: 'Tap + Scan — all phones', digital: false, card: true },
   { name: 'No app needed', digital: true, card: true },
   { name: 'Ships anywhere PH', digital: false, card: true },
@@ -95,9 +102,7 @@ export default function Pricing({ contactEmail = 'tapvinci@yahoo.com' }: { conta
         </h2>
 
         <p className="mt-5 text-[14px] font-normal leading-[1.7] text-[#F5F1E8]/60">
-          One tap. Lifetime profile. No subscriptions.
-          <br />
-          Built for those who value permanence.
+          ✦ FOUNDERS CLUB — Lifetime for first 200 customers
         </p>
       </div>
 
@@ -123,11 +128,9 @@ export default function Pricing({ contactEmail = 'tapvinci@yahoo.com' }: { conta
               </div>
 
               <div className="mt-8 flex items-end justify-between gap-4">
-                <span className="pv-serif text-[42px] font-bold leading-none text-white">₱299</span>
+                <span className="pv-serif text-[42px] font-bold leading-none text-white">₱399</span>
                 <span className="pb-1 text-right text-[11px] font-normal leading-[1.4] text-white/40">
-                  one-time
-                  <br />
-                  lifetime
+                  one-time • Founders <br/> Lifetime <br/> #200/200 left
                 </span>
               </div>
 
@@ -180,11 +183,9 @@ export default function Pricing({ contactEmail = 'tapvinci@yahoo.com' }: { conta
               </div>
 
               <div className="mt-8 flex items-end justify-between gap-4">
-                <span className="pv-serif text-[42px] font-bold leading-none text-white">₱799</span>
+                <span className="pv-serif text-[42px] font-bold leading-none text-white">₱899</span>
                 <span className="pb-1 text-right text-[11px] font-normal leading-[1.4] text-white/40">
-                  one-time
-                  <br />
-                  lifetime
+                 one-time • Founders <br/> Lifetime <br/> #200/200 left
                 </span>
               </div>
 
@@ -208,7 +209,7 @@ export default function Pricing({ contactEmail = 'tapvinci@yahoo.com' }: { conta
                 Get Card + Digital
               </a>
               <p className="mt-3 text-center text-[10px] font-normal text-white/30">
-                Ships within 2–3 days · Free delivery
+                Ships within 2–3 days
               </p>
             </div>
           </article>
@@ -258,12 +259,10 @@ export default function Pricing({ contactEmail = 'tapvinci@yahoo.com' }: { conta
       <div className="mx-auto mt-8 flex max-w-[900px] flex-col gap-4 rounded-[12px] border border-white/5 bg-[#121212]/60 px-6 py-4 sm:flex-row sm:items-center">
         <div className="flex shrink-0 items-center gap-2 text-[9px] font-semibold uppercase tracking-[1px] text-white/40">
           <span className="h-1 w-1 rounded-full bg-[#D4AF37]/60" aria-hidden="true" />
-          After Year One
+          
         </div>
         <p className="text-[11px] font-normal leading-relaxed text-white/50">
-          After 1 year, <span className="font-semibold text-white">₱299/year</span> to keep profile live or{' '}
-          <span className="font-semibold text-white">₱1,299 lifetime</span>. Optional lifetime upgrade. No lock-in. Your
-          data stays yours.
+          <span className="font-semibold text-white">Founders Club</span>. Lifetime access for the first 200 customers. One payment, your profile stays live forever. No renewal, ever. Your data stays yours.
         </p>
       </div>
     </section>
