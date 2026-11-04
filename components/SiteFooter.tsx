@@ -11,8 +11,7 @@ export default function SiteFooter({ copyright = '' }: { copyright?: string }) {
         </div>
         <p className="tv-tagline">A NEW STANDARD OF INTRODUCTION • MADE TO CONNECT • PHILIPPINES 2026</p>
         <div className="tv-footer-actions">
-          <Link href="/dashboard" className="tv-btn tv-btn-gold tv-btn-sm">Open Dashboard</Link>
-          <Link href="/admin" className="tv-btn tv-btn-glass tv-btn-sm">Admin Panel</Link>
+          <Link href="/dashboard" className="tv-btn tv-btn-gold tv-btn-sm">Create a Profile</Link>
           <a href="mailto:tapvinci@yahoo.com" className="tv-btn tv-btn-glass tv-btn-sm">Contact</a>
         </div>
         <p className="tv-copy">{copyright}</p>

@@ -1,8 +1,3 @@
-// VERIFICATION 533 LINES - SURGICAL FIX - Hydration + Font Copy + No global.css inside
-// Landing Order Hero About Me Gallery Social Media Quick Actions Contact Payment
-// Brand Respect GCash 007DFE Maya 000000 00D632
-// Fixed: window.location removed, mounted guard added, no global.css in tsx
-// Balanced braces 0 diff divs balanced
 'use client'
 import { useState, useRef, useEffect } from 'react'
 
@@ -386,12 +381,12 @@ END:VCARD`
                 </a>
               )}
               <button className="taply-action-btn small gold" onClick={saveContact}><span className="ico"><i className="fa-solid fa-address-card"></i></span><span className="lbl">Save Contact</span></button>
-              <button className="taply-action-btn small gold" onClick={()=>{if(typeof window!=='undefined'){navigator.clipboard.writeText(window.location.href).then(()=>alert('Link copied!'))}}}><span className="ico"><i className="fa-solid fa-share-nodes"></i></span><span className="lbl">Share My Card</span></button>
               {(socialsVisible.gcash_qr !== false || socialsVisible.maya_qr !== false) && (gcashQR || mayaQR) && (
                 <button className="taply-action-btn small gold payment-btn" onClick={openPaymentModal} style={{ background: '#E8C766' }}>
                   <span className="ico"><i className="fa-solid fa-qrcode"></i></span><span className="lbl">Payment</span>
                 </button>
               )}
+              <button className="taply-action-btn small gold" onClick={()=>{if(typeof window!=='undefined'){navigator.clipboard.writeText(window.location.href).then(()=>alert('Link copied!'))}}}><span className="ico"><i className="fa-solid fa-share-nodes"></i></span><span className="lbl">Share My Card</span></button>
             </div>
           </section>
 
