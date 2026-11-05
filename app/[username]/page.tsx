@@ -4,6 +4,7 @@ import Link from 'next/link'
 import { supabase } from '../../lib/supabase'
 import TaplyTemplate from '../../components/TaplyTemplate'
 import type { Profile } from '../../lib/types'
+import ViewTracker from '../../components/ViewTracker' // <-- Imported here
 
 export const dynamic = 'force-dynamic'
 export const revalidate = 0
@@ -36,6 +37,9 @@ export default async function UserPage({ params }: { params: { username: string 
 
   return (
     <>
+      {/* This invisible component tracks the view in the background */}
+      <ViewTracker username={params.username} />
+      
       {isDemo && (
         <Link
           href="/"

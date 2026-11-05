@@ -135,8 +135,8 @@ function csvCell(v: unknown) {
 // ---------------------------------------------------------------------------
 const ORDER_PREFIX = 'TV' // order numbers look like TV-USERNAME-123456 (change here if you want another prefix)
 const PACKAGES = {
-  card: { label: 'Card + Digital', price: 799, note: 'Includes NFC card' },
-  digital: { label: 'Digital Only', price: 299, note: 'Landing page only' },
+  card: { label: 'Card + Digital', price: 899, note: 'Includes NFC card' },
+  digital: { label: 'Digital Only', price: 399, note: 'Landing page only' },
 } as const
 type PackageId = keyof typeof PACKAGES
 const PAY_OPTIONS = ['paid', 'pending', 'failed'] as const

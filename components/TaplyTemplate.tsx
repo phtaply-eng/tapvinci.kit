@@ -3,7 +3,6 @@ import { useState, useRef, useEffect } from 'react'
 
 export default function TaplyTemplate({ profile }: { profile: any }) {
   const reelRef = useRef<HTMLDivElement>(null)
-  const paymentSliderRef = useRef<HTMLDivElement>(null)
   const [current, setCurrent] = useState(1)
   const [isDark, setIsDark] = useState(true)
   const [lightboxOpen, setLightboxOpen] = useState(false)
@@ -12,10 +11,6 @@ export default function TaplyTemplate({ profile }: { profile: any }) {
   const [pan, setPan] = useState({ x: 0, y: 0 })
   const [isDragging, setIsDragging] = useState(false)
   const [dragStart, setDragStart] = useState({ x: 0, y: 0 })
-  const [showPaymentModal, setShowPaymentModal] = useState(false)
-  const [paymentIndex, setPaymentIndex] = useState(0)
-  const [touchStartX, setTouchStartX] = useState(0)
-  const [touchStartY, setTouchStartY] = useState(0)
   const [mounted, setMounted] = useState(false)
   const [isDashboard, setIsDashboard] = useState(false)
   
@@ -25,7 +20,6 @@ export default function TaplyTemplate({ profile }: { profile: any }) {
     setMounted(true)
     const saved = localStorage.getItem('tapvinci-theme-mode')
     if (saved) setIsDark(saved === 'dark')
-    // FIX: window check moved to useEffect - prevents hydration mismatch
     if (typeof window !== 'undefined') {
       setIsDashboard(window.location.pathname.includes('dashboard'))
     }
@@ -62,9 +56,9 @@ export default function TaplyTemplate({ profile }: { profile: any }) {
   if (isVisible('website')) socialButtons.push({ id: 'website', href: socials.website, icon: 'fa-globe', label: 'Website' })
   if (isVisible('twitter') || isVisible('x')) socialButtons.push({ id: 'twitter', href: socials.twitter || socials.x, icon: 'fa-x-twitter', label: 'X / Twitter' })
 
-  // PAYMENT DATA - FIXED: No window in render, uses isDashboard state
-  const gcashQR = (profile as any).gcash_qr_url || (profile as any).gcash_qr || (profile as any).payment?.['gcash']?.qrImage || (isDashboard ? null : "/gallery/gcash-qr.jpg")
-  const mayaQR = (profile as any).maya_qr_url || (profile as any).maya_qr || (profile as any).payment?.['maya']?.qrImage || (isDashboard ? null : "/gallery/maya-qr.jpg")
+  // PAYMENT DATA
+  const gcashQR = (profile as any).gcash_qr_url || (profile as any).gcash_qr || (isDashboard ? null : "/gallery/gcash-qr.jpg")
+  const mayaQR = (profile as any).maya_qr_url || (profile as any).maya_qr || (isDashboard ? null : "/gallery/maya-qr.jpg")
 
   const getTheme = () => {
     const t = profile.theme || 'gold'
@@ -175,85 +169,6 @@ END:VCARD`
     a.download = `${profile.name.replace(/\s+/g, '_')}.vcf`
     a.click()
     URL.revokeObjectURL(url)
-  }
-
-  const openPaymentModal = () => {
-    setPaymentIndex(0)
-    setShowPaymentModal(true)
-    document.body.style.overflow = 'hidden'
-  }
-  const closePaymentModal = () => {
-    setShowPaymentModal(false)
-    document.body.style.overflow = ''
-  }
-
-  const switchQR = (index: number) => {
-    setPaymentIndex(index)
-    if (paymentSliderRef.current) {
-      const width = paymentSliderRef.current.offsetWidth
-      paymentSliderRef.current.scrollTo({ left: index * width, behavior: 'smooth' })
-    }
-  }
-
-  const handlePaymentTouchStart = (e: any) => {
-    setTouchStartX(e.touches[0].clientX)
-    setTouchStartY(e.touches[0].clientY)
-  }
-  const handlePaymentTouchEnd = (e: any) => {
-    const endX = e.changedTouches[0].clientX
-    const endY = e.changedTouches[0].clientY
-    const diffX = touchStartX - endX
-    const diffY = touchStartY - endY
-    if (Math.abs(diffX) > Math.abs(diffY) && Math.abs(diffX) > 50) {
-      if (diffX > 0 && paymentIndex < 1) switchQR(1)
-      if (diffX < 0 && paymentIndex > 0) switchQR(0)
-    }
-    if (diffY < -80 && Math.abs(diffX) < 50) {
-      closePaymentModal()
-    }
-  }
-
-  const handlePaymentScroll = () => {
-    if (!paymentSliderRef.current) return
-    const scrollLeft = paymentSliderRef.current.scrollLeft
-    const width = paymentSliderRef.current.offsetWidth
-    const newIndex = Math.round(scrollLeft / width)
-    if (newIndex !== paymentIndex) setPaymentIndex(newIndex)
-  }
-
-  useEffect(() => {
-    const handleKey = (e: KeyboardEvent) => {
-      if (!showPaymentModal) return
-      if (e.key === 'Escape') closePaymentModal()
-      if (e.key === 'ArrowLeft' && paymentIndex > 0) switchQR(0)
-      if (e.key === 'ArrowRight' && paymentIndex < 1) switchQR(1)
-    }
-    window.addEventListener('keydown', handleKey)
-    return () => window.removeEventListener('keydown', handleKey)
-  }, [showPaymentModal, paymentIndex])
-
-  const downloadQR = (url: string, name: string) => {
-    if (!url) return
-    const a = document.createElement('a')
-    a.href = url
-    a.download = `${name}-QR-${profile.name || 'TapVinci'}.png`
-    a.target = '_blank'
-    a.click()
-  }
-
-  const shareQR = async (url: string, type: string) => {
-    if (!url) return
-    if (navigator.share) {
-      try {
-        await navigator.share({
-          title: `${type} QR - ${profile.name}`,
-          text: `Scan my ${type} QR to pay`,
-          url: url
-        })
-      } catch {}
-    } else {
-      navigator.clipboard.writeText(url).then(() => alert(`${type} QR link copied!`))
-    }
   }
 
   if (!mounted) {
@@ -381,14 +296,45 @@ END:VCARD`
                 </a>
               )}
               <button className="taply-action-btn small gold" onClick={saveContact}><span className="ico"><i className="fa-solid fa-address-card"></i></span><span className="lbl">Save Contact</span></button>
+              
+              {/* PAYMENT ANCHOR BUTTON */}
               {(socialsVisible.gcash_qr !== false || socialsVisible.maya_qr !== false) && (gcashQR || mayaQR) && (
-                <button className="taply-action-btn small gold payment-btn" onClick={openPaymentModal} style={{ background: '#E8C766' }}>
+                <a href="#payment-section" className="taply-action-btn small gold payment-btn" style={{ background: '#E8C766', textDecoration: 'none' }}>
                   <span className="ico"><i className="fa-solid fa-qrcode"></i></span><span className="lbl">Payment</span>
-                </button>
+                </a>
               )}
+
               <button className="taply-action-btn small gold" onClick={()=>{if(typeof window!=='undefined'){navigator.clipboard.writeText(window.location.href).then(()=>alert('Link copied!'))}}}><span className="ico"><i className="fa-solid fa-share-nodes"></i></span><span className="lbl">Share My Card</span></button>
             </div>
           </section>
+
+          {/* NEW INLINE PAYMENT SECTION - Moved outside of Quick Actions */}
+          {(socialsVisible.gcash_qr !== false || socialsVisible.maya_qr !== false) && (gcashQR || mayaQR) && (
+            <section id="payment-section" className="taply-section" style={{ scrollMarginTop: '20px' }}>
+              <h2><i className="fa-solid fa-wallet"></i> Payment Options</h2>
+              <p style={{ marginBottom: '16px', fontSize: '11px', color: '#A1A1A1' }}>Scan to pay via GCash or Maya</p>
+              
+              <div style={{ display: 'flex', gap: '16px', justifyContent: 'center', flexWrap: 'wrap' }}>
+                {socialsVisible.gcash_qr !== false && gcashQR && (
+                  <div style={{ background: '#121214', padding: '12px', borderRadius: '16px', border: '1px solid #27272a', textAlign: 'center', flex: '1 1 120px', maxWidth: '160px' }}>
+                    <div style={{ background: 'white', padding: '8px', borderRadius: '8px', marginBottom: '8px' }}>
+                      <img src={gcashQR} alt="GCash QR" style={{ width: '100%', height: 'auto', display: 'block', borderRadius: '4px' }} />
+                    </div>
+                    <p style={{ color: '#007DFE', fontSize: '12px', fontWeight: 'bold', margin: 0 }}>GCash</p>
+                  </div>
+                )}
+
+                {socialsVisible.maya_qr !== false && mayaQR && (
+                  <div style={{ background: '#121214', padding: '12px', borderRadius: '16px', border: '1px solid #27272a', textAlign: 'center', flex: '1 1 120px', maxWidth: '160px' }}>
+                    <div style={{ background: 'white', padding: '8px', borderRadius: '8px', marginBottom: '8px' }}>
+                      <img src={mayaQR} alt="Maya QR" style={{ width: '100%', height: 'auto', display: 'block', borderRadius: '4px' }} />
+                    </div>
+                    <p style={{ color: '#00D632', fontSize: '12px', fontWeight: 'bold', margin: 0 }}>Maya</p>
+                  </div>
+                )}
+              </div>
+            </section>
+          )}
 
           <section className="taply-contact">
             <h2><i className="fa-solid fa-address-book"></i> Contact</h2>
@@ -397,107 +343,43 @@ END:VCARD`
             {profile.address && <div className="taply-contact-item"><span className="taply-contact-icon"><i className="fa-solid fa-location-dot"></i></span><div><small>Address</small><p>{profile.address}</p></div></div>}
           </section>
 
-          <footer className="taply-footer"><p suppressHydrationWarning>© {new Date().getFullYear()} {profile.name}. All rights reserved.</p></footer>
+          <footer className="taply-footer" style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '8px' }}>
+            <p suppressHydrationWarning style={{ margin: 0 }}>© {new Date().getFullYear()} {profile.name}. All rights reserved.</p>
+  
+            {/* VIEW COUNTER */}
+            <div style={{ display: 'inline-flex', alignItems: 'center', gap: '6px', fontSize: '10px', color: '#D4AF37', opacity: 0.8 }}>
+              <i className="fa-regular fa-eye"></i>
+              <span suppressHydrationWarning>
+                {profile.views || 0} {profile.views === 1 ? 'view' : 'views'}
+              </span>
+            </div>
+          </footer>
         </main>
       </div>
     </div>
 
-    {showPaymentModal && (
-      <div suppressHydrationWarning className="payment-modal-overlay" onClick={closePaymentModal}>
-        <div className="payment-bottom-sheet" onClick={e => e.stopPropagation()} onTouchStart={handlePaymentTouchStart} onTouchEnd={handlePaymentTouchEnd}>
-          <div className="payment-drag-handle"></div>
-          <div className="payment-modal-header">
-            <div>
-              <p className="payment-header-label">Scan to Pay</p>
-              <h3><i className="fa-solid fa-wallet"></i> Payment QR Codes</h3>
-            </div>
-            <button className="payment-close" onClick={closePaymentModal}><i className="fa-solid fa-xmark"></i></button>
-          </div>
-          
-          <div className="payment-tabs">
-            {socialsVisible.gcash_qr !== false && gcashQR && (
-              <button className={`payment-tab ${paymentIndex === 0 ? 'active gcash-active' : ''}`} onClick={() => switchQR(0)}>
-                <span className="payment-tab-icon gcash-icon">G</span> GCash
-              </button>
-            )}
-            {socialsVisible.maya_qr !== false && mayaQR && (
-              <button className={`payment-tab ${paymentIndex === 1 ? 'active maya-active' : ''}`} onClick={() => switchQR(1)}>
-                <span className="payment-tab-icon maya-icon">M</span> Maya
-              </button>
-            )}
-          </div>
-
-          <div className="payment-slider-wrapper">
-            <div className="payment-slider-scroll" ref={paymentSliderRef} onScroll={handlePaymentScroll}>
-              {socialsVisible.gcash_qr !== false && gcashQR && (
-                <div className="payment-slide-card">
-                  <div className="payment-qr-card gcash-card">
-                    <div className="qr-card-top">
-                      <span className="qr-brand gcash-brand">GCASH</span>
-                      <span className="qr-verified"><i className="fa-solid fa-circle-check"></i> Verified</span>
-                    </div>
-                    <div className="payment-qr-box">
-                      <img src={gcashQR} alt="GCash QR" className="payment-qr-img" />
-                    </div>
-                    <div className="payment-info" style={{textAlign:'center'}}>
-                      <p className="payment-name" style={{fontSize:'16px', fontWeight:'700', color:'white', textAlign:'center', margin:'0'}}></p>
-                      <p className="payment-label">GCASH QR CODE • SCAN TO PAY</p>
-                    </div>
-                  </div>
-                  <div className="payment-actions">
-                    <button className="payment-action-btn save" onClick={() => gcashQR && downloadQR(gcashQR, 'GCash')} style={{background:'#007DFE', color:'white'}}>
-                      <i className="fa-solid fa-download"></i> Save Image
-                    </button>
-                    <button className="payment-action-btn share" onClick={() => gcashQR && shareQR(gcashQR, 'GCash')}>
-                      <i className="fa-solid fa-share-nodes"></i> Share QR
-                    </button>
-                  </div>
-                </div>
-              )}
-              {socialsVisible.maya_qr !== false && mayaQR && (
-                <div className="payment-slide-card">
-                  <div className="payment-qr-card maya-card">
-                    <div className="qr-card-top">
-                      <span className="qr-brand maya-brand">MAYA</span>
-                      <span className="qr-verified"><i className="fa-solid fa-circle-check"></i> Verified</span>
-                    </div>
-                    <div className="payment-qr-box">
-                      <img src={mayaQR} alt="Maya QR" className="payment-qr-img" />
-                    </div>
-                    <div className="payment-info" style={{textAlign:'center'}}>
-                      <p className="payment-name" style={{fontSize:'16px', fontWeight:'700', color:'white', textAlign:'center', margin:'0'}}></p>
-                      <p className="payment-label">MAYA QR CODE • SCAN TO PAY</p>
-                    </div>
-                  </div>
-                  <div className="payment-actions">
-                    <button className="payment-action-btn save maya" onClick={() => mayaQR && downloadQR(mayaQR, 'Maya')} style={{background:'#000000', color:'white', border:'1px solid #00D632'}}>
-                      <i className="fa-solid fa-download"></i> Save Image
-                    </button>
-                    <button className="payment-action-btn share" onClick={() => mayaQR && shareQR(mayaQR, 'Maya')}>
-                      <i className="fa-solid fa-share-nodes"></i> Share QR
-                    </button>
-                  </div>
-                </div>
-              )}
-            </div>
-          </div>
-
-          <div className="payment-modal-footer">
-            <div className="payment-footer-dots">
-              <span className={`dot ${paymentIndex===0 ? 'active' : ''}`} onClick={() => switchQR(0)}></span>
-              <span className={`dot ${paymentIndex===1 ? 'active' : ''}`} onClick={() => switchQR(1)}></span>
-            </div>
-            <p className="payment-footer-hint"><i className="fa-solid fa-hand"></i> Swipe left/right to switch • Swipe down to close</p>
-          </div>
-        </div>
-      </div>
-    )}
-
     {lightboxOpen && gallery[lightboxIndex] && (
-      <div className="taply-lightbox" onClick={closeLightbox}>
-        <div className="taply-lightbox-content" onClick={(e) => e.stopPropagation()}>
-          <div 
-            className="taply-lightbox-img-wrapper"
+      <div 
+        style={{ position: 'fixed', inset: 0, zIndex: 99999, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center' }}
+        className="bg-[#050505]/95 backdrop-blur-[16px] p-4"
+        onClick={closeLightbox}
+      >
+        <button 
+          onClick={closeLightbox} 
+          style={{ position: 'fixed', top: '20px', right: '20px', zIndex: 100000 }}
+          className="w-10 h-10 rounded-full bg-[#121214] border border-[#2A2A2A] text-white hover:border-[#D4AF37] flex items-center justify-center cursor-pointer"
+        >
+          ×
+        </button>
+
+        <div
+          className="relative flex items-center justify-center"
+          style={{ width: '90vw', maxWidth: '900px', height: '70vh', margin: '0 auto' }}
+          onClick={(e) => e.stopPropagation()}
+        >
+          <div
+            className="relative w-full h-full flex items-center justify-center rounded-xl border border-[#1E1E1E] bg-[#121214] overflow-hidden"
+            style={{ boxShadow: '0 0 80px rgba(212,175,55,0.15)' }}
             onMouseDown={handleMouseDown}
             onMouseMove={handleMouseMove}
             onMouseUp={handleMouseUp}
@@ -505,33 +387,49 @@ END:VCARD`
             onTouchStart={handleTouchStart}
             onTouchMove={handleTouchMove}
             onTouchEnd={handleMouseUp}
-            style={{ cursor: zoom > 1 ? (isDragging ? 'grabbing' : 'grab') : 'zoom-in' }}
             onDoubleClick={() => zoom === 1 ? handleZoomIn() : handleReset()}
           >
             <img 
               src={gallery[lightboxIndex].src} 
               alt={gallery[lightboxIndex].alt}
               style={{ 
+                maxWidth: '100%', 
+                maxHeight: '100%', 
+                objectFit: 'contain',
                 transform: `scale(${zoom}) translate(${pan.x / zoom}px, ${pan.y / zoom}px)`,
-                cursor: zoom > 1 ? 'grab' : 'zoom-in'
+                transition: isDragging ? 'none' : 'transform 0.2s ease'
               }}
               draggable={false}
             />
           </div>
-          <div className="taply-lightbox-controls">
-            <button className="taply-lightbox-btn" onClick={prevImage}><i className="fa-solid fa-chevron-left"></i></button>
-            <span className="taply-lightbox-counter">{lightboxIndex + 1} / {gallery.length}</span>
-            <button className="taply-lightbox-btn" onClick={nextImage}><i className="fa-solid fa-chevron-right"></i></button>
-            <button className="taply-lightbox-btn" onClick={handleZoomOut} disabled={zoom <= 1}><i className="fa-solid fa-magnifying-glass-minus"></i></button>
-            <span className="taply-lightbox-counter">{Math.round(zoom * 100)}%</span>
-            <button className="taply-lightbox-btn" onClick={handleZoomIn} disabled={zoom >= 4}><i className="fa-solid fa-magnifying-glass-plus"></i></button>
-            <button className="taply-lightbox-btn" onClick={handleReset}><i className="fa-solid fa-expand"></i></button>
-            <button className="taply-lightbox-btn close" onClick={closeLightbox}><i className="fa-solid fa-xmark"></i></button>
-          </div>
-          <p className="taply-lightbox-zoom-info">
-            {zoom === 1 ? 'Tap image or + to zoom • Swipe to navigate' : 'Drag to pan • Double tap to reset • Pinch to zoom on mobile'}
-          </p>
+
+          {gallery.length > 1 && (
+            <>
+              <button onClick={(e) => { e.stopPropagation(); prevImage() }} className="absolute left-0 md:-left-12 top-1/2 -translate-y-1/2 w-10 h-10 rounded-full bg-[#121214] border border-[#2A2A2A] text-white hover:border-[#D4AF37] flex items-center justify-center cursor-pointer">‹</button>
+              <button onClick={(e) => { e.stopPropagation(); nextImage() }} className="absolute right-0 md:-right-12 top-1/2 -translate-y-1/2 w-10 h-10 rounded-full bg-[#121214] border border-[#2A2A2A] text-white hover:border-[#D4AF37] flex items-center justify-center cursor-pointer">›</button>
+            </>
+          )}
         </div>
+
+        <div className="flex items-center gap-2 px-4 py-2 rounded-full bg-[#121214] border border-[#1E1E1E] mt-6" style={{ boxShadow: '0 8px 32px rgba(0,0,0,0.6)' }} onClick={(e) => e.stopPropagation()}>
+          <span className="text-xs text-[#A1A1A1]">{lightboxIndex + 1} / {gallery.length}</span>
+          <div className="w-px h-4 bg-[#2A2A2A]" />
+          <span className="text-xs text-white/50">{Math.round(zoom * 100)}%</span>
+          <button onClick={handleZoomOut} disabled={zoom <= 1} className="w-8 h-8 rounded-full bg-[#1E1E1E] text-white disabled:opacity-30 flex items-center justify-center">−</button>
+          <button onClick={handleZoomIn} disabled={zoom >= 4} className="w-8 h-8 rounded-full bg-[#1E1E1E] text-white disabled:opacity-30 flex items-center justify-center">+</button>
+          <button onClick={handleReset} className="w-8 h-8 rounded-full bg-[#1E1E1E] text-white flex items-center justify-center">⛶</button>
+          <button onClick={closeLightbox} className="w-8 h-8 rounded-full bg-red-500/20 text-red-400 border border-red-500/30 flex items-center justify-center">×</button>
+        </div>
+
+        <p className="text-[11px] text-white/30 mt-3">Tap + to zoom • Arrows to navigate • Esc to close</p>
+
+        {gallery.length > 1 && (
+          <div className="flex gap-2 mt-4 max-w-[90vw] overflow-x-auto justify-center">
+            {gallery.map((img: any, i: number) => (
+              <img key={i} src={img.src} onClick={() => setLightboxIndex(i)} className={`w-14 h-14 rounded-lg object-cover border-2 cursor-pointer flex-shrink-0 ${i === lightboxIndex ? 'border-[#D4AF37]' : 'border-transparent opacity-60'}`} />
+            ))}
+          </div>
+        )}
       </div>
     )}
     </>

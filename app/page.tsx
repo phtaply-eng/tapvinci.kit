@@ -52,7 +52,7 @@ export default function Home() {
          <div className="tv-logo tv-in" style={{ ['--d' as string]: '.15s', marginBottom: '12px' } as any} aria-label="TapVinci">
             <Image src="/logo.png" alt="TapVinci" width={400} height={100} className="h-20 md:h-24 w-auto object-contain mx-auto" priority />
           </div>
-          <h1 className="tv-hero-h1 tv-in whitespace-nowrap" style={{ ['--d' as string]: '.26s', fontSize: 'clamp(69px, 6vw, 48px)' }}>
+          <h1 className="tv-hero-h1 tv-in whitespace-nowrap" style={{ ['--d' as string]: '.26s', fontSize: 'clamp(48px, 6vw, 69px)' }}>
           <span>Tap.</span> <span>Connect.</span> <em>Remember.</em>
           </h1>
           <p className="tv-hero-sub tv-in" style={{ ['--d' as string]: '.4s' }}></p>

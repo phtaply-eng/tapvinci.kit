@@ -632,17 +632,6 @@ const { data } = await supabase.from('profiles').select('*').eq('username', DEFA
               </div>
             </div>
           </div>
-
-
-          <button
-            onClick={scrollToLivePreview}
-            type="button"
-            className="w-full py-3.5 rounded-xl font-bold border text-[11px] uppercase tracking-[0.15em] transition-all hover:border-[#D4AF37] hover:text-[#D4AF37]"
-            style={{ borderColor: '#2A2A2A', color: '#F5F1E8', background: 'transparent' }}
-          >
-            See Live Preview → Order Matches Edit Form ↓
-          </button>
-
           <button onClick={save} disabled={saving || heroUploading || galleryUploading || gcashUploading || mayaUploading} className="w-full py-3 rounded-xl font-bold hover:brightness-110 disabled:opacity-50" style={{background: profile.accent_color, color: 'black'}}>{saving ? 'Saving...' : 'Save Profile'}</button>
         </div>
               </div>

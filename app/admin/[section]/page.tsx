@@ -10,7 +10,7 @@ import { supabase } from '../../../lib/supabase'
 const AUTH_KEY = 'tapvinci_admin_ok'
 const SITE_URL = (process.env.NEXT_PUBLIC_SITE_URL || 'https://tapvinci.vercel.app').replace(/\/+$/, '')
 const DEMO = (process.env.NEXT_PUBLIC_DEMO_USERNAME || 'shua').toLowerCase()
-const PKG = { card: { label: 'Card + Digital', price: 799 }, digital: { label: 'Digital Only', price: 299 } } as const
+const PKG = { card: { label: 'Card + Digital', price: 899 }, digital: { label: 'Digital Only', price: 399 } } as const
 const THEMES: Record<string, string> = { gold: 'Black Gold', purple: 'Midnight Purple', blue: 'Ocean Blue', green: 'Forest Green', pink: 'Sunset Pink', orange: 'Sunrise Orange' }
 
 type Row = { username: string; name?: string | null; business?: string | null; email?: string | null; phone?: string | null; created_at?: string | null; is_active?: boolean | null; gcash_qr_url?: string | null; maya_qr_url?: string | null; theme?: any; [k: string]: any }
@@ -336,7 +336,7 @@ function PricingSection({ profiles }: SP) {
           </Card>
         ))}
       </div>
-      <Card title="After year one" sub="Shown on the public pricing section"><p className="text-[13px] text-[#A1A1A1]">After 1 year: <b className="text-white">₱299/year</b> to keep a profile live, or <b className="text-white">₱1,299 lifetime</b>. Optional lifetime upgrade, no lock-in.</p></Card>
+      <Card title="" sub="Shown on the public pricing section"><p className="text-[13px] text-[#A1A1A1]">After 1 year: <b className="text-white"></b> to keep a profile live, or <b className="text-white"></b>.</p></Card>
     </>
   )
 }

@@ -1,5 +1,7 @@
 'use client'
 
+import { useRouter } from 'next/navigation'
+
 type PlanFeature = { key: string; desc?: string }
 
 const DIGITAL_FEATURES: PlanFeature[] = [
@@ -85,6 +87,16 @@ function Check({ on, tone }: { on: boolean; tone: 'muted' | 'gold' }) {
 }
 
 export default function Pricing({ contactEmail = 'tapvinci@yahoo.com' }: { contactEmail?: string }) {
+  const router = useRouter()
+
+  const handleSelect = (pkg: 'digital_only' | 'card_digital', price: '399' | '899') => {
+    try {
+      localStorage.setItem('selected_package', pkg)
+      localStorage.setItem('selected_price', price)
+    } catch {}
+    router.push(`/dashboard?package=${pkg}&price=${price}&new=true`)
+  }
+
   return (
     <section id="pricing" className="pv-mont bg-[#050505] px-6 py-24">
       {/* Header */}
@@ -143,12 +155,12 @@ export default function Pricing({ contactEmail = 'tapvinci@yahoo.com' }: { conta
             </div>
 
             <div className="mt-auto pt-8">
-              <a
-                href={`mailto:${contactEmail}?subject=TapVinci%20Digital%20Only%20%E2%80%94%20Starter%20Profile`}
-                className="block w-full rounded-full border border-white/20 py-4 text-center text-[12px] font-bold uppercase tracking-[0.15em] text-white transition-colors hover:border-white/35 hover:bg-white/5"
+              <button
+                onClick={() => handleSelect('digital_only','399')}
+                className="block w-full cursor-pointer rounded-full border border-white/20 py-4 text-center text-[12px] font-bold uppercase tracking-[0.15em] text-white transition-all hover:border-[#D4AF37] hover:text-[#D4AF37] hover:bg-white/5"
               >
                 Start with Digital
-              </a>
+              </button>
               <p className="mt-3 text-center text-[10px] font-normal text-white/30">Instant activation</p>
             </div>
           </article>
@@ -202,12 +214,12 @@ export default function Pricing({ contactEmail = 'tapvinci@yahoo.com' }: { conta
             </div>
 
             <div className="mt-auto pt-8">
-              <a
-                href={`mailto:${contactEmail}?subject=TapVinci%20Card%20%2B%20Digital%20%E2%80%94%20Complete%20Studio`}
-                className="block w-full rounded-full bg-[#D4AF37] py-4 text-center text-[12px] font-bold uppercase tracking-[0.15em] text-black shadow-[0_8px_32px_rgba(212,175,55,0.4)] transition-all hover:bg-[#E8C155] hover:shadow-[0_12px_40px_rgba(212,175,55,0.55)]"
+              <button
+                onClick={() => handleSelect('card_digital','899')}
+                className="block w-full cursor-pointer rounded-full bg-[#D4AF37] py-4 text-center text-[12px] font-bold uppercase tracking-[0.15em] text-black shadow-[0_8px_32px_rgba(212,175,55,0.4)] transition-all hover:bg-[#FFC21C] hover:shadow-[0_0_20px_rgba(212,175,55,0.3),0_12px_40px_rgba(212,175,55,0.55)]"
               >
                 Get Card + Digital
-              </a>
+              </button>
               <p className="mt-3 text-center text-[10px] font-normal text-white/30">
                 Ships within 2–3 days
               </p>
