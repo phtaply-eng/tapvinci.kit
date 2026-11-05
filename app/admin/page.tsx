@@ -3,14 +3,6 @@ import { useCallback, useEffect, useMemo, useState } from 'react'
 import Link from 'next/link'
 import { supabase } from '../../lib/supabase'
 
-// ---------------------------------------------------------------------------
-// TapVinci Admin - internal list of every client profile.
-//
-// ACCESS: a simple password gate. The password comes from NEXT_PUBLIC_ADMIN_PASSWORD.
-// NOTE: NEXT_PUBLIC_* values are bundled into browser JavaScript, so this keeps casual
-// visitors out but is NOT real security. Do not rely on it for sensitive data.
-// ---------------------------------------------------------------------------
-
 const ADMIN_PASSWORD = process.env.NEXT_PUBLIC_ADMIN_PASSWORD || ''
 const SITE_URL = (process.env.NEXT_PUBLIC_SITE_URL || 'https://tapvinci.vercel.app').replace(/\/+$/, '')
 const AUTH_KEY = 'tapvinci_admin_ok'
@@ -34,6 +26,7 @@ type Row = {
   created_at?: string | null
   gcash_qr_url?: string | null
   maya_qr_url?: string | null
+  receipt_url?: string | null 
   is_active?: boolean | null
   [key: string]: any
 }
@@ -73,7 +66,6 @@ const EDIT_FIELDS: { key: keyof EditForm; label: string; rows?: number }[] = [
   { key: 'website', label: 'Website' },
 ]
 
-// socials may be plain strings ("https://...") or objects ({ url, visible }) - handle both
 function socialUrl(v: unknown): string {
   if (typeof v === 'string') return v
   if (v && typeof v === 'object' && typeof (v as { url?: unknown }).url === 'string') return (v as { url: string }).url
@@ -84,7 +76,6 @@ function withSocial(socials: Record<string, unknown>, key: string, url: string):
   return cur && typeof cur === 'object' ? { ...(cur as object), url } : url
 }
 
-// "https://x.supabase.co/storage/v1/object/public/<bucket>/<path>?v=1" -> { bucket, path }
 function parseStorageUrl(u: unknown): { bucket: string; path: string } | null {
   if (typeof u !== 'string') return null
   const m = /\/storage\/v1\/object\/public\/([^/]+)\/([^?]+)/.exec(u)
@@ -92,7 +83,6 @@ function parseStorageUrl(u: unknown): { bucket: string; path: string } | null {
   try { return { bucket: m[1], path: decodeURIComponent(m[2]) } } catch { return null }
 }
 
-// every file under a folder, including sub-folders (Supabase list() is one level only)
 async function listAllFiles(bucket: string, prefix: string, depth = 0): Promise<string[]> {
   const { data } = await supabase.storage.from(bucket).list(prefix, { limit: 1000 })
   const out: string[] = []
@@ -129,11 +119,7 @@ function csvCell(v: unknown) {
   return `"${s}"`
 }
 
-// ---------------------------------------------------------------------------
-// Orders & Sales: every client profile = one order. Package / payment / fulfillment live on the
-// profiles row (run supabase-orders.sql once). Rows without those columns fall back to the defaults below.
-// ---------------------------------------------------------------------------
-const ORDER_PREFIX = 'TV' // order numbers look like TV-USERNAME-123456 (change here if you want another prefix)
+const ORDER_PREFIX = 'TV'
 const PACKAGES = {
   card: { label: 'Card + Digital', price: 899, note: 'Includes NFC card' },
   digital: { label: 'Digital Only', price: 399, note: 'Landing page only' },
@@ -151,12 +137,9 @@ const payOf = (p: Row): PayStatus => (p.payment_status === 'pending' || p.paymen
 const fulOf = (p: Row): FulStatus => (FUL_OPTIONS as readonly string[]).includes(p.fulfillment as string) ? (p.fulfillment as FulStatus) : 'pending'
 const amountOf = (p: Row) => PACKAGES[pkgOf(p)].price
 
-// Demo / test accounts: still live and editable, but never counted in sales stats.
-// Works with no migration (username list). If the profiles table also has an `is_demo` boolean, that counts too.
 const DEMO_USERNAMES = ['shua', 'tapvinci', 'robert']
-// never permanently deletable from admin (they power /shua demo and the /tapvinci template) - deactivate instead
 const PROTECTED_USERNAMES = ['shua', 'tapvinci']
-const DEMO_EMAILS = ['tapvinci@yahoo.com', 'shuarmav@gmail.com'] // keep in sync with app/admin/overview/page.tsx
+const DEMO_EMAILS = ['tapvinci@yahoo.com', 'shuarmav@gmail.com']
 const isDemo = (p: Row) =>
   p.is_demo === true ||
   DEMO_USERNAMES.includes((p.username || '').toString().toLowerCase()) ||
@@ -166,7 +149,6 @@ const DEMO_BADGE_STYLE = { background: 'rgba(255,194,28,0.2)', color: '#FFC21C' 
 const DEMO_PAY_STYLE = { background: '#1E1E1E', color: '#A1A1A1', borderColor: '#2A2A2A' } as const
 
 function orderNo(p: Row) {
-  // stable (same every render): derived from username + creation time
   let h = 0
   const s = `${p.username}|${p.created_at || ''}`
   for (let i = 0; i < s.length; i++) h = (h * 31 + s.charCodeAt(i)) >>> 0
@@ -189,7 +171,6 @@ function escapeHtml(v: unknown) {
   return (v ?? '').toString().replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c] as string))
 }
 
-// printable invoice in a new tab: use the browser's Print -> Save as PDF
 function openInvoice(p: Row) {
   const pkg = PACKAGES[pkgOf(p)]
   const w = window.open('', '_blank')
@@ -225,17 +206,16 @@ export default function AdminPage() {
   const [sortAsc, setSortAsc] = useState(false)
   const [toast, setToast] = useState('')
 
-  // Reviews - APPENDED FOR REVIEW SYSTEM
   const [reviews, setReviews] = useState<ReviewRow[]>([])
   const [reviewsLoading, setReviewsLoading] = useState(false)
   const [reviewsSearch, setReviewsSearch] = useState('')
 
-  // QR generator modal
   const [showQRModal, setShowQRModal] = useState(false)
   const [selectedProfile, setSelectedProfile] = useState<Row | null>(null)
   const [qrUrl, setQrUrl] = useState('')
 
-  // Edit / Delete
+  const [receiptModal, setReceiptModal] = useState<{ isOpen: boolean, url: string, username: string } | null>(null)
+
   const [editingProfile, setEditingProfile] = useState<Row | null>(null)
   const [editForm, setEditForm] = useState<EditForm>(EMPTY_EDIT)
   const [savingEdit, setSavingEdit] = useState(false)
@@ -243,7 +223,6 @@ export default function AdminPage() {
   const [deleteText, setDeleteText] = useState('')
   const [busyAction, setBusyAction] = useState(false)
 
-  // Orders & Sales view (the Business Profiles view below is the original client table + reviews)
   const [view, setView] = useState<'orders' | 'profiles'>('orders')
   const [oDraft, setODraft] = useState('')
   const [oQuery, setOQuery] = useState('')
@@ -255,7 +234,6 @@ export default function AdminPage() {
   const [selected, setSelected] = useState<Set<string>>(new Set())
   const [genOpen, setGenOpen] = useState(false)
 
-  // restore a previous login for this browser tab
   useEffect(() => {
     try {
       if (sessionStorage.getItem(AUTH_KEY) === '1') setIsAuthed(true)
@@ -263,7 +241,6 @@ export default function AdminPage() {
     setChecked(true)
   }, [])
 
-  // sidebar (admin/layout.tsx) switches the view with the URL hash and logs out through an event
   useEffect(() => {
     const onHash = () => setView(window.location.hash === '#profiles' ? 'profiles' : 'orders')
     const onAuth = () => {
@@ -283,10 +260,8 @@ export default function AdminPage() {
   const fetchProfiles = useCallback(async () => {
     setLoading(true)
     setLoadError('')
-    // exact query from the brief: newest first
     let { data, error } = await supabase.from('profiles').select('*').order('created_at', { ascending: false })
     if (error) {
-      // older tables may not have created_at: retry without ordering
       const retry = await supabase.from('profiles').select('*')
       data = retry.data
       error = retry.error
@@ -360,7 +335,6 @@ export default function AdminPage() {
     return { total: profiles.length, thisMonth, withQR }
   }, [profiles])
 
-  // Reviews stats and filter - APPENDED FOR REVIEW SYSTEM
   const reviewsStats = useMemo(() => {
     const total = reviews.length
     const avg = total > 0 ? reviews.reduce((s, r) => s + r.rating, 0) / total : 0
@@ -410,7 +384,6 @@ export default function AdminPage() {
 
   const closeQR = () => setShowQRModal(false)
 
-  // Esc closes the QR modal
   useEffect(() => {
     if (!showQRModal) return
     const onKey = (e: KeyboardEvent) => { if (e.key === 'Escape') setShowQRModal(false) }
@@ -435,13 +408,11 @@ export default function AdminPage() {
       URL.revokeObjectURL(objectUrl)
       showToast('QR downloaded')
     } catch {
-      // fallback: open the image so it can be saved manually
       window.open(apiUrl, '_blank', 'noopener')
       showToast('Opened QR in a new tab - right-click to save')
     }
   }
 
-  // ---------- Edit ----------
   function handleEdit(profile: Row) {
     const soc = (profile.socials && typeof profile.socials === 'object' ? profile.socials : {}) as Record<string, unknown>
     setEditForm({
@@ -469,7 +440,6 @@ export default function AdminPage() {
       instagram: withSocial(base, 'instagram', f.instagram.trim()),
       website: withSocial(base, 'website', f.website.trim()),
     }
-    // premium-schema tables call the name column "business"
     const nameKey = 'business' in editingProfile && !('name' in editingProfile) ? 'business' : 'name'
     const { data, error } = await supabase
       .from('profiles')
@@ -484,7 +454,6 @@ export default function AdminPage() {
     fetchProfiles()
   }
 
-  // ---------- Delete / Deactivate ----------
   function handleDeleteConfirm(profile: Row) {
     setDeleteText('')
     setDeleteConfirm(profile)
@@ -496,24 +465,20 @@ export default function AdminPage() {
     }
     setBusyAction(true)
     const username = profile.username
-    // 1) work out which stored files belong to this client
     const targets: Record<string, Set<string>> = {}
     const add = (bucket: string, path: string) => { (targets[bucket] ||= new Set()).add(path) }
-    const urls: unknown[] = [profile.hero_image, profile.heroImage, profile.avatar_url, profile.avatar, profile.gcash_qr_url, profile.maya_qr_url]
+    const urls: unknown[] = [profile.hero_image, profile.heroImage, profile.avatar_url, profile.avatar, profile.gcash_qr_url, profile.maya_qr_url, profile.receipt_url]
     if (Array.isArray(profile.gallery)) profile.gallery.forEach((g: unknown) => urls.push(typeof g === 'string' ? g : (g as { src?: string })?.src))
     for (const u of urls) {
       const p = parseStorageUrl(u)
-      // profile-images is organised per client: never touch another client's folder
       if (p && (p.bucket !== PROFILE_BUCKET || p.path.startsWith(`${username}/`))) add(p.bucket, p.path)
     }
     try { (await listAllFiles(PROFILE_BUCKET, username)).forEach((p) => add(PROFILE_BUCKET, p)) } catch {}
 
-    // 2) delete the row first, so a failure never leaves a live profile without its photos
     const { data, error } = await supabase.from('profiles').delete().eq('username', username).select()
     if (error) { setBusyAction(false); return showToast('Delete failed: ' + error.message) }
     if (!data || data.length === 0) { setBusyAction(false); return showToast('Nothing was deleted - check the Supabase delete policy') }
 
-    // 3) remove the files (best effort)
     let removed = 0
     for (const [bucket, paths] of Object.entries(targets)) {
       const { data: rm } = await supabase.storage.from(bucket).remove(Array.from(paths))
@@ -540,7 +505,6 @@ export default function AdminPage() {
     fetchProfiles()
   }
 
-  // Esc closes the edit / delete modals
   useEffect(() => {
     if (!editingProfile && !deleteConfirm) return
     const onKey = (e: KeyboardEvent) => {
@@ -552,16 +516,13 @@ export default function AdminPage() {
     return () => window.removeEventListener('keydown', onKey)
   }, [editingProfile, deleteConfirm])
 
-    // ---------- Orders & Sales ----------
   const activeProfiles = useMemo(() => profiles.filter((p) => p.is_active !== false), [profiles])
 
-  // sales numbers only ever use real (non-demo) active clients
   const realClients = useMemo(() => activeProfiles.filter((p) => !isDemo(p)), [activeProfiles])
   const demoCount = useMemo(() => activeProfiles.filter(isDemo).length, [activeProfiles])
 
   const orderStats = useMemo(() => {
     const paid = realClients.filter((p) => payOf(p) === 'paid')
-    // stage chips follow the Real / Demo filter so their counts match the table
     const scope = demoFilter === 'real' ? realClients : demoFilter === 'demo' ? activeProfiles.filter(isDemo) : activeProfiles
     const byFul: Record<FulStatus, number> = { pending: 0, printing: 0, shipped: 0, completed: 0 }
     scope.forEach((p) => { byFul[fulOf(p)] += 1 })
@@ -580,7 +541,14 @@ export default function AdminPage() {
     const q = oQuery.trim().toLowerCase()
     const list = profiles.filter((p) => {
       const inactive = p.is_active === false
-      if (payFilter === 'deleted' ? !inactive : inactive) return false
+      const isPendingReceipt = p.payment_status === 'pending' && !!p.receipt_url
+
+      if (payFilter === 'deleted') {
+        if (!inactive || isPendingReceipt) return false
+      } else {
+        if (inactive && !isPendingReceipt) return false
+      }
+
       if (demoFilter === 'real' && isDemo(p)) return false
       if (demoFilter === 'demo' && !isDemo(p)) return false
       if (payFilter === 'paid' && payOf(p) !== 'paid') return false
@@ -608,7 +576,6 @@ export default function AdminPage() {
   const toggleSelected = (username: string) =>
     setSelected((prev) => { const next = new Set(prev); if (next.has(username)) next.delete(username); else next.add(username); return next })
 
-  // one place for every order write; rows keep their existing data, only the changed fields are sent
   async function updateOrder(profile: Row, patch: Record<string, unknown>, okMsg?: string) {
     const { data, error } = await supabase.from('profiles').update(patch).eq('username', profile.username).select()
     if (error) return showToast(MISSING_COLS.test(error.message) ? 'Run supabase-orders.sql in Supabase first' : 'Failed: ' + error.message)
@@ -620,7 +587,6 @@ export default function AdminPage() {
   const setFulfillment = (p: Row, v: FulStatus) => updateOrder(p, { fulfillment: v, fulfilled_at: new Date().toISOString() }, `Fulfillment: ${v.toUpperCase()}`)
   const setPackage = (p: Row, v: PackageId) => updateOrder(p, { package: v }, `Package: ${PACKAGES[v].label}`)
 
-  // "Deleted History" = deactivated (profile hidden, all data kept). Restore brings it back.
   async function setSelectedActive(active: boolean) {
     if (selectedList.length === 0) return
     setBusyAction(true)
@@ -665,7 +631,6 @@ export default function AdminPage() {
     showToast(`Exported ${rows.length} ${ordersView ? 'orders' : 'clients'}`)
   }
 
-  // ---------- password gate ----------
   if (!checked) return <div className="min-h-screen bg-[#050505]" />
 
   if (!isAuthed) {
@@ -699,13 +664,11 @@ export default function AdminPage() {
     )
   }
 
-  // ---------- admin panel ----------
   return (
     <div className="min-h-screen bg-[#050505] text-white p-4 md:p-8">
       <div className="max-w-[1400px] mx-auto">
         {view === 'orders' ? (
         <>
-          {/* ===== ORDERS & SALES MANAGEMENT ===== */}
           <div className="flex flex-wrap justify-between items-start gap-4 mb-6">
             <div>
               <h1 className="ac-title text-2xl md:text-[28px] font-bold">Orders &amp; Sales Management Dashboard</h1>
@@ -771,7 +734,6 @@ export default function AdminPage() {
             </div>
           </form>
 
-          {/* fulfillment filter: click a stage to see only those orders */}
           <div className="flex flex-wrap gap-2 mb-3" role="group" aria-label="Fulfillment filter">
             {(['all', ...FUL_OPTIONS] as const).map((f) => (
               <button key={f} onClick={() => setFulFilter(f)} className={`ac-chip ${fulFilter === f ? 'on' : ''}`}>
@@ -883,14 +845,28 @@ export default function AdminPage() {
                             <p className="text-[10px] text-[#A1A1A1] mt-1 whitespace-nowrap">{p.fulfilled_at ? `Updated ${formatDateTime(p.fulfilled_at)}` : pkgOf(p) === 'digital' ? 'No card to print' : 'Not started'}</p>
                           </td>
                           <td>
-                            <div className="flex gap-1.5 flex-wrap max-w-[250px]">
+                            <div className="flex gap-1.5 flex-wrap max-w-[280px]">
                               <button onClick={() => copyLink(p.username)} title="Copy link" aria-label="Copy link" className="ac-icon"><i className="fa-regular fa-copy" /></button>
                               <button onClick={() => window.open(`/${p.username}`, '_blank', 'noopener')} title="Open live profile" aria-label="Open live profile" className="ac-icon ac-icon-open"><i className="fa-solid fa-arrow-up-right-from-square" /></button>
                               <button onClick={() => handleEdit(p)} title="Edit client" aria-label="Edit client" className="ac-icon ac-icon-blue"><i className="fa-solid fa-pen" /></button>
                               <button onClick={() => handleDeleteConfirm(p)} title="Delete or deactivate client" aria-label="Delete client" className="ac-icon ac-icon-red"><i className="fa-solid fa-trash" /></button>
                               <button onClick={() => handleGenerateQR(p)} title="Generate QR" aria-label="Generate QR" className="ac-icon ac-icon-gold"><i className="fa-solid fa-qrcode" /></button>
+                              
+                              {p.receipt_url && (
+                                <button onClick={() => setReceiptModal({ isOpen: true, url: p.receipt_url!, username: p.username })} title="View Payment Receipt" aria-label="View Payment Receipt" className="ac-icon" style={{ color: '#fbbf24', borderColor: 'rgba(251, 191, 36, 0.3)' }}>
+                                  <i className="fa-solid fa-receipt" />
+                                </button>
+                              )}
+                              
                               <button onClick={() => { if (!openInvoice(p)) showToast('Allow pop-ups to open the invoice') }} title="Download PDF invoice" aria-label="Download PDF invoice" className="ac-icon"><i className="fa-solid fa-file-pdf" /></button>
                               <button onClick={() => sendLink(p)} title="Send link by email" aria-label="Send link by email" className="ac-icon"><i className="fa-solid fa-paper-plane" /></button>
+                              
+                              {p.payment_status === 'pending' && (
+                                <button onClick={() => updateOrder(p, { payment_status: 'paid', is_active: true, paid_at: new Date().toISOString() }, 'Approved & Activated')} className="ac-mini ac-mini-gold">
+                                  Approve
+                                </button>
+                              )}
+                              
                               {p.is_active === false ? (
                                 <button onClick={() => handleSetActive(p, true)} className="ac-mini ac-mini-gold">Restore</button>
                               ) : next && (
@@ -922,7 +898,6 @@ export default function AdminPage() {
           </div>
         </div>
 
-        {/* Stats Cards */}
         <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-6">
           <div className="bg-[#121214] border border-[#2A2A2A] rounded-2xl p-4">
             <p className="text-[11px] text-gray-400 uppercase tracking-widest">Total Clients</p>
@@ -1007,7 +982,6 @@ export default function AdminPage() {
           </div>
         </div>
 
-        {/* ===== REVIEWS SECTION - APPENDED FOR REVIEW SYSTEM - APPLE LUXURY ===== */}
         <div className="mt-12">
           <div className="flex flex-wrap justify-between items-center gap-3 mb-6">
             <div>
@@ -1089,7 +1063,6 @@ export default function AdminPage() {
         )}
       </div>
 
-      {/* ===== ADMIN EDIT MODAL ===== */}
       {editingProfile && (
         <div className="admin-edit-modal" onClick={() => setEditingProfile(null)} role="dialog" aria-modal="true" aria-label={`Edit ${editingProfile.username}`}>
           <div className="admin-edit-card" onClick={(e) => e.stopPropagation()}>
@@ -1127,7 +1100,6 @@ export default function AdminPage() {
         </div>
       )}
 
-      {/* ===== ADMIN DELETE / DEACTIVATE MODAL ===== */}
       {deleteConfirm && (
         <div className="admin-delete-modal" onClick={() => !busyAction && setDeleteConfirm(null)} role="dialog" aria-modal="true" aria-label={`Delete ${deleteConfirm.username}`}>
           <div className="admin-delete-card" onClick={(e) => e.stopPropagation()}>
@@ -1173,7 +1145,6 @@ export default function AdminPage() {
         </div>
       )}
 
-      {/* ===== ADMIN QR GENERATOR MODAL ===== */}
       {showQRModal && selectedProfile && (
         <div className="admin-qr-modal" onClick={closeQR} role="dialog" aria-modal="true" aria-label={`QR code for ${selectedProfile.username}`}>
           <div className="admin-qr-card" onClick={(e) => e.stopPropagation()}>
@@ -1218,6 +1189,37 @@ export default function AdminPage() {
             <div className="mt-4 pt-4 border-t border-[#1E1E20]">
               <p className="text-[11px] text-gray-500">Use this QR for:</p>
               <p className="text-[11px] text-gray-400 mt-1">• Printing on NFC cards • Stickers • Table tents • Client handout</p>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {receiptModal && (
+        <div className="admin-qr-modal" onClick={() => setReceiptModal(null)} role="dialog" aria-modal="true">
+          <div className="admin-qr-card" onClick={e => e.stopPropagation()} style={{ maxWidth: '650px', width: '100%' }}>
+            <div className="flex justify-between items-center mb-4">
+              <div>
+                <h3 className="text-white font-bold text-lg flex items-center gap-2"><i className="fa-solid fa-receipt text-[#D4AF37]"></i> Payment Receipt</h3>
+                <p className="text-[11px] text-[#A1A1A1]">Client: {receiptModal.username}</p>
+              </div>
+              <button onClick={() => setReceiptModal(null)} className="w-8 h-8 bg-[#1E1E20] rounded-full flex items-center justify-center text-gray-400 hover:text-white">✕</button>
+            </div>
+            
+            <div className="bg-white rounded-xl p-2 max-h-[60vh] overflow-auto flex justify-center border border-[#2A2A2A]">
+              <img src={receiptModal.url} alt="Payment Receipt" className="max-w-full h-auto object-contain" />
+            </div>
+            
+            <div className="mt-6 flex gap-3">
+              <button onClick={() => window.open(receiptModal.url, '_blank')} className="flex-1 py-3 rounded-xl bg-[#2A2A2A] text-white font-bold text-sm hover:bg-[#333]">
+                Open Full Image
+              </button>
+              <button onClick={() => {
+                const p = profiles.find(x => x.username === receiptModal.username)
+                if(p) updateOrder(p, { payment_status: 'paid', is_active: true, paid_at: new Date().toISOString() }, 'Payment Approved & Profile Activated!')
+                setReceiptModal(null)
+              }} className="flex-1 py-3 rounded-xl bg-[#E8C766] text-black font-bold text-sm hover:bg-[#D4AF37]">
+                Approve & Activate
+              </button>
             </div>
           </div>
         </div>

@@ -12,7 +12,6 @@ export default function TaplyTemplate({ profile }: { profile: any }) {
   const [isDragging, setIsDragging] = useState(false)
   const [dragStart, setDragStart] = useState({ x: 0, y: 0 })
   const [mounted, setMounted] = useState(false)
-  const [isDashboard, setIsDashboard] = useState(false)
   
   const accent = profile.accent_color || '#D4AF37'
   
@@ -20,9 +19,6 @@ export default function TaplyTemplate({ profile }: { profile: any }) {
     setMounted(true)
     const saved = localStorage.getItem('tapvinci-theme-mode')
     if (saved) setIsDark(saved === 'dark')
-    if (typeof window !== 'undefined') {
-      setIsDashboard(window.location.pathname.includes('dashboard'))
-    }
   }, [])
 
   const toggleMode = () => {
@@ -55,10 +51,6 @@ export default function TaplyTemplate({ profile }: { profile: any }) {
   if (isVisible('whatsapp')) socialButtons.push({ id: 'whatsapp', href: socials.whatsapp, icon: 'fa-whatsapp', label: 'WhatsApp' })
   if (isVisible('website')) socialButtons.push({ id: 'website', href: socials.website, icon: 'fa-globe', label: 'Website' })
   if (isVisible('twitter') || isVisible('x')) socialButtons.push({ id: 'twitter', href: socials.twitter || socials.x, icon: 'fa-x-twitter', label: 'X / Twitter' })
-
-  // PAYMENT DATA
-  const gcashQR = (profile as any).gcash_qr_url || (profile as any).gcash_qr || (isDashboard ? null : "/gallery/gcash-qr.jpg")
-  const mayaQR = (profile as any).maya_qr_url || (profile as any).maya_qr || (isDashboard ? null : "/gallery/maya-qr.jpg")
 
   const getTheme = () => {
     const t = profile.theme || 'gold'
@@ -297,44 +289,9 @@ END:VCARD`
               )}
               <button className="taply-action-btn small gold" onClick={saveContact}><span className="ico"><i className="fa-solid fa-address-card"></i></span><span className="lbl">Save Contact</span></button>
               
-              {/* PAYMENT ANCHOR BUTTON */}
-              {(socialsVisible.gcash_qr !== false || socialsVisible.maya_qr !== false) && (gcashQR || mayaQR) && (
-                <a href="#payment-section" className="taply-action-btn small gold payment-btn" style={{ background: '#E8C766', textDecoration: 'none' }}>
-                  <span className="ico"><i className="fa-solid fa-qrcode"></i></span><span className="lbl">Payment</span>
-                </a>
-              )}
-
               <button className="taply-action-btn small gold" onClick={()=>{if(typeof window!=='undefined'){navigator.clipboard.writeText(window.location.href).then(()=>alert('Link copied!'))}}}><span className="ico"><i className="fa-solid fa-share-nodes"></i></span><span className="lbl">Share My Card</span></button>
             </div>
           </section>
-
-          {/* NEW INLINE PAYMENT SECTION - Moved outside of Quick Actions */}
-          {(socialsVisible.gcash_qr !== false || socialsVisible.maya_qr !== false) && (gcashQR || mayaQR) && (
-            <section id="payment-section" className="taply-section" style={{ scrollMarginTop: '20px' }}>
-              <h2><i className="fa-solid fa-wallet"></i> Payment Options</h2>
-              <p style={{ marginBottom: '16px', fontSize: '11px', color: '#A1A1A1' }}>Scan to pay via GCash or Maya</p>
-              
-              <div style={{ display: 'flex', gap: '16px', justifyContent: 'center', flexWrap: 'wrap' }}>
-                {socialsVisible.gcash_qr !== false && gcashQR && (
-                  <div style={{ background: '#121214', padding: '12px', borderRadius: '16px', border: '1px solid #27272a', textAlign: 'center', flex: '1 1 120px', maxWidth: '160px' }}>
-                    <div style={{ background: 'white', padding: '8px', borderRadius: '8px', marginBottom: '8px' }}>
-                      <img src={gcashQR} alt="GCash QR" style={{ width: '100%', height: 'auto', display: 'block', borderRadius: '4px' }} />
-                    </div>
-                    <p style={{ color: '#007DFE', fontSize: '12px', fontWeight: 'bold', margin: 0 }}>GCash</p>
-                  </div>
-                )}
-
-                {socialsVisible.maya_qr !== false && mayaQR && (
-                  <div style={{ background: '#121214', padding: '12px', borderRadius: '16px', border: '1px solid #27272a', textAlign: 'center', flex: '1 1 120px', maxWidth: '160px' }}>
-                    <div style={{ background: 'white', padding: '8px', borderRadius: '8px', marginBottom: '8px' }}>
-                      <img src={mayaQR} alt="Maya QR" style={{ width: '100%', height: 'auto', display: 'block', borderRadius: '4px' }} />
-                    </div>
-                    <p style={{ color: '#00D632', fontSize: '12px', fontWeight: 'bold', margin: 0 }}>Maya</p>
-                  </div>
-                )}
-              </div>
-            </section>
-          )}
 
           <section className="taply-contact">
             <h2><i className="fa-solid fa-address-book"></i> Contact</h2>

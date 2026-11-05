@@ -3,6 +3,7 @@ import { useState, useEffect, useRef } from 'react'
 import TaplyTemplate from '../../components/TaplyTemplate'
 import { supabase } from '../../lib/supabase'
 import HamburgerMenu from "@/components/HamburgerMenu"
+import PaymentModal from '../../components/PaymentModal'
 
 const DEFAULT_SOCIALS = {
   facebook: 'https://facebook.com/',
@@ -54,12 +55,10 @@ const THEMES = [
   { id: 'orange', name: 'Sunrise Orange', hex: '#f97316', desc: 'Energetic' },
 ]
 
-// ---- Permanent image storage: Supabase Storage bucket "profile-images" ----
 const BUCKET = 'profile-images'
-const MAX_INPUT_BYTES = 20 * 1024 * 1024 // refuse absurdly large originals; stored files end up well under 1 MB
+const MAX_INPUT_BYTES = 20 * 1024 * 1024
 
 type UploadKind = 'hero' | 'gallery' | 'gcash' | 'maya'
-// Gallery: 800px / 70% webp. Profile photo a bit larger; payment QRs kept sharp so they still scan.
 const UPLOAD_OPTS: Record<UploadKind, { maxWidth: number; quality: number }> = {
   hero: { maxWidth: 1000, quality: 0.8 },
   gallery: { maxWidth: 800, quality: 0.7 },
@@ -142,16 +141,15 @@ export default function Dashboard() {
   const [showLive, setShowLive] = useState(false)
   const sliderWrapperRef = useRef<HTMLDivElement>(null)
   const editPanelRef = useRef<HTMLDivElement>(null)
-  // After-save UX
-  const [showSuccessModal, setShowSuccessModal] = useState(false)
-  const [liveUrl, setLiveUrl] = useState('')
+  
+  const [isPaymentModalOpen, setIsPaymentModalOpen] = useState(false)
+  const [showPendingModal, setShowPendingModal] = useState(false) // Changed from Success to Pending
+
   const [toast, setToast] = useState('')
   const toastTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
   const livePreviewRef = useRef<HTMLDivElement>(null)
   const editTopRef = useRef<HTMLDivElement>(null)
 
-  // FIX VOID: wrapper height follows the ACTIVE panel only, not the taller of the two.
-  // A ResizeObserver keeps it in sync when images load or the preview re-renders.
   useEffect(() => {
     const wrapper = sliderWrapperRef.current
     const activeEl = showLive ? livePreviewRef.current : editPanelRef.current
@@ -173,34 +171,24 @@ export default function Dashboard() {
     }
   }, [showLive, profile])
 
-
-  const scrollToLivePreview = () => {
-    document.getElementById('live-preview-section')?.scrollIntoView({ behavior: 'smooth', block: 'start' })
-  }
-  const scrollToEditTop = () => {
-    editTopRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' })
-  }
-
   const showToast = (msg: string) => {
     setToast(msg)
     if (toastTimer.current) clearTimeout(toastTimer.current)
-    toastTimer.current = setTimeout(() => setToast(''), 2200)
+    toastTimer.current = setTimeout(() => setToast(''), 3000)
   }
 
-  // Close the success modal with Esc
   useEffect(() => {
-    if (!showSuccessModal) return
-    const onKey = (e: KeyboardEvent) => { if (e.key === 'Escape') setShowSuccessModal(false) }
+    if (!showPendingModal) return
+    const onKey = (e: KeyboardEvent) => { if (e.key === 'Escape') setShowPendingModal(false) }
     window.addEventListener('keydown', onKey)
     return () => window.removeEventListener('keydown', onKey)
-  }, [showSuccessModal])
+  }, [showPendingModal])
 
   useEffect(() => {
     const load = async () => {
-      // /dashboard?edit=username (used by the Admin panel) loads that client; usernames are stored lowercase
       const editParam = (new URLSearchParams(window.location.search).get('edit') || '').trim().toLowerCase()
       const DEFAULT_USERNAME = (editParam || process.env.NEXT_PUBLIC_DEFAULT_USERNAME || 'TapVinci').toLowerCase()
-const { data } = await supabase.from('profiles').select('*').eq('username', DEFAULT_USERNAME).single()
+      const { data } = await supabase.from('profiles').select('*').eq('username', DEFAULT_USERNAME).single()
       if (data) {
         const mergedSocials = { ...DEFAULT_SOCIALS, ...(data.socials || {}) }
         const mergedVisible = { ...DEFAULT_VISIBLE, ...(data.socials_visible || {}) }
@@ -232,12 +220,11 @@ const { data } = await supabase.from('profiles').select('*').eq('username', DEFA
         : `${username}/payment/${kind}-qr.webp`
       const { error } = await supabase.storage.from(BUCKET).upload(path, compressed, {
         cacheControl: '3600',
-        upsert: isQR, // QR keeps one fixed file name per client, so replacing it overwrites
+        upsert: isQR,
         contentType: 'image/webp'
       })
       if (error) throw error
       const url = supabase.storage.from(BUCKET).getPublicUrl(path).data.publicUrl
-      // fixed file name -> add a version so browsers/CDN do not show the old QR
       return isQR ? `${url}?v=${stamp}` : url
     } catch (err) {
       alert('Upload failed: ' + ((err as Error)?.message || 'unknown error') + '\nMake sure you ran the profile-images SQL in Supabase.')
@@ -303,61 +290,54 @@ const { data } = await supabase.from('profiles').select('*').eq('username', DEFA
     setProfile((p:any) => ({ ...p, socials: { ...p.socials, [key]: '' } }))
   }
 
-  // Public site base URL. Set NEXT_PUBLIC_SITE_URL in Vercel (e.g. https://tapvinci.vercel.app) to change it.
   const SITE_URL = (process.env.NEXT_PUBLIC_SITE_URL || 'https://tapvinci.vercel.app').replace(/\/+$/, '')
 
-  const copyLink = async (url: string) => {
-    try {
-      await navigator.clipboard.writeText(url)
-      showToast('Link copied!')
-    } catch {
-      showToast('Copy failed - select the link and copy it manually')
+  const handleSaveClick = () => {
+    if (!profile.username.trim() || !profile.name.trim()) {
+      showToast('Username and Name are required.')
+      return
     }
+    setIsPaymentModalOpen(true)
   }
 
-  // 500x500 PNG of the live link. Uses the free qrserver.com API (no npm package needed).
-  const downloadQR = async (url: string) => {
-    const qrApiUrl = `https://api.qrserver.com/v1/create-qr-code/?size=500x500&margin=10&format=png&data=${encodeURIComponent(url)}`
-    try {
-      const res = await fetch(qrApiUrl)
-      if (!res.ok) throw new Error('QR request failed')
-      const blob = await res.blob()
-      const a = document.createElement('a')
-      const objectUrl = URL.createObjectURL(blob)
-      a.href = objectUrl
-      a.download = `${profile.username.toLowerCase()}-tapvinci-qr.png`
-      document.body.appendChild(a)
-      a.click()
-      a.remove()
-      URL.revokeObjectURL(objectUrl)
-      showToast('QR downloaded')
-    } catch {
-      // Fallback: open the image so it can be saved manually
-      window.open(qrApiUrl, '_blank', 'noopener')
-      showToast('Opened QR in a new tab - right-click to save')
-    }
-  }
-
-  const save = async () => {
+  // UPDATED: Actually uploads the receipt and saves profile as PENDING
+  const handleConfirmPayment = async (receiptFile: File) => {
     setSaving(true)
     const fixedUsername = profile.username.trim().toLowerCase()
     const { id, created_at, ...rest } = profile
-    const fixed = { ...rest, username: fixedUsername }
-    // new client or returning client? decides the email subject
-    let isNewProfile = true
+    
     try {
-      const { data: existing } = await supabase.from('profiles').select('username').eq('username', fixed.username).maybeSingle()
-      isNewProfile = !existing
-    } catch {}
-    const { error } = await supabase.from('profiles').upsert(fixed, { onConflict: 'username' }).select()
-    setSaving(false)
-    if (error) {
-      showToast('Failed to save: ' + error.message)
-    } else {
-      const url = `${SITE_URL}/${encodeURIComponent(fixed.username)}`
-      setLiveUrl(url)
-      setShowSuccessModal(true)
-      // Email the admin (fire-and-forget: the modal never waits for it, and a failure never blocks saving)
+      // 1. Upload the receipt image to Supabase Storage
+      const fileExt = receiptFile.name.split('.').pop()
+      const path = `${fixedUsername}/receipts/receipt-${Date.now()}.${fileExt}`
+      const { error: uploadError } = await supabase.storage.from(BUCKET).upload(path, receiptFile)
+      if (uploadError) throw new Error('Receipt upload failed: ' + uploadError.message)
+      
+      const receiptUrl = supabase.storage.from(BUCKET).getPublicUrl(path).data.publicUrl
+
+      // 2. Save profile to database as INACTIVE
+      const fixed = { 
+        ...rest, 
+        username: fixedUsername,
+        receipt_url: receiptUrl,       // Store the receipt so you can view it!
+        payment_status: 'pending',     // Mark as pending
+        is_active: false               // HIDE from public until you approve!
+      }
+      
+      let isNewProfile = true
+      try {
+        const { data: existing } = await supabase.from('profiles').select('username').eq('username', fixed.username).maybeSingle()
+        isNewProfile = !existing
+      } catch {}
+      
+      const { error: dbError } = await supabase.from('profiles').upsert(fixed, { onConflict: 'username' }).select()
+      if (dbError) throw new Error('Database save failed: ' + dbError.message)
+
+      // 3. Success! Close payment modal, show Pending Modal
+      setIsPaymentModalOpen(false)
+      setShowPendingModal(true)
+      
+      // 4. Notify Admin (Email)
       try {
         fetch('/api/send-notification', {
           method: 'POST',
@@ -366,6 +346,12 @@ const { data } = await supabase.from('profiles').select('*').eq('username', DEFA
           keepalive: true,
         }).catch(() => {})
       } catch {}
+
+    } catch (err: any) {
+      // Let the modal handle the error message
+      throw new Error(err.message || 'Failed to process payment proof.')
+    } finally {
+      setSaving(false)
     }
   }
 
@@ -374,13 +360,20 @@ const { data } = await supabase.from('profiles').select('*').eq('username', DEFA
   return (
     <>
       <HamburgerMenu />
+      
+      <PaymentModal 
+        isOpen={isPaymentModalOpen}
+        onClose={() => setIsPaymentModalOpen(false)}
+        onConfirm={handleConfirmPayment}
+        gcashQR={profile.gcash_qr_url}
+        mayaQR={profile.maya_qr_url}
+      />
+
       <style jsx global>{`
-        /* DASHBOARD ONLY - NO VOID FIX - Does not touch globals.css file, scoped to dashboard */
         .dashboard-slider-wrapper { overflow:hidden !important; display:block !important; }
         .dashboard-slider { height:auto !important; min-height:auto !important; align-items:flex-start !important; }
         .edit-panel { height:auto !important; min-height:auto !important; padding-bottom:24px !important; margin-bottom:0 !important; }
         .live-panel { height:auto !important; min-height:auto !important; padding-bottom:0 !important; margin-bottom:0 !important; }
-        /* Floating buttons sit BELOW the hamburger overlay (z 40) and fade out while the menu is open */
         .floating-toggle-btn { transition: opacity .3s ease, transform .3s ease; }
         body:has(.menu-panel.open) .floating-toggle-btn { opacity:0 !important; transform:translateY(16px) !important; pointer-events:none !important; }
         .live-panel .taply-gold-wrapper { min-height:auto !important; height:auto !important; min-height:0 !important; padding-bottom:0 !important; }
@@ -402,10 +395,7 @@ const { data } = await supabase.from('profiles').select('*').eq('username', DEFA
             <h1 className="text-xl font-bold">Edit Profile</h1>
           </div>
           
-          {/* 1. USERNAME */}
           <label className="block text-[11px] tracking-widest text-zinc-400 uppercase">Username<input value={profile.username} onChange={e => setProfile({...profile, username: e.target.value.toLowerCase()})} className={inputCls} /></label>
-
-          {/* 2. NAME */}
           <label className="block text-[11px] tracking-widest text-zinc-400 uppercase">Name<input value={profile.name} onChange={e => setProfile({...profile, name: e.target.value})} className={inputCls} /></label>
           
           {/* 3. PROFILE PHOTO */}
@@ -439,7 +429,7 @@ const { data } = await supabase.from('profiles').select('*').eq('username', DEFA
             <p className="text-[9px] text-zinc-500">/hero.png (Upload your profile)</p>
           </div>
 
-          {/* 3.5 THEME - After Profile Photo, Before Title per previous requirement */}
+          {/* 3.5 THEME */}
           <div className="space-y-3 border-t border-zinc-800 pt-4">
             <p className="text-[11px] uppercase tracking-widest text-[#D4AF37] font-bold">Themes</p>
             <div className="grid grid-cols-2 gap-2">
@@ -452,7 +442,7 @@ const { data } = await supabase.from('profiles').select('*').eq('username', DEFA
             </div>
           </div>
 
-          {/* 4. TITLE, BIO, ABOUT ME - Grouped like Hero + About */}
+          {/* 4. HERO CONTENT */}
           <div className="space-y-3 border-t border-zinc-800 pt-4">
             <p className="text-[11px] uppercase tracking-widest text-[#D4AF37] font-bold">Hero</p>
             <label className="block text-[11px] tracking-widest text-zinc-400 uppercase">Title<input value={profile.title} onChange={e => setProfile({...profile, title: e.target.value})} className={inputCls} placeholder="WEB DEVELOPER | TAPVINCI FOUNDER..." /></label>
@@ -488,7 +478,7 @@ const { data } = await supabase.from('profiles').select('*').eq('username', DEFA
             )}
           </div>
 
-          {/* 6. SOCIALS - Facebook, Instagram, TikTok, Messenger, LinkedIn, YouTube, WhatsApp, Website with Show/Hide */}
+          {/* 6. SOCIALS */}
           <div className="space-y-3 border-t border-zinc-800 pt-4">
             <div className="flex items-center justify-between">
               <p className="text-[11px] uppercase tracking-widest text-[#D4AF37] font-bold">Social Links</p>
@@ -533,7 +523,7 @@ const { data } = await supabase.from('profiles').select('*').eq('username', DEFA
             })}
           </div>
 
-          {/* 7. QUICK ACTIONS + CONTACT INFO - Phone, Email, Address, Google Maps with Show/Hide */}
+          {/* 7. QUICK ACTIONS & CONTACT */}
           <div className="space-y-3 border-t border-zinc-800 pt-4">
             <p className="text-[11px] uppercase tracking-widest text-[#D4AF37] font-bold">Quick Actions & Contact Info</p>
             <p className="text-[11px] text-zinc-500">Controls Quick Actions row + Contact section. Matches Live Preview order.</p>
@@ -558,24 +548,22 @@ const { data } = await supabase.from('profiles').select('*').eq('username', DEFA
             </div>
           </div>
 
-          {/* 8. PAYMENT QR CODES - DESIRED: 2 drop zones */}
+          {/* 8. PAYMENT QR CODES */}
           <div className="space-y-4 border-t border-zinc-800 pt-6">
             <div>
               <div className="flex items-center justify-between">
                 <p className="text-[10px] uppercase tracking-[1px] text-[#9CA3AF] font-bold flex items-center gap-2">
-                  <i className="fa-solid fa-qrcode text-[#D4AF37]"></i> Payment QR Codes
+                  <i className="fa-solid fa-qrcode text-[#D4AF37]"></i> Payment QR Codes (For YOUR Customers)
                 </p>
-                <span className="text-[10px] bg-zinc-800 px-2 py-1 rounded-full">{(profile.socials_visible.gcash_qr !== false ? 1 : 0) + (profile.socials_visible.maya_qr !== false ? 1 : 0)} visible</span>
               </div>
-              <p className="text-[11px] text-zinc-500 mt-1">👁 Show = visible, 🙈 Hide = hidden but saved</p>
+              <p className="text-[11px] text-zinc-500 mt-1">Upload YOUR GCash/Maya QR so your customers can pay you.</p>
             </div>
 
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               {/* GCASH */}
               <div className="space-y-2">
                 <div className="flex items-center justify-between">
-                  <p className="text-[11px] uppercase tracking-widest text-zinc-400 font-bold">GCash QR {profile.socials_visible.gcash_qr !== false ? <span className="text-[9px] bg-green-500/20 px-1.5 py-0.5 rounded text-green-300 ml-2">VISIBLE</span> : <span className="text-[9px] bg-red-500/20 px-1.5 py-0.5 rounded text-red-300 ml-2">HIDDEN</span>}</p>
-                  <button onClick={() => toggleVisibility('gcash_qr')} className={`px-3 py-1 rounded-full text-[11px] font-bold flex items-center gap-1.5 ${profile.socials_visible.gcash_qr !== false ? 'bg-green-500/20 text-green-300 border border-green-500/30' : 'bg-red-500/20 text-red-300 border border-red-500/30'}`}><i className={`fa-solid ${profile.socials_visible.gcash_qr !== false ? 'fa-eye' : 'fa-eye-slash'}`}></i>{profile.socials_visible.gcash_qr !== false ? 'Show' : 'Hide'}</button>
+                  <p className="text-[11px] uppercase tracking-widest text-zinc-400 font-bold">GCash QR</p>
                 </div>
                 <div
                   onDragOver={(e) => { e.preventDefault(); setDragOverGcash(true) }}
@@ -595,17 +583,14 @@ const { data } = await supabase.from('profiles').select('*').eq('username', DEFA
                       <div className="w-8 h-8 rounded-full bg-[#2A2A2A] flex items-center justify-center mb-2"><i className="fa-solid fa-qrcode text-zinc-400 text-[12px]"></i></div>
                     )}
                     <p className="text-[13px] font-semibold text-white mt-2">{gcashUploading ? 'Uploading...' : 'Drop GCash QR here'}</p>
-                    <p className="text-[11px] text-[#8a8a8e] mt-1">GCash QR will show in Payment modal</p>
                   </div>
                 </div>
-                <p className="text-[11px] text-zinc-500">/gcash-qr.png (Upload your GCash QR)</p>
               </div>
 
               {/* MAYA */}
               <div className="space-y-2">
                 <div className="flex items-center justify-between">
-                  <p className="text-[11px] uppercase tracking-widest text-zinc-400 font-bold">Maya QR {profile.socials_visible.maya_qr !== false ? <span className="text-[9px] bg-green-500/20 px-1.5 py-0.5 rounded text-green-300 ml-2">VISIBLE</span> : <span className="text-[9px] bg-red-500/20 px-1.5 py-0.5 rounded text-red-300 ml-2">HIDDEN</span>}</p>
-                  <button onClick={() => toggleVisibility('maya_qr')} className={`px-3 py-1 rounded-full text-[11px] font-bold flex items-center gap-1.5 ${profile.socials_visible.maya_qr !== false ? 'bg-green-500/20 text-green-300 border border-green-500/30' : 'bg-red-500/20 text-red-300 border border-red-500/30'}`}><i className={`fa-solid ${profile.socials_visible.maya_qr !== false ? 'fa-eye' : 'fa-eye-slash'}`}></i>{profile.socials_visible.maya_qr !== false ? 'Show' : 'Hide'}</button>
+                  <p className="text-[11px] uppercase tracking-widest text-zinc-400 font-bold">Maya QR</p>
                 </div>
                 <div
                   onDragOver={(e) => { e.preventDefault(); setDragOverMaya(true) }}
@@ -625,14 +610,15 @@ const { data } = await supabase.from('profiles').select('*').eq('username', DEFA
                       <div className="w-8 h-8 rounded-full bg-[#2A2A2A] flex items-center justify-center mb-2"><i className="fa-solid fa-qrcode text-zinc-400 text-[12px]"></i></div>
                     )}
                     <p className="text-[13px] font-semibold text-white mt-2">{mayaUploading ? 'Uploading...' : 'Drop Maya QR here'}</p>
-                    <p className="text-[11px] text-[#8a8a8e] mt-1">Maya QR will show when swiped</p>
                   </div>
                 </div>
-                <p className="text-[11px] text-zinc-500">/maya-qr.png (Upload your Maya QR)</p>
               </div>
             </div>
           </div>
-          <button onClick={save} disabled={saving || heroUploading || galleryUploading || gcashUploading || mayaUploading} className="w-full py-3 rounded-xl font-bold hover:brightness-110 disabled:opacity-50" style={{background: profile.accent_color, color: 'black'}}>{saving ? 'Saving...' : 'Save Profile'}</button>
+          
+          <button onClick={handleSaveClick} disabled={saving || heroUploading || galleryUploading || gcashUploading || mayaUploading} className="w-full py-3 rounded-xl font-bold hover:brightness-110 disabled:opacity-50" style={{background: profile.accent_color, color: 'black'}}>
+            {saving ? 'Processing...' : 'Save Profile & Activate'}
+          </button>
         </div>
               </div>
             </div>
@@ -647,17 +633,34 @@ const { data } = await supabase.from('profiles').select('*').eq('username', DEFA
         </div>
       </div>
 
-      {showSuccessModal && (
-        <div className="success-modal-overlay" onClick={() => setShowSuccessModal(false)} role="dialog" aria-modal="true" aria-label="Profile saved">
+      {/* CHANGED: Pending Verification Modal (Not Success) */}
+      {showPendingModal && (
+        <div className="success-modal-overlay" onClick={() => setShowPendingModal(false)} role="dialog" aria-modal="true" aria-label="Pending Verification">
           <div className="success-modal" onClick={e => e.stopPropagation()}>
-            <div className="success-check">✓</div>
-            <h3 className="success-title">Profile Saved!</h3>
-            <p className="success-sub">Your TapVinci is now live</p>
-            <div className="live-url-box"><span className="live-url-text">{liveUrl}</span><button onClick={() => copyLink(liveUrl)} className="live-url-copy">Copy</button></div>
-            <div className="mt-4 grid grid-cols-1 gap-3"><a href={liveUrl} target="_blank" rel="noopener noreferrer" className="success-primary-btn">View My Live Profile → /{profile.username.toLowerCase()}</a><div className="grid grid-cols-2 gap-3"><button onClick={() => copyLink(liveUrl)} className="success-secondary-btn">Copy Link</button><button onClick={() => downloadQR(liveUrl)} className="success-secondary-btn">Download QR of my link</button></div></div>
-            <div className="success-qr-box"><img src={`https://api.qrserver.com/v1/create-qr-code/?size=320x320&margin=0&format=png&data=${encodeURIComponent(liveUrl)}`} alt="QR code" width={136} height={136} /></div>
-            <p className="success-hint">Scan to view profile • Print this QR on your NFC card</p>
-            <button onClick={() => setShowSuccessModal(false)} className="success-close">Close</button>
+            
+            {/* Changed icon to a clock for "pending" */}
+            <div className="success-check" style={{ background: '#D4AF37', color: '#000' }}>
+              <i className="fa-regular fa-clock"></i>
+            </div>
+            
+            <h3 className="success-title">Proof Submitted!</h3>
+            <p className="success-sub text-[#A1A1A1]">
+              Your payment is pending admin verification. <br/>
+              We will review your receipt shortly and activate your link.
+            </p>
+            
+            <div className="mt-6 p-4 bg-[#0A0A0A] border border-[#1E1E1E] rounded-xl">
+              <p className="text-[11px] uppercase tracking-widest text-[#D4AF37] mb-2">What happens next?</p>
+              <ul className="text-left text-[12px] text-gray-400 space-y-2">
+                <li className="flex items-start gap-2"><i className="fa-solid fa-check text-green-500 mt-1"></i> We check your receipt against our GCash/Maya records.</li>
+                <li className="flex items-start gap-2"><i className="fa-solid fa-check text-green-500 mt-1"></i> Once verified, your link /{profile.username.toLowerCase()} goes live.</li>
+                <li className="flex items-start gap-2"><i className="fa-solid fa-envelope text-blue-400 mt-1"></i> You will receive an email confirmation.</li>
+              </ul>
+            </div>
+
+            <button onClick={() => setShowPendingModal(false)} className="success-primary-btn mt-6">
+              Got it, I'll wait
+            </button>
           </div>
         </div>
       )}
