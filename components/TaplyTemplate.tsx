@@ -1,5 +1,6 @@
 'use client'
 import { useState, useRef, useEffect } from 'react'
+import { createPortal } from 'react-dom' // <-- NEW IMPORT FOR THE FIX
 
 export default function TaplyTemplate({ profile }: { profile: any }) {
   const reelRef = useRef<HTMLDivElement>(null)
@@ -145,6 +146,15 @@ export default function TaplyTemplate({ profile }: { profile: any }) {
     setPan({ x: 0, y: 0 })
     document.body.style.overflow = ''
   }
+
+  // NEW: ESC key closes the lightbox
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape' && lightboxOpen) closeLightbox()
+    }
+    window.addEventListener('keydown', handleKeyDown)
+    return () => window.removeEventListener('keydown', handleKeyDown)
+  }, [lightboxOpen])
 
   const nextImage = () => {
     setLightboxIndex((prev) => (prev + 1) % gallery.length)
@@ -365,7 +375,7 @@ END:VCARD`
       </div>
     </div>
 
-    {/* RESTORED TABBED PAYMENT MODAL */}
+    {/* PAYMENT MODAL */}
     {showPaymentModal && (gcashQR || mayaQR) && (
       <div className="fixed inset-0 z-[9999] bg-black/80 backdrop-blur-sm flex items-center justify-center p-4 animate-in fade-in duration-200" onClick={() => setShowPaymentModal(false)}>
         <div className="bg-[#121214] border border-[#2A2A2A] rounded-3xl w-full max-w-[340px] relative shadow-[0_0_80px_rgba(0,0,0,0.8)] overflow-hidden" onClick={e => e.stopPropagation()}>
@@ -376,7 +386,6 @@ END:VCARD`
             <button onClick={() => setShowPaymentModal(false)} className="absolute top-6 right-6 w-8 h-8 rounded-full bg-[#1E1E20] text-gray-400 hover:text-white flex items-center justify-center transition-colors">✕</button>
           </div>
 
-          {/* TABS */}
           <div className="px-6 mb-4">
             <div className="flex bg-[#050505] p-1 rounded-xl border border-[#1E1E1E]">
               {gcashQR && (
@@ -398,7 +407,6 @@ END:VCARD`
             </div>
           </div>
 
-          {/* CONTENT */}
           <div className="px-6 pb-6">
             <div className="flex items-center justify-between mb-3">
               <p className={`text-[11px] font-bold uppercase tracking-wider ${activeTab === 'gcash' ? 'text-[#007DFE]' : 'text-[#00D632]'}`}>
@@ -421,7 +429,6 @@ END:VCARD`
               Open your {activeTab === 'gcash' ? 'GCash' : 'Maya'} app, scan this code,<br/>and enter the amount to pay.
             </p>
 
-            {/* ACTIONS */}
             <div className="flex gap-3">
               <button 
                 onClick={() => handleSaveQR(activeTab === 'gcash' ? gcashQR : mayaQR, activeTab === 'gcash' ? 'GCash' : 'Maya')} 
@@ -441,7 +448,8 @@ END:VCARD`
       </div>
     )}
 
-    {lightboxOpen && gallery[lightboxIndex] && (
+    {/* LIGHTBOX WITH REACT PORTAL FIX */}
+    {lightboxOpen && gallery[lightboxIndex] && mounted && createPortal(
       <div 
         style={{ position: 'fixed', inset: 0, zIndex: 99999, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center' }}
         className="bg-[#050505]/95 backdrop-blur-[16px] p-4"
@@ -513,7 +521,8 @@ END:VCARD`
             ))}
           </div>
         )}
-      </div>
+      </div>,
+      document.body // <-- MAGIC HAPPENS HERE: RENDERS OUTSIDE THE TRANSFORMED DASHBOARD
     )}
     </>
   )
