@@ -137,13 +137,9 @@ const payOf = (p: Row): PayStatus => (p.payment_status === 'pending' || p.paymen
 const fulOf = (p: Row): FulStatus => (FUL_OPTIONS as readonly string[]).includes(p.fulfillment as string) ? (p.fulfillment as FulStatus) : 'pending'
 const amountOf = (p: Row) => PACKAGES[pkgOf(p)].price
 
-const DEMO_USERNAMES = ['shua', 'tapvinci', 'robert']
-const PROTECTED_USERNAMES = ['shua', 'tapvinci']
-const DEMO_EMAILS = ['tapvinci@yahoo.com', 'shuarmav@gmail.com']
-const isDemo = (p: Row) =>
-  p.is_demo === true ||
-  DEMO_USERNAMES.includes((p.username || '').toString().toLowerCase()) ||
-  DEMO_EMAILS.includes((p.email || '').toString().trim().toLowerCase())
+const PROTECTED_USERNAMES = ['shua', 'tapvinci', 'shuashushu']
+// ONLY checks the database column now!
+const isDemo = (p: Row) => p.is_demo === true
 type DemoFilter = 'all' | 'real' | 'demo'
 const DEMO_BADGE_STYLE = { background: 'rgba(255,194,28,0.2)', color: '#FFC21C' } as const
 const DEMO_PAY_STYLE = { background: '#1E1E1E', color: '#A1A1A1', borderColor: '#2A2A2A' } as const
@@ -583,6 +579,7 @@ export default function AdminPage() {
     setProfiles((list) => list.map((r) => (r.username === profile.username ? { ...r, ...(data[0] as Row) } : r)))
     if (okMsg) showToast(okMsg)
   }
+  
   const setPayment = (p: Row, v: PayStatus) => updateOrder(p, { payment_status: v, paid_at: v === 'paid' ? new Date().toISOString() : null }, `Payment: ${v.toUpperCase()}`)
   const setFulfillment = (p: Row, v: FulStatus) => updateOrder(p, { fulfillment: v, fulfilled_at: new Date().toISOString() }, `Fulfillment: ${v.toUpperCase()}`)
   const setPackage = (p: Row, v: PackageId) => updateOrder(p, { package: v }, `Package: ${PACKAGES[v].label}`)
@@ -629,6 +626,19 @@ export default function AdminPage() {
     a.remove()
     URL.revokeObjectURL(url)
     showToast(`Exported ${rows.length} ${ordersView ? 'orders' : 'clients'}`)
+  }
+
+  async function handleApprove(p: Row) {
+    await updateOrder(p, { payment_status: 'paid', is_active: true, paid_at: new Date().toISOString() }, 'Approved & Activated')
+    
+    try {
+      fetch('/api/send-approval-email', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ username: p.username }),
+        keepalive: true,
+      }).catch(() => {})
+    } catch {}
   }
 
   if (!checked) return <div className="min-h-screen bg-[#050505]" />
@@ -862,7 +872,7 @@ export default function AdminPage() {
                               <button onClick={() => sendLink(p)} title="Send link by email" aria-label="Send link by email" className="ac-icon"><i className="fa-solid fa-paper-plane" /></button>
                               
                               {p.payment_status === 'pending' && (
-                                <button onClick={() => updateOrder(p, { payment_status: 'paid', is_active: true, paid_at: new Date().toISOString() }, 'Approved & Activated')} className="ac-mini ac-mini-gold">
+                                <button onClick={() => handleApprove(p)} className="ac-mini ac-mini-gold">
                                   Approve
                                 </button>
                               )}
@@ -1215,7 +1225,7 @@ export default function AdminPage() {
               </button>
               <button onClick={() => {
                 const p = profiles.find(x => x.username === receiptModal.username)
-                if(p) updateOrder(p, { payment_status: 'paid', is_active: true, paid_at: new Date().toISOString() }, 'Payment Approved & Profile Activated!')
+                if(p) handleApprove(p)
                 setReceiptModal(null)
               }} className="flex-1 py-3 rounded-xl bg-[#E8C766] text-black font-bold text-sm hover:bg-[#D4AF37]">
                 Approve & Activate

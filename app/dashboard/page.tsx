@@ -143,7 +143,11 @@ export default function Dashboard() {
   const editPanelRef = useRef<HTMLDivElement>(null)
   
   const [isPaymentModalOpen, setIsPaymentModalOpen] = useState(false)
-  const [showPendingModal, setShowPendingModal] = useState(false) // Changed from Success to Pending
+  const [showPendingModal, setShowPendingModal] = useState(false) 
+  
+  // Demo Code State
+  const [demoCode, setDemoCode] = useState('')
+  const [showDemoCode, setShowDemoCode] = useState(false)
 
   const [toast, setToast] = useState('')
   const toastTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
@@ -151,6 +155,10 @@ export default function Dashboard() {
   const editTopRef = useRef<HTMLDivElement>(null)
 
   useEffect(() => {
+    // Check if we should show the hidden demo code field
+    const params = new URLSearchParams(window.location.search)
+    if (params.get('admin') === 'true') setShowDemoCode(true)
+
     const wrapper = sliderWrapperRef.current
     const activeEl = showLive ? livePreviewRef.current : editPanelRef.current
     if (!wrapper || !activeEl) return
@@ -300,7 +308,6 @@ export default function Dashboard() {
     setIsPaymentModalOpen(true)
   }
 
-  // UPDATED: Actually uploads the receipt and saves profile as PENDING
   const handleConfirmPayment = async (receiptFile: File) => {
     setSaving(true)
     const fixedUsername = profile.username.trim().toLowerCase()
@@ -315,13 +322,17 @@ export default function Dashboard() {
       
       const receiptUrl = supabase.storage.from(BUCKET).getPublicUrl(path).data.publicUrl
 
+      // Check if the secret code matches
+      const isDemoAccount = demoCode.trim() === process.env.NEXT_PUBLIC_DEMO_SECRET_CODE
+
       // 2. Save profile to database as INACTIVE
       const fixed = { 
         ...rest, 
         username: fixedUsername,
-        receipt_url: receiptUrl,       // Store the receipt so you can view it!
-        payment_status: 'pending',     // Mark as pending
-        is_active: false               // HIDE from public until you approve!
+        receipt_url: receiptUrl,       
+        payment_status: 'pending',     
+        is_active: false,
+        is_demo: isDemoAccount         // Save demo status to DB!
       }
       
       let isNewProfile = true
@@ -615,6 +626,22 @@ export default function Dashboard() {
               </div>
             </div>
           </div>
+
+          {/* HIDDEN DEMO SECRET CODE */}
+          {showDemoCode && (
+            <div className="border-t border-zinc-800 pt-4 mt-4 animate-in fade-in">
+              <label className="block text-[10px] tracking-widest text-[#D4AF37] uppercase">
+                🔒 Admin Only: Demo Secret Code
+                <input 
+                  value={demoCode} 
+                  onChange={e => setDemoCode(e.target.value)} 
+                  className={inputCls} 
+                  placeholder="Type secret code here to create a demo" 
+                />
+              </label>
+              <p className="text-[9px] text-zinc-500 mt-1">This field is hidden from public users.</p>
+            </div>
+          )}
           
           <button onClick={handleSaveClick} disabled={saving || heroUploading || galleryUploading || gcashUploading || mayaUploading} className="w-full py-3 rounded-xl font-bold hover:brightness-110 disabled:opacity-50" style={{background: profile.accent_color, color: 'black'}}>
             {saving ? 'Processing...' : 'Save Profile & Activate'}
