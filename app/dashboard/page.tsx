@@ -3,7 +3,7 @@ import { useState, useEffect, useRef } from 'react'
 import TaplyTemplate from '../../components/TaplyTemplate'
 import { supabase } from '../../lib/supabase'
 import HamburgerMenu from "@/components/HamburgerMenu"
-import PaymentModal from '../../components/PaymentModal'
+import PaymentModal, { type PaymentSubmission } from '../../components/PaymentModal'
 
 
 const DEFAULT_SOCIALS = {
@@ -144,7 +144,6 @@ export default function Dashboard() {
   const editPanelRef = useRef<HTMLDivElement>(null)
   
   const [isPaymentModalOpen, setIsPaymentModalOpen] = useState(false)
-  const [showPendingModal, setShowPendingModal] = useState(false) 
   
   // Demo Code State
   const [demoCode, setDemoCode] = useState('')
@@ -185,13 +184,6 @@ export default function Dashboard() {
     if (toastTimer.current) clearTimeout(toastTimer.current)
     toastTimer.current = setTimeout(() => setToast(''), 3000)
   }
-
-  useEffect(() => {
-    if (!showPendingModal) return
-    const onKey = (e: KeyboardEvent) => { if (e.key === 'Escape') setShowPendingModal(false) }
-    window.addEventListener('keydown', onKey)
-    return () => window.removeEventListener('keydown', onKey)
-  }, [showPendingModal])
 
   useEffect(() => {
     const load = async () => {
@@ -302,21 +294,35 @@ export default function Dashboard() {
   const SITE_URL = (process.env.NEXT_PUBLIC_SITE_URL || 'https://tapvinci.vercel.app').replace(/\/+$/, '')
 
   const handleSaveClick = () => {
-    if (!profile.username.trim() || !profile.name.trim()) {
+    const username = (profile.username || '').trim().toLowerCase()
+    const name = (profile.name || '').trim()
+
+    if (!username || !name) {
       showToast('Username and Name are required.')
+      return
+    }
+    if (!/^[a-z0-9_-]+$/.test(username)) {
+      showToast('Username can only use letters, numbers, hyphens, and underscores.')
       return
     }
     setIsPaymentModalOpen(true)
   }
 
-  const handleConfirmPayment = async (receiptFile: File) => {
+  const handleConfirmPayment = async ({ receiptFile, planTier, planAmount, paymentMethod }: PaymentSubmission) => {
     setSaving(true)
     const fixedUsername = profile.username.trim().toLowerCase()
     const { id, created_at, ...rest } = profile
     
     try {
-      // 1. Upload the receipt image to Supabase Storage
-      const fileExt = receiptFile.name.split('.').pop()
+      // 1. Upload the receipt to Supabase Storage
+      const rawExt = receiptFile.name.split('.').pop()?.toLowerCase() || ''
+      const fileExt = /^(jpe?g|png|pdf)$/.test(rawExt)
+        ? rawExt
+        : receiptFile.type === 'application/pdf'
+          ? 'pdf'
+          : receiptFile.type === 'image/png'
+            ? 'png'
+            : 'jpg'
       const path = `${fixedUsername}/receipts/receipt-${Date.now()}.${fileExt}`
       const { error: uploadError } = await supabase.storage.from(BUCKET).upload(path, receiptFile)
       if (uploadError) throw new Error('Receipt upload failed: ' + uploadError.message)
@@ -326,14 +332,18 @@ export default function Dashboard() {
       // Check if the secret code matches
       const isDemoAccount = demoCode.trim() === process.env.NEXT_PUBLIC_DEMO_SECRET_CODE
 
-      // 2. Save profile to database as INACTIVE
+      // 2. Save profile to database as INACTIVE, with the plan and payment method
       const fixed = { 
         ...rest, 
         username: fixedUsername,
-        receipt_url: receiptUrl,       
-        payment_status: 'pending',     
+        receipt_url: receiptUrl,
+        payment_status: 'pending',
         is_active: false,
-        is_demo: isDemoAccount         // Save demo status to DB!
+        is_demo: isDemoAccount,
+        package: planTier,
+        plan_tier: planTier,
+        plan_amount: planAmount,
+        payment_method: paymentMethod,
       }
       
       let isNewProfile = true
@@ -345,9 +355,7 @@ export default function Dashboard() {
       const { error: dbError } = await supabase.from('profiles').upsert(fixed, { onConflict: 'username' }).select()
       if (dbError) throw new Error('Database save failed: ' + dbError.message)
 
-      // 3. Success! Close payment modal, show Pending Modal
-      setIsPaymentModalOpen(false)
-      setShowPendingModal(true)
+      // 3. Success - PaymentModal shows the pending-activation confirmation.
       
       // 4. Notify Admin (Email)
       try {
@@ -377,8 +385,6 @@ export default function Dashboard() {
         isOpen={isPaymentModalOpen}
         onClose={() => setIsPaymentModalOpen(false)}
         onConfirm={handleConfirmPayment}
-        gcashQR={profile.gcash_qr_url}
-        mayaQR={profile.maya_qr_url}
       />
 
       <style jsx global>{`
@@ -645,7 +651,7 @@ export default function Dashboard() {
           )}
           
           <button onClick={handleSaveClick} disabled={saving || heroUploading || galleryUploading || gcashUploading || mayaUploading} className="w-full py-3 rounded-xl font-bold hover:brightness-110 disabled:opacity-50" style={{background: profile.accent_color, color: 'black'}}>
-            {saving ? 'Processing...' : 'Save Profile & Activate'}
+            {saving ? 'Processing...' : 'Save Profile'}
           </button>
         </div>
               </div>
@@ -661,37 +667,6 @@ export default function Dashboard() {
         </div>
       </div>
 
-      {/* CHANGED: Pending Verification Modal (Not Success) */}
-      {showPendingModal && (
-        <div className="success-modal-overlay" onClick={() => setShowPendingModal(false)} role="dialog" aria-modal="true" aria-label="Pending Verification">
-          <div className="success-modal" onClick={e => e.stopPropagation()}>
-            
-            {/* Changed icon to a clock for "pending" */}
-            <div className="success-check" style={{ background: '#D4AF37', color: '#000' }}>
-              <i className="fa-regular fa-clock"></i>
-            </div>
-            
-            <h3 className="success-title">Proof Submitted!</h3>
-            <p className="success-sub text-[#A1A1A1]">
-              Your payment is pending admin verification. <br/>
-              We will review your receipt shortly and activate your link.
-            </p>
-            
-            <div className="mt-6 p-4 bg-[#0A0A0A] border border-[#1E1E1E] rounded-xl">
-              <p className="text-[11px] uppercase tracking-widest text-[#D4AF37] mb-2">What happens next?</p>
-              <ul className="text-left text-[12px] text-gray-400 space-y-2">
-                <li className="flex items-start gap-2"><i className="fa-solid fa-check text-green-500 mt-1"></i> We check your receipt against our GCash/Maya records.</li>
-                <li className="flex items-start gap-2"><i className="fa-solid fa-check text-green-500 mt-1"></i> Once verified, your link /{profile.username.toLowerCase()} goes live.</li>
-                <li className="flex items-start gap-2"><i className="fa-solid fa-envelope text-blue-400 mt-1"></i> You will receive an email confirmation.</li>
-              </ul>
-            </div>
-
-            <button onClick={() => setShowPendingModal(false)} className="success-primary-btn mt-6">
-              Got it, I'll wait
-            </button>
-          </div>
-        </div>
-      )}
       {toast && <div className="success-toast" role="status">{toast}</div>}
     </>
   )

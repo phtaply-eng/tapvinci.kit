@@ -89,7 +89,7 @@ function Check({ on, tone }: { on: boolean; tone: 'muted' | 'gold' }) {
 export default function Pricing({ contactEmail = 'tapvinci@yahoo.com' }: { contactEmail?: string }) {
   const router = useRouter()
 
-  const handleSelect = (pkg: 'digital_only' | 'card_digital', price: '399' | '899') => {
+  const handleSelect = (pkg: 'digital_only' | 'card_digital', price: '399' | '799') => {
     try {
       localStorage.setItem('selected_package', pkg)
       localStorage.setItem('selected_price', price)
@@ -195,7 +195,7 @@ export default function Pricing({ contactEmail = 'tapvinci@yahoo.com' }: { conta
               </div>
 
               <div className="mt-8 flex items-end justify-between gap-4">
-                <span className="pv-serif text-[42px] font-bold leading-none text-white">₱899</span>
+                <span className="pv-serif text-[42px] font-bold leading-none text-white">₱799</span>
                 <span className="pb-1 text-right text-[11px] font-normal leading-[1.4] text-white/40">
                  one-time • Founders <br/> Lifetime <br/> #200/200 left
                 </span>
@@ -215,7 +215,7 @@ export default function Pricing({ contactEmail = 'tapvinci@yahoo.com' }: { conta
 
             <div className="mt-auto pt-8">
               <button
-                onClick={() => handleSelect('card_digital','899')}
+                onClick={() => handleSelect('card_digital','799')}
                 className="block w-full cursor-pointer rounded-full bg-[#D4AF37] py-4 text-center text-[12px] font-bold uppercase tracking-[0.15em] text-black shadow-[0_8px_32px_rgba(212,175,55,0.4)] transition-all hover:bg-[#FFC21C] hover:shadow-[0_0_20px_rgba(212,175,55,0.3),0_12px_40px_rgba(212,175,55,0.55)]"
               >
                 Get Card + Digital

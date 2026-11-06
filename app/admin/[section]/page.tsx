@@ -10,7 +10,7 @@ import { supabase } from '../../../lib/supabase'
 const AUTH_KEY = 'tapvinci_admin_ok'
 const SITE_URL = (process.env.NEXT_PUBLIC_SITE_URL || 'https://tapvinci.vercel.app').replace(/\/+$/, '')
 const DEMO = (process.env.NEXT_PUBLIC_DEMO_USERNAME || 'shua').toLowerCase()
-const PKG = { card: { label: 'Card + Digital', price: 899 }, digital: { label: 'Digital Only', price: 399 } } as const
+const PKG = { card: { label: 'Card + Digital', price: 799 }, digital: { label: 'Digital Only', price: 399 } } as const
 const THEMES: Record<string, string> = { gold: 'Black Gold', purple: 'Midnight Purple', blue: 'Ocean Blue', green: 'Forest Green', pink: 'Sunset Pink', orange: 'Sunrise Orange' }
 
 type Row = { username: string; name?: string | null; business?: string | null; email?: string | null; phone?: string | null; created_at?: string | null; is_active?: boolean | null; gcash_qr_url?: string | null; maya_qr_url?: string | null; theme?: any; [k: string]: any }
@@ -322,7 +322,14 @@ function CmsSection({ profiles, loading }: SP) {
 // ---------------- Packages & Pricing ----------------
 function PricingSection({ profiles }: SP) {
   const act = active(profiles).filter((p) => payOf(p) === 'paid')
-  const rows = (Object.keys(PKG) as (keyof typeof PKG)[]).map((k) => { const n = act.filter((p) => pkgOf(p) === k).length; return { k, ...PKG[k], n, revenue: n * PKG[k].price } })
+  const amountOf = (p: Row) => {
+    const stored = Number(p.plan_amount)
+    return Number.isFinite(stored) && stored > 0 ? stored : PKG[pkgOf(p)].price
+  }
+  const rows = (Object.keys(PKG) as (keyof typeof PKG)[]).map((k) => {
+    const planRows = act.filter((p) => pkgOf(p) === k)
+    return { k, ...PKG[k], n: planRows.length, revenue: planRows.reduce((sum, p) => sum + amountOf(p), 0) }
+  })
   const total = rows.reduce((s, r) => s + r.revenue, 0)
   return (
     <>

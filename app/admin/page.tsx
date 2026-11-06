@@ -25,8 +25,11 @@ type Row = {
   created_at?: string | null
   gcash_qr_url?: string | null
   maya_qr_url?: string | null
-  receipt_url?: string | null 
+  receipt_url?: string | null
   is_active?: boolean | null
+  plan_tier?: string | null
+  plan_amount?: number | string | null
+  payment_method?: string | null
   [key: string]: any
 }
 
@@ -119,22 +122,43 @@ function csvCell(v: unknown) {
 }
 
 const ORDER_PREFIX = 'TV'
+const PLAN_META = {
+  digital: { label: 'Digital Only', price: 399 },
+  card: { label: 'Card + Digital', price: 799 },
+} as const
 const PACKAGES = {
-  card: { label: 'Card + Digital', price: 899, note: 'Includes NFC card' },
-  digital: { label: 'Digital Only', price: 399, note: 'Landing page only' },
+  card: { label: PLAN_META.card.label, price: PLAN_META.card.price, note: 'Includes NFC card' },
+  digital: { label: PLAN_META.digital.label, price: PLAN_META.digital.price, note: 'Landing page only' },
 } as const
 type PackageId = keyof typeof PACKAGES
+const LEGACY_CARD_PRICE = 899
 const PAY_OPTIONS = ['paid', 'pending', 'failed'] as const
 type PayStatus = (typeof PAY_OPTIONS)[number]
 const FUL_OPTIONS = ['pending', 'printing', 'shipped', 'completed'] as const
 type FulStatus = (typeof FUL_OPTIONS)[number]
 const FUL_NEXT: Record<FulStatus, FulStatus | null> = { pending: 'printing', printing: 'shipped', shipped: 'completed', completed: null }
-const MISSING_COLS = /package|payment_status|paid_at|fulfillment|fulfilled_at|is_active|deactivated_at/
+const MISSING_COLS = /package|payment_status|paid_at|fulfillment|fulfilled_at|is_active|deactivated_at|plan_tier|plan_amount|payment_method/
 
 const pkgOf = (p: Row): PackageId => (p.package === 'digital' ? 'digital' : 'card')
+const planTierOf = (p: Row): PackageId => {
+  const value = (p.plan_tier || '').toString().toLowerCase()
+  if (value === 'digital' || value === 'digital_only') return 'digital'
+  if (value === 'card' || value === 'card_digital') return 'card'
+  return pkgOf(p)
+}
+const amountOf = (p: Row) => {
+  const stored = Number(p.plan_amount)
+  if (Number.isFinite(stored) && stored > 0) return stored
+  // Orders created before plan_amount existed used the ₱899 card price.
+  if (!p.plan_tier && pkgOf(p) === 'card') return LEGACY_CARD_PRICE
+  return PLAN_META[planTierOf(p)].price
+}
+const planOf = (p: Row) => {
+  const tier = planTierOf(p)
+  return { tier, label: PLAN_META[tier].label, amount: amountOf(p) }
+}
 const payOf = (p: Row): PayStatus => (p.payment_status === 'pending' || p.payment_status === 'failed' ? p.payment_status : 'paid')
 const fulOf = (p: Row): FulStatus => (FUL_OPTIONS as readonly string[]).includes(p.fulfillment as string) ? (p.fulfillment as FulStatus) : 'pending'
-const amountOf = (p: Row) => PACKAGES[pkgOf(p)].price
 
 const PROTECTED_USERNAMES = ['shua', 'tapvinci', 'shuashushu']
 // ONLY checks the database column now!
@@ -167,7 +191,8 @@ function escapeHtml(v: unknown) {
 }
 
 function openInvoice(p: Row) {
-  const pkg = PACKAGES[pkgOf(p)]
+  const plan = planOf(p)
+  const pkg = PACKAGES[plan.tier]
   const w = window.open('', '_blank')
   if (!w) return false
   w.document.write(`<!doctype html><html><head><meta charset="utf-8"><title>Invoice ${escapeHtml(orderNo(p))}</title>
@@ -178,8 +203,8 @@ table{width:100%;border-collapse:collapse;margin-top:28px}td,th{padding:10px 8px
 <p><b>Order #</b> ${escapeHtml(orderNo(p))}<br><b>Date</b> ${escapeHtml(formatDateTime(p.created_at))}<br><b>Payment</b> ${escapeHtml(payOf(p).toUpperCase())} &bull; GCash/Maya QR Ph</p>
 <p><b>Bill to</b><br>${escapeHtml(displayName(p) || p.username)}<br>${escapeHtml(p.email || '')}<br>${escapeHtml(p.phone || '')}</p>
 <table><tr><th>Item</th><th>Link</th><th class="r">Amount</th></tr>
-<tr><td>${escapeHtml(pkg.label)}<br><small>${escapeHtml(pkg.note)}</small></td><td>${escapeHtml(SITE_URL + '/' + p.username)}</td><td class="r">${escapeHtml(money(pkg.price))}</td></tr>
-<tr><td colspan="2" class="r tot">Total</td><td class="r tot">${escapeHtml(money(pkg.price))}</td></tr></table>
+<tr><td>${escapeHtml(plan.label)}<br><small>${escapeHtml(pkg.note)}</small></td><td>${escapeHtml(SITE_URL + '/' + p.username)}</td><td class="r">${escapeHtml(money(plan.amount))}</td></tr>
+<tr><td colspan="2" class="r tot">Total</td><td class="r tot">${escapeHtml(money(plan.amount))}</td></tr></table>
 <p><small>Thank you for choosing TapVinci.</small></p><button onclick="window.print()">Print / Save as PDF</button></body></html>`)
   w.document.close()
   w.focus()
@@ -604,7 +629,7 @@ export default function AdminPage() {
 
   async function updateOrder(profile: Row, patch: Record<string, unknown>, okMsg?: string) {
     const { data, error } = await supabase.from('profiles').update(patch).eq('username', profile.username).select()
-    if (error) return showToast(MISSING_COLS.test(error.message) ? 'Run supabase-orders.sql in Supabase first' : 'Failed: ' + error.message)
+    if (error) return showToast(MISSING_COLS.test(error.message) ? 'Run supabase-orders.sql and supabase-plan-tier.sql in Supabase first' : 'Failed: ' + error.message)
     if (!data || data.length === 0) return showToast('Nothing was updated - check the Supabase update policy')
     setProfiles((list) => list.map((r) => (r.username === profile.username ? { ...r, ...(data[0] as Row) } : r)))
     if (okMsg) showToast(okMsg)
@@ -612,7 +637,7 @@ export default function AdminPage() {
   
   const setPayment = (p: Row, v: PayStatus) => updateOrder(p, { payment_status: v, paid_at: v === 'paid' ? new Date().toISOString() : null }, `Payment: ${v.toUpperCase()}`)
   const setFulfillment = (p: Row, v: FulStatus) => updateOrder(p, { fulfillment: v, fulfilled_at: new Date().toISOString() }, `Fulfillment: ${v.toUpperCase()}`)
-  const setPackage = (p: Row, v: PackageId) => updateOrder(p, { package: v }, `Package: ${PACKAGES[v].label}`)
+  const setPackage = (p: Row, v: PackageId) => updateOrder(p, { package: v, plan_tier: v, plan_amount: PLAN_META[v].price }, `Package: ${PACKAGES[v].label}`)
 
   async function setSelectedActive(active: boolean) {
     if (selectedList.length === 0) return
@@ -641,10 +666,10 @@ export default function AdminPage() {
   const exportCsv = () => {
     const ordersView = view === 'orders'
     const rows = ordersView ? orders : filtered
-    const header = ['username', 'name', 'phone', 'email', 'theme', 'created_at', 'link', ...(ordersView ? ['order_no', 'package', 'amount_php', 'payment_status', 'fulfillment'] : [])]
+    const header = ['username', 'name', 'phone', 'email', 'theme', 'created_at', 'link', ...(ordersView ? ['order_no', 'plan_tier', 'plan', 'amount_php', 'payment_status', 'fulfillment'] : [])]
     const lines = rows.map((p) =>
       [p.username, displayName(p), p.phone, p.email, themeLabel(p), p.created_at, `${SITE_URL}/${p.username}`,
-        ...(ordersView ? [orderNo(p), PACKAGES[pkgOf(p)].label, amountOf(p), payOf(p), fulOf(p)] : [])].map(csvCell).join(',')
+        ...(ordersView ? [orderNo(p), planOf(p).tier, planOf(p).label, amountOf(p), payOf(p), fulOf(p)] : [])].map(csvCell).join(',')
     )
     const blob = new Blob([[header.join(','), ...lines].join('\r\n')], { type: 'text/csv;charset=utf-8' })
     const url = URL.createObjectURL(blob)
@@ -830,7 +855,8 @@ export default function AdminPage() {
                     orders.map((p) => {
                       const pay = payOf(p)
                       const ful = fulOf(p)
-                      const pkg = PACKAGES[pkgOf(p)]
+                      const plan = planOf(p)
+                      const pkg = PACKAGES[plan.tier]
                       const next = FUL_NEXT[ful]
                       const url = `${SITE_URL}/${p.username}`
                       return (
@@ -840,7 +866,7 @@ export default function AdminPage() {
                               <input type="checkbox" checked={selected.has(p.username)} onChange={() => toggleSelected(p.username)} aria-label={`Select ${p.username}`} className="mt-1 accent-[#D4AF37]" />
                               <div>
                                 <p className="font-bold text-[#D4AF37] text-[12px] whitespace-nowrap">{orderNo(p)}{isDemo(p) && <span className="demo-badge ml-2 text-[9px] font-bold px-1.5 py-0.5 rounded-full align-middle" style={DEMO_BADGE_STYLE}>DEMO</span>}{p.is_active === false && <span className="ml-2 text-[9px] font-semibold bg-[#f59e0b]/20 text-[#f59e0b] px-1.5 py-0.5 rounded align-middle">DELETED</span>}</p>
-                                <p className="text-[10px] text-[#A1A1A1] mt-0.5 whitespace-nowrap">{formatDateTime(p.created_at)} • Via GCash/Maya QR Ph</p>
+                                <p className="text-[10px] text-[#A1A1A1] mt-0.5 whitespace-nowrap">{formatDateTime(p.created_at)} • Via {p.payment_method ? p.payment_method.toString().toUpperCase() : 'GCash/Maya'} QR Ph</p>
                               </div>
                             </div>
                           </td>
@@ -854,7 +880,7 @@ export default function AdminPage() {
                                 {[
                                   ['Profile Done', !!(displayName(p) && p.phone)],
                                   ['QR Uploaded', !!(p.gcash_qr_url || p.maya_qr_url)],
-                                  ['Card Printed', pkgOf(p) === 'digital' ? null : ful === 'shipped' || ful === 'completed'],
+                                  ['Card Printed', plan.tier === 'digital' ? null : ful === 'shipped' || ful === 'completed'],
                                 ].map(([label, ok]) => (
                                   <p key={label as string} className="text-[11px] flex items-center gap-2">
                                     <span className={ok === null ? 'text-[#6B7280]' : ok ? 'text-[#00D632]' : 'text-[#FFC21C]'}>{ok === null ? '–' : ok ? '✓' : '?'}</span>
@@ -869,8 +895,13 @@ export default function AdminPage() {
                             <p className="text-[10px] text-[#6B7280] mt-0.5 break-all max-w-[220px]">{url}</p>
                           </td>
                           <td>
-                            <p className="font-bold text-white whitespace-nowrap">{money(pkg.price)}</p>
-                            <select value={pkgOf(p)} onChange={(e) => setPackage(p, e.target.value as PackageId)} aria-label="Package" className="ac-select ac-select-sm mt-1">
+                            <div className="flex flex-wrap items-center gap-1.5">
+                              <p className="font-bold text-white whitespace-nowrap">{money(plan.amount)}</p>
+                              <span className={`inline-flex items-center whitespace-nowrap rounded-full border px-2 py-0.5 text-[9px] font-bold ${plan.tier === 'card' ? 'border-[#D4AF37]/35 bg-[#D4AF37]/15 text-[#E8C766]' : 'border-white/10 bg-white/5 text-[#A1A1A1]'}`}>
+                                {plan.label} · ₱{plan.amount}
+                              </span>
+                            </div>
+                            <select value={plan.tier} onChange={(e) => setPackage(p, e.target.value as PackageId)} aria-label="Package" className="ac-select ac-select-sm mt-1">
                               {(Object.keys(PACKAGES) as PackageId[]).map((k) => <option key={k} value={k}>{PACKAGES[k].label}</option>)}
                             </select>
                             <p className="text-[10px] text-[#A1A1A1] mt-0.5">{pkg.note}</p>
@@ -885,7 +916,7 @@ export default function AdminPage() {
                             <select value={ful} onChange={(e) => setFulfillment(p, e.target.value as FulStatus)} aria-label="Fulfillment" className={`ac-badge ac-ful-${ful}`}>
                               {FUL_OPTIONS.map((o) => <option key={o} value={o}>{o.toUpperCase()}</option>)}
                             </select>
-                            <p className="text-[10px] text-[#A1A1A1] mt-1 whitespace-nowrap">{p.fulfilled_at ? `Updated ${formatDateTime(p.fulfilled_at)}` : pkgOf(p) === 'digital' ? 'No card to print' : 'Not started'}</p>
+                            <p className="text-[10px] text-[#A1A1A1] mt-1 whitespace-nowrap">{p.fulfilled_at ? `Updated ${formatDateTime(p.fulfilled_at)}` : plan.tier === 'digital' ? 'No card to print' : 'Not started'}</p>
                           </td>
                           <td>
                             <div className="flex gap-1.5 flex-wrap max-w-[280px]">

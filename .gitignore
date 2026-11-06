@@ -6,4 +6,4 @@ node_modules/
 *.zip
 *.log
 Supabase-Final.sql
-*.sql.bak
+*.sql.bak*.tsbuildinfo

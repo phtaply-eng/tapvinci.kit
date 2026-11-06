@@ -7,7 +7,7 @@ import { supabase } from '../../../lib/supabase'
 // Package / payment / fulfillment fields come from supabase-orders.sql; rows without them use the same defaults as Orders & Sales.
 
 const AUTH_KEY = 'tapvinci_admin_ok'
-const PRICES = { card: 799, digital: 299 } as const
+const PRICES = { card: 799, digital: 399 } as const
 const FUL = ['pending', 'printing', 'shipped', 'completed'] as const
 type Ful = (typeof FUL)[number]
 type Row = { username: string; name?: string | null; business?: string | null; email?: string | null; phone?: string | null; created_at?: string | null; paid_at?: string | null; is_active?: boolean | null; gcash_qr_url?: string | null; maya_qr_url?: string | null; [k: string]: any }
