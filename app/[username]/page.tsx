@@ -4,12 +4,12 @@ import Link from 'next/link'
 import { supabase } from '../../lib/supabase'
 import TaplyTemplate from '../../components/TaplyTemplate'
 import type { Profile } from '../../lib/types'
-import ViewTracker from '../../components/ViewTracker' // <-- Imported here
+import ViewTracker from '../../components/ViewTracker'
+import IntroWrapper from '../../components/IntroWrapper' // <-- IMPORT INTRO WRAPPER
 
 export const dynamic = 'force-dynamic'
 export const revalidate = 0
 
-// demo-only username - set NEXT_PUBLIC_DEMO_USERNAME=shua in Vercel env
 const DEMO_USERNAME = (process.env.NEXT_PUBLIC_DEMO_USERNAME || 'shua').toLowerCase()
 
 async function getProfile(username: string): Promise<Profile | null> {
@@ -36,8 +36,7 @@ export default async function UserPage({ params }: { params: { username: string 
   const isDemo = params.username.toLowerCase() === DEMO_USERNAME
 
   return (
-    <>
-      {/* This invisible component tracks the view in the background */}
+    <IntroWrapper>
       <ViewTracker username={params.username} />
       
       {isDemo && (
@@ -56,7 +55,8 @@ export default async function UserPage({ params }: { params: { username: string 
           Home
         </Link>
       )}
+      
       <TaplyTemplate profile={profile} />
-    </>
+    </IntroWrapper>
   )
 }

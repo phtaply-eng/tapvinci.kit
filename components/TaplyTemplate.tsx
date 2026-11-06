@@ -13,6 +13,10 @@ export default function TaplyTemplate({ profile }: { profile: any }) {
   const [dragStart, setDragStart] = useState({ x: 0, y: 0 })
   const [mounted, setMounted] = useState(false)
   
+  // Payment Modal State
+  const [showPaymentModal, setShowPaymentModal] = useState(false)
+  const [activeTab, setActiveTab] = useState<'gcash' | 'maya'>('gcash')
+  
   const accent = profile.accent_color || '#D4AF37'
   
   useEffect(() => {
@@ -51,6 +55,47 @@ export default function TaplyTemplate({ profile }: { profile: any }) {
   if (isVisible('whatsapp')) socialButtons.push({ id: 'whatsapp', href: socials.whatsapp, icon: 'fa-whatsapp', label: 'WhatsApp' })
   if (isVisible('website')) socialButtons.push({ id: 'website', href: socials.website, icon: 'fa-globe', label: 'Website' })
   if (isVisible('twitter') || isVisible('x')) socialButtons.push({ id: 'twitter', href: socials.twitter || socials.x, icon: 'fa-x-twitter', label: 'X / Twitter' })
+
+  // PAYMENT DATA
+  const gcashQR = (profile as any).gcash_qr_url || (profile as any).gcash_qr
+  const mayaQR = (profile as any).maya_qr_url || (profile as any).maya_qr
+
+  // Auto-select the available tab
+  useEffect(() => {
+    if (!gcashQR && mayaQR) setActiveTab('maya')
+    if (gcashQR && !mayaQR) setActiveTab('gcash')
+  }, [gcashQR, mayaQR])
+
+  const handleSaveQR = async (url: string, type: string) => {
+    try {
+      const res = await fetch(url)
+      const blob = await res.blob()
+      const objectUrl = URL.createObjectURL(blob)
+      const a = document.createElement('a')
+      a.href = objectUrl
+      a.download = `${type}-QR-${profile.name || 'TapVinci'}.png`
+      document.body.appendChild(a)
+      a.click()
+      a.remove()
+      URL.revokeObjectURL(objectUrl)
+    } catch {
+      window.open(url, '_blank')
+    }
+  }
+
+  const handleShareQR = async (url: string, type: string) => {
+    if (navigator.share) {
+      try {
+        await navigator.share({
+          title: `${type} QR - ${profile.name}`,
+          text: `Scan my ${type} QR to pay`,
+          url: url
+        })
+      } catch {}
+    } else {
+      navigator.clipboard.writeText(url).then(() => alert(`${type} QR link copied!`))
+    }
+  }
 
   const getTheme = () => {
     const t = profile.theme || 'gold'
@@ -289,6 +334,12 @@ END:VCARD`
               )}
               <button className="taply-action-btn small gold" onClick={saveContact}><span className="ico"><i className="fa-solid fa-address-card"></i></span><span className="lbl">Save Contact</span></button>
               
+              {(gcashQR || mayaQR) && (
+                <button className="taply-action-btn small gold" onClick={() => setShowPaymentModal(true)}>
+                  <span className="ico"><i className="fa-solid fa-qrcode"></i></span><span className="lbl">Payment</span>
+                </button>
+              )}
+
               <button className="taply-action-btn small gold" onClick={()=>{if(typeof window!=='undefined'){navigator.clipboard.writeText(window.location.href).then(()=>alert('Link copied!'))}}}><span className="ico"><i className="fa-solid fa-share-nodes"></i></span><span className="lbl">Share My Card</span></button>
             </div>
           </section>
@@ -302,8 +353,7 @@ END:VCARD`
 
           <footer className="taply-footer" style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '8px' }}>
             <p suppressHydrationWarning style={{ margin: 0 }}>© {new Date().getFullYear()} {profile.name}. All rights reserved.</p>
-  
-            {/* VIEW COUNTER */}
+            
             <div style={{ display: 'inline-flex', alignItems: 'center', gap: '6px', fontSize: '10px', color: '#D4AF37', opacity: 0.8 }}>
               <i className="fa-regular fa-eye"></i>
               <span suppressHydrationWarning>
@@ -314,6 +364,82 @@ END:VCARD`
         </main>
       </div>
     </div>
+
+    {/* RESTORED TABBED PAYMENT MODAL */}
+    {showPaymentModal && (gcashQR || mayaQR) && (
+      <div className="fixed inset-0 z-[9999] bg-black/80 backdrop-blur-sm flex items-center justify-center p-4 animate-in fade-in duration-200" onClick={() => setShowPaymentModal(false)}>
+        <div className="bg-[#121214] border border-[#2A2A2A] rounded-3xl w-full max-w-[340px] relative shadow-[0_0_80px_rgba(0,0,0,0.8)] overflow-hidden" onClick={e => e.stopPropagation()}>
+          
+          <div className="p-6 pb-2 relative">
+            <h3 className="text-white font-bold text-xl mb-1 tracking-wide">Scan to Pay</h3>
+            <p className="text-[11px] text-[#A1A1A1]">Secure payment via e-wallet</p>
+            <button onClick={() => setShowPaymentModal(false)} className="absolute top-6 right-6 w-8 h-8 rounded-full bg-[#1E1E20] text-gray-400 hover:text-white flex items-center justify-center transition-colors">✕</button>
+          </div>
+
+          {/* TABS */}
+          <div className="px-6 mb-4">
+            <div className="flex bg-[#050505] p-1 rounded-xl border border-[#1E1E1E]">
+              {gcashQR && (
+                <button 
+                  onClick={() => setActiveTab('gcash')} 
+                  className={`flex-1 py-2 text-xs font-bold rounded-lg transition-all ${activeTab === 'gcash' ? 'bg-[#007DFE] text-white shadow-lg' : 'text-gray-400 hover:text-white'}`}
+                >
+                  GCash
+                </button>
+              )}
+              {mayaQR && (
+                <button 
+                  onClick={() => setActiveTab('maya')} 
+                  className={`flex-1 py-2 text-xs font-bold rounded-lg transition-all ${activeTab === 'maya' ? 'bg-[#00D632] text-black shadow-lg' : 'text-gray-400 hover:text-white'}`}
+                >
+                  Maya
+                </button>
+              )}
+            </div>
+          </div>
+
+          {/* CONTENT */}
+          <div className="px-6 pb-6">
+            <div className="flex items-center justify-between mb-3">
+              <p className={`text-[11px] font-bold uppercase tracking-wider ${activeTab === 'gcash' ? 'text-[#007DFE]' : 'text-[#00D632]'}`}>
+                {activeTab === 'gcash' ? 'GCash QR' : 'Maya QR'}
+              </p>
+              <span className="text-[10px] text-[#00D632] flex items-center gap-1 font-semibold">
+                <i className="fa-solid fa-circle-check"></i> Verified
+              </span>
+            </div>
+
+            <div className="bg-white p-3 rounded-2xl mb-4 flex justify-center">
+              <img 
+                src={activeTab === 'gcash' ? gcashQR : mayaQR} 
+                alt={`${activeTab} QR`} 
+                className="w-[200px] h-[200px] object-contain rounded-xl" 
+              />
+            </div>
+
+            <p className="text-[11px] text-[#A1A1A1] text-center leading-relaxed mb-6">
+              Open your {activeTab === 'gcash' ? 'GCash' : 'Maya'} app, scan this code,<br/>and enter the amount to pay.
+            </p>
+
+            {/* ACTIONS */}
+            <div className="flex gap-3">
+              <button 
+                onClick={() => handleSaveQR(activeTab === 'gcash' ? gcashQR : mayaQR, activeTab === 'gcash' ? 'GCash' : 'Maya')} 
+                className="flex-1 py-3 rounded-xl bg-[#1E1E20] text-white font-bold text-xs border border-[#2A2A2A] hover:bg-[#2A2A2A] transition-colors flex items-center justify-center gap-2"
+              >
+                <i className="fa-solid fa-download"></i> Save
+              </button>
+              <button 
+                onClick={() => handleShareQR(activeTab === 'gcash' ? gcashQR : mayaQR, activeTab === 'gcash' ? 'GCash' : 'Maya')} 
+                className="flex-1 py-3 rounded-xl bg-[#E8C766] text-black font-bold text-xs hover:bg-[#D4AF37] transition-colors flex items-center justify-center gap-2"
+              >
+                <i className="fa-solid fa-share-nodes"></i> Share
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
+    )}
 
     {lightboxOpen && gallery[lightboxIndex] && (
       <div 
