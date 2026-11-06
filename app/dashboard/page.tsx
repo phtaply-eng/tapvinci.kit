@@ -5,6 +5,7 @@ import { supabase } from '../../lib/supabase'
 import HamburgerMenu from "@/components/HamburgerMenu"
 import PaymentModal from '../../components/PaymentModal'
 
+
 const DEFAULT_SOCIALS = {
   facebook: 'https://facebook.com/',
   instagram: 'https://instagram.com/',
