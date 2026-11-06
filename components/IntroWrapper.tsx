@@ -4,21 +4,22 @@ import { motion, AnimatePresence } from 'framer-motion'
 import IntroOverlay from './IntroOverlay'
 
 export default function IntroWrapper({ children }: { children: React.ReactNode }) {
-  const [showIntro, setShowIntro] = useState(false)
+  // Default to true so the intro starts immediately
+  const [showIntro, setShowIntro] = useState(true) 
   const [isMounted, setIsMounted] = useState(false)
 
   useEffect(() => {
-    const hasSeen = sessionStorage.getItem('tapvinci_intro_played')
+    // We still respect accessibility settings
     const prefersReduced = window.matchMedia('(prefers-reduced-motion: reduce)').matches
     
-    if (!hasSeen && !prefersReduced) {
-      setShowIntro(true)
+    if (prefersReduced) {
+      setShowIntro(false)
     }
     setIsMounted(true)
   }, [])
 
   const handleIntroComplete = () => {
-    sessionStorage.setItem('tapvinci_intro_played', 'true')
+    // Just hide the intro, no session storage saved
     setShowIntro(false)
   }
 
@@ -36,7 +37,7 @@ export default function IntroWrapper({ children }: { children: React.ReactNode }
         transition={{ 
           duration: 1.2, 
           ease: [0.22, 1, 0.36, 1], 
-          delay: showIntro ? 2.5 : 0 // Syncs exactly with the curtain opening at 2.5s
+          delay: showIntro ? 2.5 : 0 // Syncs with the curtain opening
         }}
         className="min-h-screen"
       >
