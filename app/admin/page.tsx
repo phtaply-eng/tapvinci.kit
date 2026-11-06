@@ -3,7 +3,6 @@ import { useCallback, useEffect, useMemo, useState } from 'react'
 import Link from 'next/link'
 import { supabase } from '../../lib/supabase'
 
-const ADMIN_PASSWORD = process.env.NEXT_PUBLIC_ADMIN_PASSWORD || ''
 const SITE_URL = (process.env.NEXT_PUBLIC_SITE_URL || 'https://tapvinci.vercel.app').replace(/\/+$/, '')
 const AUTH_KEY = 'tapvinci_admin_ok'
 
@@ -193,6 +192,8 @@ export default function AdminPage() {
   const [checked, setChecked] = useState(false)
   const [password, setPassword] = useState('')
   const [authError, setAuthError] = useState('')
+  const [pwSet, setPwSet] = useState<boolean | null>(null)
+  const [authBusy, setAuthBusy] = useState(false)
 
   const [profiles, setProfiles] = useState<Row[]>([])
   const [loading, setLoading] = useState(false)
@@ -235,6 +236,15 @@ export default function AdminPage() {
       if (sessionStorage.getItem(AUTH_KEY) === '1') setIsAuthed(true)
     } catch {}
     setChecked(true)
+  }, [])
+
+  useEffect(() => {
+    let alive = true
+    fetch('/api/admin/status', { cache: 'no-store' })
+      .then((res) => (res.ok ? res.json() : { pwSet: false }))
+      .then((data) => { if (alive) setPwSet(!!data?.pwSet) })
+      .catch(() => { if (alive) setPwSet(false) })
+    return () => { alive = false }
   }, [])
 
   useEffect(() => {
@@ -281,27 +291,47 @@ export default function AdminPage() {
     }
   }, [isAuthed, fetchProfiles])
 
-  const checkPassword = () => {
-    if (!ADMIN_PASSWORD) {
-      setAuthError('Admin password is not set. Add NEXT_PUBLIC_ADMIN_PASSWORD in .env.local / Vercel, then redeploy.')
+  const checkPassword = async () => {
+    if (pwSet === false) {
+      setAuthError('Admin password is not set. Set ADMIN_PASSWORD in .env.local / Vercel, then redeploy.')
       return
     }
-    if (password === ADMIN_PASSWORD) {
-      setIsAuthed(true)
-      setAuthError('')
-      setPassword('')
-      try { sessionStorage.setItem(AUTH_KEY, '1') } catch {}
-      window.dispatchEvent(new Event('tv-admin-auth'))
-    } else {
-      setAuthError('Wrong password.')
+    if (!password) {
+      setAuthError('Enter the admin password.')
+      return
+    }
+    setAuthBusy(true)
+    setAuthError('')
+    try {
+      const res = await fetch('/api/admin/login', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ password }),
+      })
+      if (res.ok) {
+        setIsAuthed(true)
+        setPassword('')
+        try { sessionStorage.setItem(AUTH_KEY, '1') } catch {}
+        window.dispatchEvent(new Event('tv-admin-auth'))
+      } else if (res.status === 401) {
+        setAuthError('Wrong password.')
+      } else {
+        const data = await res.json().catch(() => ({}))
+        setAuthError(data?.error || 'Login failed. Please try again.')
+      }
+    } catch {
+      setAuthError('Could not reach the server. Please try again.')
+    } finally {
+      setAuthBusy(false)
     }
   }
 
-  const logout = () => {
+  const logout = async () => {
     setIsAuthed(false)
     setProfiles([])
     try { sessionStorage.removeItem(AUTH_KEY) } catch {}
     window.dispatchEvent(new Event('tv-admin-auth'))
+    try { await fetch('/api/admin/login', { method: 'DELETE' }) } catch {}
   }
 
   const filtered = useMemo(() => {
@@ -665,9 +695,12 @@ export default function AdminPage() {
             onChange={(e) => setPassword(e.target.value)}
             className="w-full h-11 bg-[#1E1E20] border border-[#2A2A2A] focus:border-[#D4AF37] outline-none rounded-xl px-3 text-sm"
           />
+          {pwSet === false && !authError && (
+            <p className="text-xs text-amber-400" role="status">Admin password is not set. Set ADMIN_PASSWORD in .env.local / Vercel, then redeploy.</p>
+          )}
           {authError && <p className="text-xs text-red-400" role="alert">{authError}</p>}
-          <button type="submit" className="w-full h-11 rounded-xl bg-[#E8C766] hover:bg-[#D4AF37] text-black font-bold text-sm transition">
-            Enter Admin
+          <button type="submit" disabled={authBusy} className="w-full h-11 rounded-xl bg-[#E8C766] hover:bg-[#D4AF37] disabled:opacity-60 text-black font-bold text-sm transition">
+            {authBusy ? 'Checking...' : 'Enter Admin'}
           </button>
         </form>
       </div>

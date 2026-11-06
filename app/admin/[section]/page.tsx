@@ -343,13 +343,21 @@ function PricingSection({ profiles }: SP) {
 
 // ---------------- Admin Account ----------------
 function AccountSection({ toast }: SP) {
-  const pwSet = !!process.env.NEXT_PUBLIC_ADMIN_PASSWORD
+  const [pwSet, setPwSet] = useState<boolean | null>(null)
+  useEffect(() => {
+    let alive = true
+    fetch('/api/admin/status', { cache: 'no-store' })
+      .then((res) => (res.ok ? res.json() : { pwSet: false }))
+      .then((data) => { if (alive) setPwSet(!!data?.pwSet) })
+      .catch(() => { if (alive) setPwSet(false) })
+    return () => { alive = false }
+  }, [])
   const items: [string, boolean, string][] = [
-    ['Admin password configured', pwSet, pwSet ? 'NEXT_PUBLIC_ADMIN_PASSWORD is set' : 'Set NEXT_PUBLIC_ADMIN_PASSWORD in .env.local and Vercel'],
+    ['Admin password configured', pwSet === true, pwSet === null ? 'Checking...' : pwSet ? 'ADMIN_PASSWORD is set on the server' : 'Set ADMIN_PASSWORD in .env.local and Vercel'],
     ['Site URL', !!process.env.NEXT_PUBLIC_SITE_URL, process.env.NEXT_PUBLIC_SITE_URL ? SITE_URL : `Using default ${SITE_URL} - set NEXT_PUBLIC_SITE_URL to change`],
     ['Demo profile', true, `View Demo opens /${DEMO}`],
   ]
-  const logout = () => { try { sessionStorage.removeItem(AUTH_KEY) } catch {} ; window.dispatchEvent(new Event('tv-admin-auth')); toast('Logged out') }
+  const logout = async () => { try { sessionStorage.removeItem(AUTH_KEY) } catch {} ; window.dispatchEvent(new Event('tv-admin-auth')); toast('Logged out'); try { await fetch('/api/admin/login', { method: 'DELETE' }) } catch {} }
   return (
     <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
       <Card title="Account & settings" sub="Read from your environment variables">
@@ -361,7 +369,7 @@ function AccountSection({ toast }: SP) {
         <button onClick={logout} className="ac-mini ac-mini-red !h-10 mt-4">Safe Logout</button>
       </Card>
       <Card title="Security notice">
-        <p className="text-[13px] text-[#A1A1A1] leading-relaxed">The admin password is a simple gate stored in the browser bundle (NEXT_PUBLIC_*). It keeps casual visitors out but is <b className="text-white">not real security</b>, and your Supabase policies are open. Before storing sensitive customer data, move the admin to Supabase Auth with row-level security that only allows your admin account.</p>
+        <p className="text-[13px] text-[#A1A1A1] leading-relaxed">The admin password is checked on the server using <b className="text-white">ADMIN_PASSWORD</b> and is never included in the browser bundle. It keeps casual visitors out but is <b className="text-white">not real security</b>, and your Supabase policies are open. Before storing sensitive customer data, move the admin to Supabase Auth with row-level security that only allows your admin account.</p>
       </Card>
     </div>
   )
