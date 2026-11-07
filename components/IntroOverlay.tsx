@@ -19,8 +19,25 @@ export default function IntroOverlay({ onComplete }: { onComplete: () => void })
     }
   }, [onComplete])
 
+  // Lock the page behind the intro so the site underneath cannot scroll and
+  // no body/html scrollbars are visible while the animation is playing.
+  useEffect(() => {
+    const body = document.body
+    const html = document.documentElement
+    const previousBodyOverflow = body.style.overflow
+    const previousHtmlOverflow = html.style.overflow
+
+    body.style.overflow = 'hidden'
+    html.style.overflow = 'hidden'
+
+    return () => {
+      body.style.overflow = previousBodyOverflow
+      html.style.overflow = previousHtmlOverflow
+    }
+  }, [])
+
   return (
-    <div className="fixed inset-0 z-[99999] pointer-events-none overflow-hidden font-mono bg-transparent">
+    <div className="fixed inset-0 z-[99999] h-[100dvh] w-full overflow-hidden overscroll-none pointer-events-none select-none font-mono bg-transparent">
       
       {/* CURTAIN REVEAL (No more center line) */}
       <motion.div 
@@ -42,14 +59,14 @@ export default function IntroOverlay({ onComplete }: { onComplete: () => void })
           <motion.div 
             exit={{ opacity: 0, filter: 'blur(10px)', scale: 1.05 }}
             transition={{ duration: 0.5, ease: 'easeInOut' }}
-            className="absolute inset-0 flex items-center justify-center z-40 bg-[#050505]"
+            className="absolute inset-0 z-40 flex h-full w-full flex-col items-center justify-center overflow-hidden bg-[#050505]"
           >
             {/* LOGO CONTAINER */}
             <motion.div
               initial={{ scale: 0.85, opacity: 0 }}
               animate={{ scale: 1, opacity: 1 }}
               transition={{ duration: 0.8, ease: 'easeOut' }}
-              className="relative w-[240px] md:w-[320px]"
+              className="relative mx-auto flex w-[240px] max-w-[70vw] items-center justify-center md:w-[320px]"
             >
               {/* Pulsing Gold Glow */}
               <motion.div 
