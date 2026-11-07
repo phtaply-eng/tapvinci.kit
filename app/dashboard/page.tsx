@@ -57,6 +57,7 @@ const THEMES = [
 ]
 
 const BUCKET = 'profile-images'
+const RECEIPT_BUCKET = 'payment-proofs'
 const MAX_INPUT_BYTES = 20 * 1024 * 1024
 
 type UploadKind = 'hero' | 'gallery' | 'gcash' | 'maya'
@@ -312,7 +313,7 @@ export default function Dashboard() {
     setSaving(true)
     const fixedUsername = profile.username.trim().toLowerCase()
     const { id, created_at, ...rest } = profile
-    
+
     try {
       // 1. Upload the receipt to Supabase Storage
       const rawExt = receiptFile.name.split('.').pop()?.toLowerCase() || ''
@@ -324,17 +325,21 @@ export default function Dashboard() {
             ? 'png'
             : 'jpg'
       const path = `${fixedUsername}/receipts/receipt-${Date.now()}.${fileExt}`
-      const { error: uploadError } = await supabase.storage.from(BUCKET).upload(path, receiptFile)
-      if (uploadError) throw new Error('Receipt upload failed: ' + uploadError.message)
-      
-      const receiptUrl = supabase.storage.from(BUCKET).getPublicUrl(path).data.publicUrl
+      const { error: uploadError } = await supabase.storage.from(RECEIPT_BUCKET).upload(path, receiptFile)
+      if (uploadError) {
+        console.error('[Checkout] Receipt upload failed:', uploadError)
+        throw new Error('Receipt upload failed. Please try again.')
+      }
+
+      const receiptUrl = supabase.storage.from(RECEIPT_BUCKET).getPublicUrl(path).data.publicUrl
 
       // Check if the secret code matches
       const isDemoAccount = demoCode.trim() === process.env.NEXT_PUBLIC_DEMO_SECRET_CODE
 
-      // 2. Save profile to database as INACTIVE, with the plan and payment method
-      const fixed = { 
-        ...rest, 
+      // 2. Build the row written to profiles. All of these columns are created
+      //    by supabase-plan-tier.sql.
+      const fixed = {
+        ...rest,
         username: fixedUsername,
         receipt_url: receiptUrl,
         payment_status: 'pending',
@@ -345,19 +350,38 @@ export default function Dashboard() {
         plan_amount: planAmount,
         payment_method: paymentMethod,
       }
-      
-      let isNewProfile = true
-      try {
-        const { data: existing } = await supabase.from('profiles').select('username').eq('username', fixed.username).maybeSingle()
-        isNewProfile = !existing
-      } catch {}
-      
-      const { error: dbError } = await supabase.from('profiles').upsert(fixed, { onConflict: 'username' }).select()
-      if (dbError) throw new Error('Database save failed: ' + dbError.message)
 
-      // 3. Success - PaymentModal shows the pending-activation confirmation.
-      
-      // 4. Notify Admin (Email)
+      // 3. Decide whether this is a new order (only used for the admin email).
+      const { data: existing, error: existingError } = await supabase
+        .from('profiles')
+        .select('username')
+        .eq('username', fixed.username)
+        .maybeSingle()
+      if (existingError) {
+        console.warn('[Checkout] Could not check for an existing profile:', existingError)
+      }
+      const isNewProfile = !existing
+
+      // 4. Upsert handles both cases: username is the primary key, so an
+      //    existing profile is updated and a brand-new one is inserted.
+      const { data: saved, error: dbError } = await supabase
+        .from('profiles')
+        .upsert(fixed, { onConflict: 'username' })
+        .select('username, payment_status')
+        .single()
+
+      if (dbError) {
+        console.error('[Checkout] Database save failed:', dbError)
+        throw new Error('Database save failed. Please try again.')
+      }
+      if (!saved) {
+        console.error('[Checkout] Database save returned no row:', { username: fixed.username })
+        throw new Error('Database save failed. Please try again.')
+      }
+
+      // 5. Success - PaymentModal shows the pending-activation confirmation.
+
+      // 6. Notify admin (email). Notification failures must not block checkout.
       try {
         fetch('/api/send-notification', {
           method: 'POST',
@@ -367,9 +391,9 @@ export default function Dashboard() {
         }).catch(() => {})
       } catch {}
 
-    } catch (err: any) {
-      // Let the modal handle the error message
-      throw new Error(err.message || 'Failed to process payment proof.')
+    } catch (err) {
+      console.error('[Checkout] Payment submission failed:', err)
+      throw err instanceof Error ? err : new Error('Payment submission failed.')
     } finally {
       setSaving(false)
     }

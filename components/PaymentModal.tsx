@@ -53,6 +53,8 @@ const PAYMENT_ACCOUNTS: Record<PaymentMethod, PaymentAccount> = {
 
 const MAX_FILE_BYTES = 5 * 1024 * 1024
 const ACCEPTED_TYPES = ['image/jpeg', 'image/png', 'application/pdf']
+const SUBMIT_ERROR_MESSAGE =
+  'Something went wrong while saving your payment. Please try again or contact support.'
 
 interface PaymentModalProps {
   isOpen: boolean
@@ -266,7 +268,11 @@ export default function PaymentModal({ isOpen, onClose, onConfirm }: PaymentModa
       })
       setIsSuccess(true)
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Something went wrong. Please try again.')
+      // Keep the raw database/network error in the console for debugging, but
+      // never expose schema details (e.g. "Could not find the 'plan_tier' column")
+      // to a customer who is trying to pay.
+      console.error('[PaymentModal] Payment submission failed:', err)
+      setError(SUBMIT_ERROR_MESSAGE)
     } finally {
       submitLockRef.current = false
       setIsSubmitting(false)
