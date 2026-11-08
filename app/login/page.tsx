@@ -8,20 +8,18 @@ export default function LoginPage() {
   const router = useRouter();
   const [loading, setLoading] = useState(false);
   const [checking, setChecking] = useState(true);
+  const [userEmail, setUserEmail] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
     const check = async () => {
       const supabase = createClient();
       const { data } = await supabase.auth.getUser();
-      if (data?.user) {
-        router.replace("/dashboard");
-        return;
-      }
+      setUserEmail(data?.user?.email ?? null);
       setChecking(false);
     };
     check();
-  }, [router]);
+  }, []);
 
   const handleSignIn = async () => {
     setLoading(true);
@@ -39,6 +37,19 @@ export default function LoginPage() {
     }
   };
 
+  const handleSignOut = async () => {
+    setLoading(true);
+    const supabase = createClient();
+    await supabase.auth.signOut();
+    setUserEmail(null);
+    setLoading(false);
+    // stay on this page so you can pick a different Google account
+  };
+
+  const handleContinue = () => {
+    router.push("/dashboard");
+  };
+
   if (checking) {
     return (
       <main style={{ minHeight: "100vh", display: "flex", alignItems: "center", justifyContent: "center", background: "#0a0a0a", color: "white" }}>
@@ -53,28 +64,57 @@ export default function LoginPage() {
         <h1 style={{ fontSize: 28, fontWeight: 800, margin: 0 }}>TapVinci</h1>
         <p style={{ color: "#a3a3a3", marginTop: 8, marginBottom: 24 }}>Sign in to edit your card</p>
 
-        <p style={{ fontSize: 14, color: "#d4d4d4", lineHeight: 1.5, marginBottom: 20 }}>
-          Use the same Google account that claimed your card.
-          <br />
-          For the student card, that is the account you used when you first tapped / claimed it.
-        </p>
-
-        <button
-          onClick={handleSignIn}
-          disabled={loading}
-          style={{ width: "100%", padding: "14px 16px", borderRadius: 999, border: "none", background: "#facc15", color: "black", fontWeight: 700, fontSize: 16, cursor: "pointer", opacity: loading ? 0.7 : 1 }}
-        >
-          {loading ? "Opening Google..." : "Sign in with Google →"}
-        </button>
+        {userEmail ? (
+          <>
+            <p style={{ fontSize: 14, color: "#d4d4d4", lineHeight: 1.5, marginBottom: 6 }}>
+              You are signed in as:
+            </p>
+            <p style={{ fontSize: 15, fontWeight: 700, color: "#facc15", marginTop: 0, marginBottom: 20, wordBreak: "break-all" }}>
+              {userEmail}
+            </p>
+            <p style={{ fontSize: 13, color: "#a3a3a3", lineHeight: 1.5, marginBottom: 20 }}>
+              To edit the student card, you must be signed in as the Google account that claimed it.
+              If this is not that account, sign out and sign in with the student account.
+            </p>
+            <button
+              onClick={handleContinue}
+              style={{ width: "100%", padding: "14px 16px", borderRadius: 999, border: "none", background: "#facc15", color: "black", fontWeight: 700, fontSize: 16, cursor: "pointer", marginBottom: 12 }}
+            >
+              Continue to Dashboard
+            </button>
+            <button
+              onClick={handleSignOut}
+              disabled={loading}
+              style={{ width: "100%", padding: "14px 16px", borderRadius: 999, border: "1px solid #555", background: "transparent", color: "white", fontWeight: 600, fontSize: 15, cursor: "pointer", opacity: loading ? 0.7 : 1 }}
+            >
+              {loading ? "Signing out..." : "Sign out and use a different account"}
+            </button>
+          </>
+        ) : (
+          <>
+            <p style={{ fontSize: 14, color: "#d4d4d4", lineHeight: 1.5, marginBottom: 20 }}>
+              Use the same Google account that claimed your card.
+              <br />
+              For the student card, that is the account you used when you first tapped / claimed it.
+            </p>
+            <button
+              onClick={handleSignIn}
+              disabled={loading}
+              style={{ width: "100%", padding: "14px 16px", borderRadius: 999, border: "none", background: "#facc15", color: "black", fontWeight: 700, fontSize: 16, cursor: "pointer", opacity: loading ? 0.7 : 1 }}
+            >
+              {loading ? "Opening Google..." : "Sign in with Google"}
+            </button>
+          </>
+        )}
 
         {error && <p style={{ color: "#f87171", fontSize: 14, marginTop: 16 }}>{error}</p>}
 
         <p style={{ fontSize: 13, color: "#737373", marginTop: 20 }}>
-          No account yet? Open your NFC card link <span style={{ color: "#e5e5e5" }}>/c/XXXXXXX</span> to claim a card first.
+          No account yet? Open your NFC card link /c/XXXXXXX to claim a card first.
         </p>
 
         <a href="/" style={{ display: "inline-block", marginTop: 12, color: "#facc15", fontSize: 14, textDecoration: "none" }}>
-          ← Back to home
+          Back to home
         </a>
       </div>
     </main>
