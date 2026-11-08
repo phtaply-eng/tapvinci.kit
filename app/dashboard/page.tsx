@@ -1,6 +1,7 @@
 'use client'
 import { useState, useEffect, useRef } from 'react'
 import TaplyTemplate from '../../components/TaplyTemplate'
+import StudentFieldsEditor from '../../components/students/StudentFieldsEditor'
 import { supabase } from '../../lib/supabase'
 import HamburgerMenu from "@/components/HamburgerMenu"
 import PaymentModal, { type PaymentSubmission } from '../../components/PaymentModal'
@@ -134,6 +135,36 @@ export default function Dashboard() {
     gcash_number: '',
     maya_number: '',
   })
+  // --- Phase 3 Part C: Student-only helpers ---
+  // Professional profiles are untouched. This only activates when the loaded profile has tier === 'student'.
+  const isStudent = (profile as any)?.tier === 'student'
+  const studentProfile = {
+    id: (profile as any)?.id || '',
+    username: profile.username || '',
+    name: profile.name || null,
+    tier: (profile as any)?.tier || null,
+    school: (profile as any)?.school || null,
+    course: (profile as any)?.course || null,
+    year_level: (profile as any)?.year_level || null,
+    spotify_url: profile.spotify_url || null,
+    tap_count: (profile as any)?.tap_count ?? null,
+    streak_count: (profile as any)?.streak_count ?? null,
+    last_tap_date: (profile as any)?.last_tap_date || null,
+  }
+  const reloadProfileAfterStudentSave = async () => {
+    // StudentFieldsEditor already saved to Supabase. Re-fetch so dashboard state stays in sync,
+    // including a username change via set_my_username.
+    const id = (profile as any)?.id
+    const query = id
+      ? supabase.from('profiles').select('*').eq('id', id).single()
+      : supabase.from('profiles').select('*').eq('username', (profile.username || '').toLowerCase()).single()
+    const { data } = await query
+    if (data) {
+      const mergedSocials = { ...DEFAULT_SOCIALS, ...((data as any).socials || {}) }
+      const mergedVisible = { ...DEFAULT_VISIBLE, ...((data as any).socials_visible || {}) }
+      setProfile((p: any) => ({ ...p, ...data, socials: mergedSocials, socials_visible: mergedVisible }))
+    }
+  }
   const [saving, setSaving] = useState(false)
   const [heroUploading, setHeroUploading] = useState(false)
   const [galleryUploading, setGalleryUploading] = useState(false)
@@ -515,6 +546,13 @@ export default function Dashboard() {
             )}
           </div>
           
+          {/* Phase 3 Part C: Student editor - only for tier === 'student'. Professional profiles never see this. */}
+          {isStudent && profile.id && (
+            <div className="border-t border-zinc-800 pt-4">
+              <StudentFieldsEditor profile={studentProfile} onSaved={reloadProfileAfterStudentSave} />
+            </div>
+          )}
+
           <label className="block text-[11px] tracking-widest text-zinc-400 uppercase">Username<input value={profile.username} onChange={e => setProfile({...profile, username: e.target.value.toLowerCase()})} className={inputCls} /></label>
           <label className="block text-[11px] tracking-widest text-zinc-400 uppercase">Name<input value={profile.name} onChange={e => setProfile({...profile, name: e.target.value})} className={inputCls} /></label>
           

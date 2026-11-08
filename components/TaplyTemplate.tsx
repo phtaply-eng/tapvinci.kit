@@ -2,6 +2,9 @@
 import { useState, useRef, useEffect } from 'react'
 import { createPortal } from 'react-dom' // <-- NEW IMPORT
 import SpotifyPlayer from './SpotifyPlayer'
+import StudentStats from './students/StudentStats'
+import StudentEducation from './students/StudentEducation'
+import StudentSpotify from './students/StudentSpotify'
 
 export default function TaplyTemplate({ profile }: { profile: any }) {
   const reelRef = useRef<HTMLDivElement>(null)
@@ -20,6 +23,8 @@ export default function TaplyTemplate({ profile }: { profile: any }) {
   const [activeTab, setActiveTab] = useState<'gcash' | 'maya'>('gcash')
   
   const accent = profile.accent_color || '#D4AF37'
+  // Phase 3 Part C: Only student profiles show the student section. Professional profiles are untouched.
+  const isStudent = profile?.tier === 'student'
   
   useEffect(() => {
     setMounted(true)
@@ -286,7 +291,7 @@ END:VCARD`
               />
               <div className="taply-bio" style={{ marginTop: '24px' }}>{profile.bio || 'Bio'}</div>
               {socialButtons.length > 0 && <a href="#socials" className="taply-primary-btn" style={{ marginTop: '16px', display: 'inline-flex' }}>Let's Connect ↓</a>}
-              {profile.spotify_url && (
+              {!isStudent && profile.spotify_url && (
                 <div style={{ marginTop: '18px' }}>
                   <SpotifyPlayer spotifyUrl={profile.spotify_url} accentColor={accent} />
                 </div>
@@ -295,6 +300,17 @@ END:VCARD`
           </section>
 
           {profile.about && (<section className="taply-section"><h2><i className="fa-regular fa-user"></i> About Me</h2><p>{profile.about}</p></section>)}
+
+          {/* Phase 3 Part C: Student section - only when tier === 'student'. Professional profiles never see this. */}
+          {isStudent && (
+            <section className="taply-section">
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+                <StudentStats profile={profile} />
+                <StudentEducation profile={profile} />
+                <StudentSpotify spotifyUrl={profile.spotify_url} />
+              </div>
+            </section>
+          )}
 
           {gallery.length > 0 && (
             <section className="taply-section">

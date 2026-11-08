@@ -5,6 +5,7 @@ import { supabase } from '../../lib/supabase'
 import TaplyTemplate from '../../components/TaplyTemplate'
 import type { Profile } from '../../lib/types'
 import ViewTracker from '../../components/ViewTracker'
+import StudentTapTracker from '../../components/students/StudentTapTracker'
 import IntroWrapper from '../../components/IntroWrapper' // <-- IMPORT INTRO WRAPPER
 
 export const dynamic = 'force-dynamic'
@@ -34,10 +35,16 @@ export default async function UserPage({ params }: { params: { username: string 
   if (!profile) notFound()
 
   const isDemo = params.username.toLowerCase() === DEMO_USERNAME
+  // Phase 3 Part C: Student pages count taps only, professional pages count views only. Never both, so no double-count.
+  const isStudent = (profile as any)?.tier === 'student'
 
   return (
     <IntroWrapper>
-      <ViewTracker username={params.username} />
+      {isStudent ? (
+        <StudentTapTracker username={params.username} />
+      ) : (
+        <ViewTracker username={params.username} />
+      )}
       
       {isDemo && (
         <Link
