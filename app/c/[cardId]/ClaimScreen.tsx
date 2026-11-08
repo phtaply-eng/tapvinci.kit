@@ -1,6 +1,7 @@
 'use client'
 
 import { useEffect, useRef, useState, type CSSProperties } from 'react'
+import { useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase-browser'
 
 const SERIF = "'Playfair Display', Georgia, serif"
@@ -73,6 +74,149 @@ const inputStyle: CSSProperties = {
   outline: 'none',
 }
 
+const errorBoxStyle: CSSProperties = {
+  marginTop: '16px',
+  padding: '12px 14px',
+  borderRadius: '12px',
+  border: '1px solid rgba(224,141,141,0.35)',
+  background: 'rgba(224,141,141,0.07)',
+  color: '#e08d8d',
+  fontSize: '11px',
+  lineHeight: 1.55,
+  textAlign: 'left',
+  wordBreak: 'break-word',
+  overflowWrap: 'anywhere',
+}
+
+const errorKeyStyle: CSSProperties = {
+  margin: 0,
+  paddingTop: '2px',
+  color: '#a06b6b',
+  fontSize: '9px',
+  letterSpacing: '0.12em',
+  textTransform: 'uppercase',
+}
+
+const errorValueStyle: CSSProperties = {
+  margin: 0,
+  color: '#efc3c3',
+  fontFamily: 'ui-monospace, SFMono-Regular, Menlo, Consolas, monospace',
+  fontSize: '10.5px',
+}
+
+type ClaimError = {
+  message: string
+  code?: string
+  details?: string
+  hint?: string
+}
+
+/**
+ * Client-side claim button. The RPC is invoked from the browser so the real
+ * Postgres error (message/code/details/hint) can be logged and shown in the UI
+ * instead of being swallowed by a server action redirect.
+ */
+export function ClaimCardButton({ code }: { code: string }) {
+  const [supabase] = useState(() => createClient())
+  const [busy, setBusy] = useState(false)
+  const [claimError, setClaimError] = useState<ClaimError | null>(null)
+  const router = useRouter()
+
+  const handleClaim = async () => {
+    if (busy) return
+    setBusy(true)
+    setClaimError(null)
+
+    try {
+      const { data, error } = await supabase.rpc('claim_student_card', { p_code: code })
+
+      if (error) {
+        const detail = {
+          message: error.message,
+          code: error.code,
+          details: error.details,
+          hint: error.hint,
+        }
+        console.error('[claim_student_card] RPC failed', { ...detail, raw: error })
+        setClaimError(detail)
+        return
+      }
+
+      console.log('[claim_student_card] RPC result', data)
+
+      // The function returns 'claimed' / 'owned_by_you' on success.
+      if (data === 'claimed' || data === 'owned_by_you') {
+        router.push('/dashboard')
+        router.refresh()
+        return
+      }
+
+      setClaimError({
+        message:
+          data == null
+            ? 'claim_student_card returned no data (null) with no error.'
+            : `claim_student_card returned "${String(data)}"`,
+      })
+    } catch (err) {
+      const message = err instanceof Error ? err.message : String(err)
+      console.error('[claim_student_card] unexpected error', { message, error: err })
+      setClaimError({ message })
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  return (
+    <>
+      <button
+        type="button"
+        onClick={() => void handleClaim()}
+        disabled={busy}
+        style={{ ...goldButton, opacity: busy ? 0.65 : 1 }}
+      >
+        {busy ? (
+          'Claiming...'
+        ) : (
+          <>
+            Claim this card
+            <i className="fa-solid fa-arrow-right" style={{ fontSize: '11px' }} />
+          </>
+        )}
+      </button>
+
+      {claimError && (
+        <div role="alert" style={errorBoxStyle}>
+          <p style={{ margin: 0, color: '#f0a8a8', fontSize: '12px', fontWeight: 700 }}>
+            Claim failed
+          </p>
+          <dl style={{ margin: '8px 0 0', display: 'grid', gridTemplateColumns: 'auto 1fr', gap: '4px 10px' }}>
+            <dt style={errorKeyStyle}>message</dt>
+            <dd style={errorValueStyle}>{claimError.message}</dd>
+            {claimError.code ? (
+              <>
+                <dt style={errorKeyStyle}>code</dt>
+                <dd style={errorValueStyle}>{claimError.code}</dd>
+              </>
+            ) : null}
+            {claimError.details ? (
+              <>
+                <dt style={errorKeyStyle}>details</dt>
+                <dd style={errorValueStyle}>{claimError.details}</dd>
+              </>
+            ) : null}
+            {claimError.hint ? (
+              <>
+                <dt style={errorKeyStyle}>hint</dt>
+                <dd style={errorValueStyle}>{claimError.hint}</dd>
+              </>
+            ) : null}
+          </dl>
+        </div>
+      )}
+    </>
+  )
+}
+
 export default function ClaimScreen({ code, message }: { code: string; message?: string }) {
   const [supabase] = useState(() => createClient())
   const [mode, setMode] = useState<Mode>('start')
@@ -106,8 +250,7 @@ export default function ClaimScreen({ code, message }: { code: string; message?:
   }
 
   const buildCallbackUrl = () => {
-    const next = `/c/${encodeURIComponent(code)}?claim=1`
-    return `${window.location.origin}/auth/callback?next=${encodeURIComponent(next)}`
+    return `${window.location.origin}/auth/callback?next=/c/${encodeURIComponent(code)}`
   }
 
   const handleGoogle = async () => {

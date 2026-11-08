@@ -2,8 +2,8 @@ import type { CSSProperties, ReactNode } from 'react'
 import Image from 'next/image'
 import Link from 'next/link'
 import { createClient } from '@/lib/supabase-server'
-import ClaimScreen from './ClaimScreen'
-import { claimCardAction, signOutAction } from './actions'
+import ClaimScreen, { ClaimCardButton } from './ClaimScreen'
+import { signOutAction } from './actions'
 
 export const dynamic = 'force-dynamic'
 
@@ -309,13 +309,8 @@ function ClaimPanel({
       </p>
       <div style={{ marginTop: '22px' }}>
         <MessageBanner message={message} />
+        <ClaimCardButton code={code} />
       </div>
-      <form action={claimCardAction.bind(null, code)}>
-        <button type="submit" style={goldButton}>
-          Claim this card
-          <i className="fa-solid fa-arrow-right" style={{ fontSize: '11px' }} />
-        </button>
-      </form>
       <form action={signOutAction.bind(null, code)} style={{ marginTop: '12px' }}>
         <button type="submit" style={ghostButton}>
           Not you? Sign out
