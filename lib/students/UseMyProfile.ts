@@ -1,7 +1,7 @@
 'use client'
 
 import { useCallback, useEffect, useState } from 'react'
-import { createClient } from './supabase-browser'
+import { createClient } from '../supabase-browser'
 import type { StudentProfile } from './student'
 
 export function useMyProfile() {
