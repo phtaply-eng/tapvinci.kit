@@ -1,45 +1,30 @@
 'use client'
+import { useEffect, useRef } from 'react'
+import { supabase } from '../../lib/supabase'
 
-import { useEffect, useState } from 'react'
-import { createClient } from '../../lib/supabase-browser'
-
-type TapResult = {
-  counted?: boolean
-  tap_count?: number
-  streak_count?: number
-}
-
-export default function StudentTapTracker({
-  username,
-  isOwner = false,
-}: {
-  username: string
-  isOwner?: boolean
-}) {
-  const [tapCount, setTapCount] = useState<number | null>(null)
-  const [streak, setStreak] = useState<number | null>(null)
+// Phase 3 Fix: Invisible tracker.
+// It only calls record_student_tap and returns null, so it shows NO bar.
+// The tap count is displayed by StudentStats inside the card, not here.
+// The RPC itself skips owner views, so we don't need a client-side owner check.
+export default function StudentTapTracker({ username }: { username: string }) {
+  const hasCounted = useRef(false)
 
   useEffect(() => {
-    if (!username) return
-    if (isOwner) return
-    const supabase = createClient()
-    supabase
-      .rpc('record_student_tap', { p_username: username })
-      .then(({ data, error }) => {
-        if (error) return
-        const row = (Array.isArray(data) ? data[0] : data) as TapResult | null
-        if (!row) return
-        if (typeof row.tap_count === 'number') setTapCount(row.tap_count)
-        if (typeof row.streak_count === 'number') setStreak(row.streak_count)
+    if (hasCounted.current) return
+    hasCounted.current = true
+
+    const record = async () => {
+      const { error } = await supabase.rpc('record_student_tap', {
+        p_username: username.toLowerCase(),
       })
-  }, [username, isOwner])
+      if (error) {
+        // Don't break the page if tap counting fails, just log it
+        console.warn('[StudentTapTracker] record_student_tap failed:', error.message)
+      }
+    }
 
-  if (tapCount === null) return null
+    record()
+  }, [username])
 
-  return (
-    <div className="rounded-2xl border p-4 text-center">
-      <p className="text-2xl font-bold">{tapCount} taps</p>
-      <p className="text-sm opacity-70">{streak ?? 0} day streak</p>
-    </div>
-  )
+  return null
 }

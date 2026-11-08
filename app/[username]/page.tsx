@@ -17,6 +17,29 @@ async function getProfile(username: string): Promise<Profile | null> {
   const { data } = await supabase.from('profiles').select('*').eq('username', username.toLowerCase()).maybeSingle()
   if (!data) return null
   if ((data as { is_active?: boolean | null }).is_active === false) return null
+
+  // Phase 3 Fix: Student data lives in student_profiles, not profiles.
+  // Merge it so StudentStats / StudentEducation / StudentSpotify inside TaplyTemplate
+  // see the real tap_count, streak_count, school, course, year_level, spotify_url.
+  // We only overwrite with non-null values, so a NULL in student_profiles
+  // never wipes a real value from profiles.
+  if ((data as any)?.tier === 'student') {
+    const { data: studentData } = await supabase
+      .from('student_profiles')
+      .select('*')
+      .eq('id', (data as any).id)
+      .maybeSingle()
+    if (studentData) {
+      const merged: any = { ...(data as any) }
+      for (const [key, value] of Object.entries(studentData as any)) {
+        if (value !== null && value !== undefined) {
+          merged[key] = value
+        }
+      }
+      return merged as Profile
+    }
+  }
+
   return data as Profile
 }
 
