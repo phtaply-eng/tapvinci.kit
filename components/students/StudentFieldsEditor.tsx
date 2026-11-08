@@ -44,15 +44,22 @@ export default function StudentFieldsEditor({
       }
     }
 
+    // FIX: school / course / year_level / spotify_url live in student_profiles, not profiles.
+    // profiles only has username, name, tier, etc. Saving them to profiles caused:
+    // "Could not find the 'course' column of 'profiles' in the schema cache"
+    // Use upsert so it works even if the student_profiles row does not exist yet.
     const { error } = await supabase
-      .from('profiles')
-      .update({
-        school: school.trim() || null,
-        course: course.trim() || null,
-        year_level: yearLevel.trim() || null,
-        spotify_url: spotifyUrl.trim() || null,
-      })
-      .eq('id', profile.id)
+      .from('student_profiles')
+      .upsert(
+        {
+          id: profile.id,
+          school: school.trim() || null,
+          course: course.trim() || null,
+          year_level: yearLevel.trim() || null,
+          spotify_url: spotifyUrl.trim() || null,
+        },
+        { onConflict: 'id' }
+      )
 
     setSaving(false)
     if (error) {

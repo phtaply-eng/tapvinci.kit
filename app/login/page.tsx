@@ -9,13 +9,36 @@ export default function LoginPage() {
   const [loading, setLoading] = useState(false);
   const [checking, setChecking] = useState(true);
   const [userEmail, setUserEmail] = useState<string | null>(null);
+  const [myUsername, setMyUsername] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
     const check = async () => {
       const supabase = createClient();
       const { data } = await supabase.auth.getUser();
-      setUserEmail(data?.user?.email ?? null);
+      const user = data?.user;
+      setUserEmail(user?.email ?? null);
+      if (user) {
+        // Find the profile owned by this Google account
+        // Try claimed_by first, then id as fallback
+        let found: string | null = null;
+        const byClaimed = await supabase
+          .from("profiles")
+          .select("username")
+          .eq("claimed_by", user.id)
+          .maybeSingle();
+        if (byClaimed.data?.username) {
+          found = byClaimed.data.username;
+        } else {
+          const byId = await supabase
+            .from("profiles")
+            .select("username")
+            .eq("id", user.id)
+            .maybeSingle();
+          if (byId.data?.username) found = byId.data.username;
+        }
+        if (found) setMyUsername(found);
+      }
       setChecking(false);
     };
     check();
@@ -28,7 +51,7 @@ export default function LoginPage() {
     const { error } = await supabase.auth.signInWithOAuth({
       provider: "google",
       options: {
-        redirectTo: `${window.location.origin}/dashboard`,
+        redirectTo: `${window.location.origin}/login`,
       },
     });
     if (error) {
@@ -42,12 +65,16 @@ export default function LoginPage() {
     const supabase = createClient();
     await supabase.auth.signOut();
     setUserEmail(null);
+    setMyUsername(null);
     setLoading(false);
-    // stay on this page so you can pick a different Google account
   };
 
   const handleContinue = () => {
-    router.push("/dashboard");
+    if (myUsername) {
+      router.push(`/dashboard?edit=${myUsername}`);
+    } else {
+      router.push("/dashboard");
+    }
   };
 
   if (checking) {
@@ -69,18 +96,24 @@ export default function LoginPage() {
             <p style={{ fontSize: 14, color: "#d4d4d4", lineHeight: 1.5, marginBottom: 6 }}>
               You are signed in as:
             </p>
-            <p style={{ fontSize: 15, fontWeight: 700, color: "#facc15", marginTop: 0, marginBottom: 20, wordBreak: "break-all" }}>
+            <p style={{ fontSize: 15, fontWeight: 700, color: "#facc15", marginTop: 0, marginBottom: 8, wordBreak: "break-all" }}>
               {userEmail}
             </p>
-            <p style={{ fontSize: 13, color: "#a3a3a3", lineHeight: 1.5, marginBottom: 20 }}>
-              To edit the student card, you must be signed in as the Google account that claimed it.
-              If this is not that account, sign out and sign in with the student account.
-            </p>
+            {myUsername && (
+              <p style={{ fontSize: 13, color: "#a3a3a3", marginTop: 0, marginBottom: 20 }}>
+                Your card: <span style={{ color: "#e5e5e5", fontWeight: 600 }}>{myUsername}</span>
+              </p>
+            )}
+            {!myUsername && (
+              <p style={{ fontSize: 13, color: "#a3a3a3", lineHeight: 1.5, marginBottom: 20 }}>
+                To edit the student card, you must be signed in as the Google account that claimed it.
+              </p>
+            )}
             <button
               onClick={handleContinue}
               style={{ width: "100%", padding: "14px 16px", borderRadius: 999, border: "none", background: "#facc15", color: "black", fontWeight: 700, fontSize: 16, cursor: "pointer", marginBottom: 12 }}
             >
-              Continue to Dashboard
+              {myUsername ? `Continue to my card (${myUsername})` : "Continue to Dashboard"}
             </button>
             <button
               onClick={handleSignOut}
