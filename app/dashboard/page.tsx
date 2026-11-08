@@ -56,6 +56,11 @@ const THEMES = [
   { id: 'orange', name: 'Sunrise Orange', hex: '#f97316', desc: 'Energetic' },
 ]
 
+const SPOTIFY_URL_PATTERN =
+  /^(spotify:(track|album|playlist|episode|show|artist):[A-Za-z0-9]+|https?:\/\/(?:open|play)\.spotify\.com\/(?:intl-[a-z-]+\/)?(?:embed\/)?(track|album|playlist|episode|show|artist)\/[A-Za-z0-9]+)/i
+
+const isValidSpotifyUrl = (value: string) => !value.trim() || SPOTIFY_URL_PATTERN.test(value.trim())
+
 const BUCKET = 'profile-images'
 const RECEIPT_BUCKET = 'payment-proofs'
 const MAX_INPUT_BYTES = 20 * 1024 * 1024
@@ -120,6 +125,8 @@ export default function Dashboard() {
     gallery: [],
     socials: { ...DEFAULT_SOCIALS },
     socials_visible: { ...DEFAULT_VISIBLE },
+    spotify_url: '',
+    is_admin: false,
     gcash_qr_url: '',
     maya_qr_url: '',
     gcash_name: '',
@@ -294,20 +301,86 @@ export default function Dashboard() {
 
   const SITE_URL = (process.env.NEXT_PUBLIC_SITE_URL || 'https://tapvinci.vercel.app').replace(/\/+$/, '')
 
-  const handleSaveClick = () => {
+  // Only the profile row flagged in Supabase can skip checkout. Do not use the
+  // editable `email` field for this check: any user could type the admin email.
+  const isAdmin =
+    profile.is_admin === true ||
+    String(profile.role || '').toLowerCase() === 'admin'
+
+  const validateProfile = () => {
     const username = (profile.username || '').trim().toLowerCase()
     const name = (profile.name || '').trim()
 
     if (!username || !name) {
       showToast('Username and Name are required.')
-      return
+      return false
     }
     if (!/^[a-z0-9_-]+$/.test(username)) {
       showToast('Username can only use letters, numbers, hyphens, and underscores.')
+      return false
+    }
+    return true
+  }
+
+  const handleSaveProfile = async () => {
+    if (!validateProfile()) return
+
+    // Regular users keep the existing checkout/verification flow.
+    if (!isAdmin) {
+      setIsPaymentModalOpen(true)
       return
     }
-    setIsPaymentModalOpen(true)
+
+    // Admin/creator: save directly, keep the profile active, skip payment.
+    setSaving(true)
+    const fixedUsername = profile.username.trim().toLowerCase()
+
+    // Do not overwrite server-managed/order fields with stale dashboard state.
+    const rest: Record<string, any> = { ...profile }
+    for (const key of [
+      'id', 'created_at', 'views', 'receipt_url',
+      'payment_status', 'is_active', 'is_admin', 'paid_at',
+      'fulfillment', 'fulfilled_at', 'deactivated_at',
+      'package', 'plan_tier', 'plan_amount', 'payment_method',
+    ]) {
+      delete rest[key]
+    }
+
+    try {
+      const fixed = {
+        ...rest,
+        username: fixedUsername,
+        is_admin: true,
+        is_active: true,
+        payment_status: 'paid',
+        paid_at: profile.paid_at || new Date().toISOString(),
+      }
+
+      const { data, error } = await supabase
+        .from('profiles')
+        .upsert(fixed, { onConflict: 'username' })
+        .select('username, is_admin, is_active, payment_status')
+        .single()
+
+      if (error) throw error
+      if (!data) throw new Error('The database did not return the saved profile.')
+
+      setProfile((p: any) => ({
+        ...p,
+        ...data,
+        is_admin: true,
+        is_active: true,
+        payment_status: 'paid',
+      }))
+      showToast('Profile updated successfully')
+    } catch (err) {
+      console.error('[Admin save] Profile save failed:', err)
+      showToast('Could not save profile. Please try again.')
+    } finally {
+      setSaving(false)
+    }
   }
+
 
   const handleConfirmPayment = async ({ receiptFile, planTier, planAmount, paymentMethod }: PaymentSubmission) => {
     setSaving(true)
@@ -435,6 +508,11 @@ export default function Dashboard() {
 <div ref={editTopRef} className="edit-panel space-y-4 bg-zinc-900 p-6 rounded-2xl h-auto min-h-0 pb-6" style={{ height: 'auto', minHeight: 0 }}>
           <div className="flex items-center justify-between gap-3">
             <h1 className="text-xl font-bold">Edit Profile</h1>
+            {isAdmin && (
+              <span className="rounded-full border px-2.5 py-1 text-[9px] font-bold uppercase tracking-widest" style={{ borderColor: '#D4AF3755', background: '#D4AF3715', color: '#D4AF37' }}>
+                Admin · Payment skipped
+              </span>
+            )}
           </div>
           
           <label className="block text-[11px] tracking-widest text-zinc-400 uppercase">Username<input value={profile.username} onChange={e => setProfile({...profile, username: e.target.value.toLowerCase()})} className={inputCls} /></label>
@@ -563,6 +641,34 @@ export default function Dashboard() {
                 </div>
               )
             })}
+
+            {/* 6.5 SPOTIFY PLAYER */}
+            <div className="mt-4 rounded-xl border border-zinc-800 bg-zinc-800/50 p-3">
+              <div className="flex items-center justify-between mb-2">
+                <label className="text-xs font-bold text-[#1DB954] flex items-center gap-2">
+                  <i className="fa-brands fa-spotify"></i>
+                  Spotify
+                  {profile.spotify_url && isValidSpotifyUrl(profile.spotify_url) && (
+                    <span className="text-[9px] bg-[#1DB954]/20 px-1.5 py-0.5 rounded text-[#1ED760]">LIVE</span>
+                  )}
+                </label>
+              </div>
+              <input
+                value={profile.spotify_url || ''}
+                onChange={e => setProfile({ ...profile, spotify_url: e.target.value })}
+                className={inputCls + ' mt-0'}
+                placeholder="https://open.spotify.com/track/..."
+                aria-label="Spotify track or playlist link"
+              />
+              <p className="text-[10px] text-zinc-500 mt-1.5">
+                Paste a track, album, or playlist link. It appears under &ldquo;Let&apos;s Connect&rdquo; on your profile.
+              </p>
+              {!isValidSpotifyUrl(profile.spotify_url || '') && (
+                <p className="text-[10px] text-red-400 mt-1">
+                  That doesn&apos;t look like a Spotify link yet.
+                </p>
+              )}
+            </div>
           </div>
 
           {/* 7. QUICK ACTIONS & CONTACT */}
@@ -674,8 +780,8 @@ export default function Dashboard() {
             </div>
           )}
           
-          <button onClick={handleSaveClick} disabled={saving || heroUploading || galleryUploading || gcashUploading || mayaUploading} className="w-full py-3 rounded-xl font-bold hover:brightness-110 disabled:opacity-50" style={{background: profile.accent_color, color: 'black'}}>
-            {saving ? 'Processing...' : 'Save Profile'}
+          <button onClick={handleSaveProfile} disabled={saving || heroUploading || galleryUploading || gcashUploading || mayaUploading} className="w-full py-3 rounded-xl font-bold hover:brightness-110 disabled:opacity-50" style={{background: profile.accent_color, color: 'black'}}>
+            {saving ? 'Saving...' : isAdmin ? 'Save Profile (Admin)' : 'Save Profile'}
           </button>
         </div>
               </div>

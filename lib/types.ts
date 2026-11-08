@@ -21,6 +21,11 @@ export type Profile = {
   gallery?: (GalleryItem|string)[]
   socials?: Partial<Record<SocialKey,string>>
   socials_visible?: Record<string, boolean>
+  spotify_url?: string | null
+  is_admin?: boolean
+  role?: string | null
+  is_active?: boolean
+  payment_status?: string | null
   created_at?: string
 }
 

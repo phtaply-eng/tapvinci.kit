@@ -1,5 +1,5 @@
 'use client'
-import { useCallback, useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import Link from 'next/link'
 import { supabase } from '../../lib/supabase'
 
@@ -54,9 +54,48 @@ const COLUMNS: { key: SortKey; label: string }[] = [
 
 const PROFILE_BUCKET = 'profile-images'
 
-type EditForm = { name: string; title: string; bio: string; about: string; phone: string; email: string; facebook: string; instagram: string; website: string }
-const EMPTY_EDIT: EditForm = { name: '', title: '', bio: '', about: '', phone: '', email: '', facebook: '', instagram: '', website: '' }
-const EDIT_FIELDS: { key: keyof EditForm; label: string; rows?: number }[] = [
+const THEME_OPTIONS = [
+  { id: 'gold', name: 'Black Gold', hex: '#D4AF37', desc: 'Default luxury' },
+  { id: 'purple', name: 'Midnight Purple', hex: '#a855f7', desc: 'Creative / Tour' },
+  { id: 'blue', name: 'Ocean Blue', hex: '#2563eb', desc: 'Professional' },
+  { id: 'green', name: 'Forest Green', hex: '#22c55e', desc: 'Fresh / Nature' },
+  { id: 'pink', name: 'Sunset Pink', hex: '#ec4899', desc: 'Bold / Creator' },
+  { id: 'orange', name: 'Sunrise Orange', hex: '#f97316', desc: 'Energetic' },
+] as const
+
+const SPOTIFY_URL_PATTERN =
+  /^(spotify:(track|album|playlist|episode|show|artist):[A-Za-z0-9]+|https?:\/\/(?:open|play)\.spotify\.com\/(?:intl-[a-z-]+\/)?(?:embed\/)?(track|album|playlist|episode|show|artist)\/[A-Za-z0-9]+)/i
+const isValidSpotifyUrl = (value: string) => !value.trim() || SPOTIFY_URL_PATTERN.test(value.trim())
+
+type GalleryItem = { src: string; alt?: string }
+
+type EditForm = {
+  name: string
+  title: string
+  bio: string
+  about: string
+  phone: string
+  email: string
+  facebook: string
+  instagram: string
+  website: string
+  address: string
+  mapsLink: string
+  hero_image: string
+  gallery: GalleryItem[]
+  theme: string
+  accent_color: string
+  spotify_url: string
+  gcash_qr_url: string
+  maya_qr_url: string
+}
+const EMPTY_EDIT: EditForm = {
+  name: '', title: '', bio: '', about: '', phone: '', email: '', facebook: '', instagram: '', website: '',
+  address: '', mapsLink: '', hero_image: '', gallery: [], theme: 'gold', accent_color: '#D4AF37',
+  spotify_url: '', gcash_qr_url: '', maya_qr_url: '',
+}
+type EditTextField = 'name' | 'title' | 'bio' | 'about' | 'phone' | 'email' | 'facebook' | 'instagram' | 'website'
+const EDIT_FIELDS: { key: EditTextField; label: string; rows?: number }[] = [
   { key: 'name', label: 'Name' },
   { key: 'title', label: 'Title' },
   { key: 'bio', label: 'Bio', rows: 3 },
@@ -67,6 +106,50 @@ const EDIT_FIELDS: { key: keyof EditForm; label: string; rows?: number }[] = [
   { key: 'instagram', label: 'Instagram Link' },
   { key: 'website', label: 'Website' },
 ]
+
+type UploadKind = 'hero' | 'gallery' | 'gcash' | 'maya'
+const UPLOAD_OPTS: Record<UploadKind, { maxWidth: number; quality: number }> = {
+  hero: { maxWidth: 1000, quality: 0.8 },
+  gallery: { maxWidth: 800, quality: 0.7 },
+  gcash: { maxWidth: 1000, quality: 0.92 },
+  maya: { maxWidth: 1000, quality: 0.92 },
+}
+const MAX_INPUT_BYTES = 20 * 1024 * 1024
+
+function compressImage(file: File, maxWidth: number, quality: number): Promise<File> {
+  return new Promise((resolve, reject) => {
+    const objectUrl = URL.createObjectURL(file)
+    const img = new Image()
+    img.onload = () => {
+      URL.revokeObjectURL(objectUrl)
+      let width = img.naturalWidth
+      let height = img.naturalHeight
+      if (width > maxWidth) {
+        height = Math.round((maxWidth / width) * height)
+        width = maxWidth
+      }
+      const canvas = document.createElement('canvas')
+      canvas.width = width
+      canvas.height = height
+      const ctx = canvas.getContext('2d')
+      if (!ctx) return reject(new Error('Canvas not supported in this browser'))
+      ctx.drawImage(img, 0, 0, width, height)
+      canvas.toBlob((blob) => {
+        if (!blob) return reject(new Error('Could not compress the image'))
+        resolve(new File([blob], file.name.replace(/\.[^/.]+$/, '') + '.webp', { type: 'image/webp' }))
+      }, 'image/webp', quality)
+    }
+    img.onerror = () => {
+      URL.revokeObjectURL(objectUrl)
+      reject(new Error('Could not read this image. Try a JPG or PNG.'))
+    }
+    img.src = objectUrl
+  })
+}
+
+const fieldCls = 'w-full mt-1 h-10 bg-[#1E1E20] border border-[#2A2A2A] focus:border-[#D4AF37] outline-none rounded-[10px] px-3 text-[13px] normal-case tracking-normal text-white'
+const areaCls = 'w-full mt-1 bg-[#1E1E20] border border-[#2A2A2A] focus:border-[#D4AF37] outline-none rounded-[10px] p-3 text-[13px] normal-case tracking-normal text-white'
+const sectionTitle = 'text-[10px] uppercase tracking-[1.5px] text-[#D4AF37] font-bold'
 
 function socialUrl(v: unknown): string {
   if (typeof v === 'string') return v
@@ -242,6 +325,12 @@ export default function AdminPage() {
   const [editingProfile, setEditingProfile] = useState<Row | null>(null)
   const [editForm, setEditForm] = useState<EditForm>(EMPTY_EDIT)
   const [savingEdit, setSavingEdit] = useState(false)
+  const [uploading, setUploading] = useState<UploadKind | null>(null)
+  const [dragOver, setDragOver] = useState<UploadKind | null>(null)
+  const heroInputRef = useRef<HTMLInputElement>(null)
+  const galleryInputRef = useRef<HTMLInputElement>(null)
+  const gcashInputRef = useRef<HTMLInputElement>(null)
+  const mayaInputRef = useRef<HTMLInputElement>(null)
   const [deleteConfirm, setDeleteConfirm] = useState<Row | null>(null)
   const [deleteText, setDeleteText] = useState('')
   const [busyAction, setBusyAction] = useState(false)
@@ -467,7 +556,20 @@ export default function AdminPage() {
 
   function handleEdit(profile: Row) {
     const soc = (profile.socials && typeof profile.socials === 'object' ? profile.socials : {}) as Record<string, unknown>
+    const rawTheme = typeof profile.theme === 'object' && profile.theme ? profile.theme.pack : profile.theme
+    const themeId = (rawTheme || 'gold').toString()
+    const themeMeta = THEME_OPTIONS.find((t) => t.id === themeId)
+    const gallery = Array.isArray(profile.gallery)
+      ? profile.gallery
+          .map((g: unknown): GalleryItem =>
+            typeof g === 'string'
+              ? { src: g, alt: 'Gallery photo' }
+              : { src: (g as GalleryItem)?.src || '', alt: (g as GalleryItem)?.alt || 'Gallery photo' }
+          )
+          .filter((g) => !!g.src)
+      : []
     setEditForm({
+      ...EMPTY_EDIT,
       name: displayName(profile),
       title: profile.title || '',
       bio: profile.bio || '',
@@ -477,12 +579,97 @@ export default function AdminPage() {
       facebook: socialUrl(soc.facebook),
       instagram: socialUrl(soc.instagram),
       website: socialUrl(soc.website),
+      address: profile.address || '',
+      mapsLink: profile.mapsLink || profile.maps_link || '',
+      hero_image: profile.hero_image || profile.avatar_url || '',
+      gallery,
+      theme: themeId,
+      accent_color: profile.accent_color || themeMeta?.hex || '#D4AF37',
+      spotify_url: profile.spotify_url || '',
+      gcash_qr_url: profile.gcash_qr_url || '',
+      maya_qr_url: profile.maya_qr_url || '',
     })
+    setUploading(null)
+    setDragOver(null)
     setEditingProfile(profile)
+  }
+
+  // Same storage contract as the full dashboard editor: compressed WebP files
+  // under profile-images/{username}/..., public URL saved on the profile row.
+  async function uploadProfileImage(file: File, kind: UploadKind): Promise<string | null> {
+    const username = (editingProfile?.username || '').toLowerCase().replace(/[^a-z0-9_-]/g, '')
+    if (!username) {
+      showToast('Missing username - cannot upload photos')
+      return null
+    }
+    if (!file.type.startsWith('image/')) {
+      showToast('Please choose an image file')
+      return null
+    }
+    if (file.size > MAX_INPUT_BYTES) {
+      showToast(`${file.name} is too large (max ${MAX_INPUT_BYTES / 1024 / 1024} MB)`)
+      return null
+    }
+    try {
+      const { maxWidth, quality } = UPLOAD_OPTS[kind]
+      const compressed = await compressImage(file, maxWidth, quality)
+      const safeName = file.name.replace(/\.[^/.]+$/, '').replace(/[^a-zA-Z0-9-]/g, '').slice(0, 40) || 'photo'
+      const stamp = Date.now()
+      const isQR = kind === 'gcash' || kind === 'maya'
+      const path =
+        kind === 'hero' ? `${username}/avatar/${stamp}-avatar.webp`
+        : kind === 'gallery' ? `${username}/gallery/${stamp}-${safeName}.webp`
+        : `${username}/payment/${kind}-qr.webp`
+      const { error } = await supabase.storage.from(PROFILE_BUCKET).upload(path, compressed, {
+        cacheControl: '3600',
+        upsert: isQR,
+        contentType: 'image/webp',
+      })
+      if (error) throw error
+      const url = supabase.storage.from(PROFILE_BUCKET).getPublicUrl(path).data.publicUrl
+      return isQR ? `${url}?v=${stamp}` : url
+    } catch (err) {
+      showToast('Upload failed: ' + ((err as Error)?.message || 'unknown error'))
+      return null
+    }
+  }
+
+  async function handleHeroUpload(files: FileList | null) {
+    if (!files || files.length === 0) return
+    setUploading('hero')
+    const url = await uploadProfileImage(files[0], 'hero')
+    setUploading(null)
+    if (url) setEditForm((p) => ({ ...p, hero_image: url }))
+  }
+
+  async function handleGalleryUpload(files: FileList | null) {
+    if (!files || files.length === 0) return
+    setUploading('gallery')
+    const added: GalleryItem[] = []
+    for (let i = 0; i < files.length; i++) {
+      const url = await uploadProfileImage(files[i], 'gallery')
+      if (url) added.push({ src: url, alt: 'Gallery photo' })
+    }
+    setUploading(null)
+    if (added.length > 0) setEditForm((p) => ({ ...p, gallery: [...p.gallery, ...added] }))
+  }
+
+  async function handleQrUpload(files: FileList | null, kind: 'gcash' | 'maya') {
+    if (!files || files.length === 0) return
+    setUploading(kind)
+    const url = await uploadProfileImage(files[0], kind)
+    setUploading(null)
+    if (url) setEditForm((p) => ({ ...p, [kind === 'gcash' ? 'gcash_qr_url' : 'maya_qr_url']: url }))
+  }
+
+  function removeGalleryItem(idx: number) {
+    setEditForm((p) => ({ ...p, gallery: p.gallery.filter((_, i) => i !== idx) }))
   }
 
   async function handleSaveEdit() {
     if (!editingProfile) return
+    if (uploading) return showToast('Wait for the upload to finish')
+    if (!isValidSpotifyUrl(editForm.spotify_url)) return showToast('That does not look like a Spotify link')
     setSavingEdit(true)
     const f = editForm
     const base = (editingProfile.socials && typeof editingProfile.socials === 'object' ? editingProfile.socials : {}) as Record<string, unknown>
@@ -495,7 +682,26 @@ export default function AdminPage() {
     const nameKey = 'business' in editingProfile && !('name' in editingProfile) ? 'business' : 'name'
     const { data, error } = await supabase
       .from('profiles')
-      .update({ [nameKey]: f.name.trim(), title: f.title.trim(), bio: f.bio, about: f.about, phone: f.phone.trim(), email: f.email.trim(), socials })
+      .update({
+        [nameKey]: f.name.trim(),
+        title: f.title.trim(),
+        bio: f.bio,
+        about: f.about,
+        phone: f.phone.trim(),
+        email: f.email.trim(),
+        address: f.address.trim(),
+        mapsLink: f.mapsLink.trim(),
+        socials,
+        hero_image: f.hero_image,
+        // Keep the legacy avatar column in sync so "Remove" truly clears the photo.
+        avatar_url: f.hero_image,
+        gallery: f.gallery,
+        theme: f.theme,
+        accent_color: f.accent_color,
+        spotify_url: f.spotify_url.trim(),
+        gcash_qr_url: f.gcash_qr_url,
+        maya_qr_url: f.maya_qr_url,
+      })
       .eq('username', editingProfile.username)
       .select()
     setSavingEdit(false)
@@ -1159,37 +1365,253 @@ export default function AdminPage() {
 
       {editingProfile && (
         <div className="admin-edit-modal" onClick={() => setEditingProfile(null)} role="dialog" aria-modal="true" aria-label={`Edit ${editingProfile.username}`}>
-          <div className="admin-edit-card" onClick={(e) => e.stopPropagation()}>
-            <div className="flex justify-between items-center mb-4">
-              <h3 className="text-white font-bold">Edit {editingProfile.username}</h3>
-              <button onClick={() => setEditingProfile(null)} aria-label="Close" className="w-8 h-8 bg-[#1E1E20] rounded-full flex items-center justify-center text-gray-400 hover:text-white">✕</button>
+          <div
+            className="admin-edit-card flex flex-col"
+            style={{ maxWidth: 680, maxHeight: '90vh', overflow: 'hidden' }}
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="flex justify-between items-center gap-3 pb-4 border-b border-[#1E1E20] shrink-0">
+              <div>
+                <h3 className="text-white font-bold">Edit {editingProfile.username}</h3>
+                <p className="text-[10px] text-gray-500 mt-0.5">Profile, photos, gallery, theme &amp; payment details</p>
+              </div>
+              <button onClick={() => setEditingProfile(null)} aria-label="Close" className="w-8 h-8 bg-[#1E1E20] rounded-full flex items-center justify-center text-gray-400 hover:text-white shrink-0">✕</button>
             </div>
-            <div className="space-y-3">
-              {EDIT_FIELDS.map((fld) => (
-                <label key={fld.key} className="block text-[10px] uppercase tracking-widest text-gray-500">
-                  {fld.label}
-                  {fld.rows ? (
-                    <textarea
-                      rows={fld.rows}
-                      value={editForm[fld.key]}
-                      onChange={(e) => setEditForm((p) => ({ ...p, [fld.key]: e.target.value }))}
-                      className="w-full mt-1 bg-[#1E1E20] border border-[#2A2A2A] focus:border-[#D4AF37] outline-none rounded-[10px] p-3 text-[13px] normal-case tracking-normal text-white"
-                    />
+
+            {/* Scrollable body */}
+            <div className="max-h-[90vh] overflow-y-auto flex-1 min-h-0 py-4 pr-1 space-y-5">
+              {/* BASIC INFO */}
+              <div className="space-y-3">
+                <p className={sectionTitle}>Basic Info</p>
+                {EDIT_FIELDS.map((fld) => (
+                  <label key={fld.key} className="block text-[10px] uppercase tracking-widest text-gray-500">
+                    {fld.label}
+                    {fld.rows ? (
+                      <textarea
+                        rows={fld.rows}
+                        value={editForm[fld.key]}
+                        onChange={(e) => setEditForm((p) => ({ ...p, [fld.key]: e.target.value }))}
+                        className={areaCls}
+                      />
+                    ) : (
+                      <input
+                        value={editForm[fld.key]}
+                        onChange={(e) => setEditForm((p) => ({ ...p, [fld.key]: e.target.value }))}
+                        className={fieldCls}
+                      />
+                    )}
+                  </label>
+                ))}
+              </div>
+
+              {/* HERO IMAGE / AVATAR */}
+              <div className="space-y-2 border-t border-[#1E1E20] pt-4">
+                <p className={sectionTitle}>Hero Image / Avatar</p>
+                <div
+                  onDragOver={(e) => { e.preventDefault(); setDragOver('hero') }}
+                  onDragLeave={() => setDragOver(null)}
+                  onDrop={(e) => { e.preventDefault(); setDragOver(null); handleHeroUpload(e.dataTransfer.files) }}
+                  onClick={() => heroInputRef.current?.click()}
+                  className={`relative w-full rounded-xl border-2 border-dashed p-4 cursor-pointer transition-all ${dragOver === 'hero' ? 'border-[#D4AF37] bg-[#D4AF37]/10' : 'border-[#2A2A2A] bg-[#1A1A1C] hover:border-[#3a3a3c]'}`}
+                >
+                  <input ref={heroInputRef} type="file" accept="image/*" className="hidden" onChange={(e) => { const files = e.target.files; handleHeroUpload(files); e.target.value = '' }} />
+                  {editForm.hero_image ? (
+                    <div className="flex items-center gap-3">
+                      <img src={editForm.hero_image} alt="Hero preview" className="w-16 h-16 rounded-lg object-cover bg-white/5 shrink-0" />
+                      <div className="flex-1 min-w-0">
+                        <p className="text-xs text-white truncate">{uploading === 'hero' ? 'Uploading...' : 'Hero image set'}</p>
+                        <p className="text-[11px] text-[#D4AF37] mt-1">Click or drag a new image to replace</p>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={(e) => { e.stopPropagation(); setEditForm((p) => ({ ...p, hero_image: '' })) }}
+                        className="text-[11px] text-red-300 hover:text-red-200 px-2 py-1 rounded-md bg-red-500/10 border border-red-500/25 shrink-0"
+                      >
+                        Remove
+                      </button>
+                    </div>
                   ) : (
-                    <input
-                      value={editForm[fld.key]}
-                      onChange={(e) => setEditForm((p) => ({ ...p, [fld.key]: e.target.value }))}
-                      className="w-full mt-1 h-10 bg-[#1E1E20] border border-[#2A2A2A] focus:border-[#D4AF37] outline-none rounded-[10px] px-3 text-[13px] normal-case tracking-normal text-white"
-                    />
+                    <div className="text-center py-2">
+                      <div className="text-2xl mb-1">📸</div>
+                      <p className="text-xs text-white font-semibold">{uploading === 'hero' ? 'Uploading...' : 'Drop profile photo here'}</p>
+                      <p className="text-[11px] text-gray-500">JPG, PNG or WebP — compressed automatically</p>
+                    </div>
                   )}
+                </div>
+              </div>
+
+              {/* THEME */}
+              <div className="space-y-2 border-t border-[#1E1E20] pt-4">
+                <p className={sectionTitle}>Theme</p>
+                <div className="grid grid-cols-2 gap-2">
+                  {THEME_OPTIONS.map((t) => {
+                    const active = editForm.theme === t.id
+                    return (
+                      <button
+                        key={t.id}
+                        type="button"
+                        onClick={() => setEditForm((p) => ({ ...p, theme: t.id, accent_color: t.hex }))}
+                        className={`p-3 rounded-xl border-2 text-left transition ${active ? 'border-[#D4AF37] bg-[#D4AF37]/10' : 'border-[#2A2A2A] bg-[#1A1A1C] hover:border-[#3a3a3c]'}`}
+                      >
+                        <div className="flex items-center gap-2">
+                          <span className="w-4 h-4 rounded-full border border-white/20 shrink-0" style={{ background: t.hex }} />
+                          <span className="text-xs font-bold text-white">{t.name}</span>
+                        </div>
+                        <p className="text-[10px] text-gray-500 mt-1">{t.desc} • {t.hex}</p>
+                      </button>
+                    )
+                  })}
+                </div>
+              </div>
+
+              {/* GALLERY */}
+              <div className="space-y-2 border-t border-[#1E1E20] pt-4">
+                <div className="flex items-center justify-between">
+                  <p className={sectionTitle}>Gallery</p>
+                  <span className="text-[10px] text-gray-500">{editForm.gallery.length} image{editForm.gallery.length === 1 ? '' : 's'}</span>
+                </div>
+                {editForm.gallery.length > 0 && (
+                  <div className="grid grid-cols-4 gap-2">
+                    {editForm.gallery.map((item, idx) => (
+                      <div key={`${item.src}-${idx}`} className="relative group rounded-lg overflow-hidden border border-[#2A2A2A] bg-[#1A1A1C] aspect-square">
+                        <img src={item.src} alt={item.alt || 'Gallery photo'} className="w-full h-full object-cover" />
+                        <button
+                          type="button"
+                          onClick={() => removeGalleryItem(idx)}
+                          aria-label={`Delete gallery image ${idx + 1}`}
+                          className="absolute top-1 right-1 w-6 h-6 rounded-full bg-black/70 text-red-300 hover:bg-red-500 hover:text-white text-[11px] flex items-center justify-center transition"
+                        >
+                          ✕
+                        </button>
+                      </div>
+                    ))}
+                  </div>
+                )}
+                <div
+                  onDragOver={(e) => { e.preventDefault(); setDragOver('gallery') }}
+                  onDragLeave={() => setDragOver(null)}
+                  onDrop={(e) => { e.preventDefault(); setDragOver(null); handleGalleryUpload(e.dataTransfer.files) }}
+                  onClick={() => galleryInputRef.current?.click()}
+                  className={`w-full rounded-xl border-2 border-dashed p-6 cursor-pointer text-center transition-all ${dragOver === 'gallery' ? 'border-[#D4AF37] bg-[#D4AF37]/10' : 'border-[#2A2A2A] bg-[#1A1A1C] hover:border-[#3a3a3c]'}`}
+                >
+                  <input ref={galleryInputRef} type="file" accept="image/*" multiple className="hidden" onChange={(e) => { const files = e.target.files; handleGalleryUpload(files); e.target.value = '' }} />
+                  <div className="text-2xl mb-1">🖼</div>
+                  <p className="text-xs text-white font-semibold">{uploading === 'gallery' ? 'Uploading...' : 'Drop images here'}</p>
+                  <p className="text-[11px] text-gray-500">or click to pick from computer — multiple allowed</p>
+                </div>
+              </div>
+
+              {/* SPOTIFY */}
+              <div className="space-y-2 border-t border-[#1E1E20] pt-4">
+                <div className="flex items-center gap-2">
+                  <p className="text-[10px] uppercase tracking-[1.5px] text-[#1DB954] font-bold flex items-center gap-2">
+                    <i className="fa-brands fa-spotify" aria-hidden="true" /> Spotify
+                  </p>
+                  {editForm.spotify_url.trim() && isValidSpotifyUrl(editForm.spotify_url) && (
+                    <span className="text-[9px] bg-[#1DB954]/20 px-1.5 py-0.5 rounded text-[#1ED760] font-bold">LIVE</span>
+                  )}
+                </div>
+                <input
+                  value={editForm.spotify_url}
+                  onChange={(e) => setEditForm((p) => ({ ...p, spotify_url: e.target.value }))}
+                  className={fieldCls}
+                  placeholder="https://open.spotify.com/track/..."
+                  aria-label="Spotify track or playlist link"
+                />
+                <p className="text-[10px] text-gray-500">Paste a track, album, or playlist link. Appears under &ldquo;Let&apos;s Connect&rdquo;.</p>
+                {!isValidSpotifyUrl(editForm.spotify_url) && (
+                  <p className="text-[10px] text-red-400">That doesn&apos;t look like a Spotify link yet.</p>
+                )}
+              </div>
+
+              {/* LOCATION */}
+              <div className="space-y-3 border-t border-[#1E1E20] pt-4">
+                <p className={sectionTitle}>Location &amp; Google Maps</p>
+                <label className="block text-[10px] uppercase tracking-widest text-gray-500">
+                  Address
+                  <input
+                    value={editForm.address}
+                    onChange={(e) => setEditForm((p) => ({ ...p, address: e.target.value }))}
+                    className={fieldCls}
+                    placeholder="Quezon City, Philippines"
+                  />
                 </label>
-              ))}
+                <label className="block text-[10px] uppercase tracking-widest text-gray-500">
+                  Google Maps Link
+                  <input
+                    value={editForm.mapsLink}
+                    onChange={(e) => setEditForm((p) => ({ ...p, mapsLink: e.target.value }))}
+                    className={fieldCls}
+                    placeholder="https://maps.app.goo.gl/..."
+                  />
+                </label>
+              </div>
+
+              {/* PAYMENT QR CODES */}
+              <div className="space-y-3 border-t border-[#1E1E20] pt-4">
+                <div>
+                  <p className={sectionTitle}>Payment QR Codes</p>
+                  <p className="text-[11px] text-gray-500 mt-1">Upload this client&apos;s GCash / Maya QR for their customers.</p>
+                </div>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                  {([
+                    { kind: 'gcash' as const, label: 'GCash QR', url: editForm.gcash_qr_url, ref: gcashInputRef, key: 'gcash_qr_url' as const },
+                    { kind: 'maya' as const, label: 'Maya QR', url: editForm.maya_qr_url, ref: mayaInputRef, key: 'maya_qr_url' as const },
+                  ]).map((qr) => (
+                    <div key={qr.kind} className="space-y-2">
+                      <p className="text-[11px] uppercase tracking-widest text-gray-400 font-bold">{qr.label}</p>
+                      <div
+                        onDragOver={(e) => { e.preventDefault(); setDragOver(qr.kind) }}
+                        onDragLeave={() => setDragOver(null)}
+                        onDrop={(e) => { e.preventDefault(); setDragOver(null); handleQrUpload(e.dataTransfer.files, qr.kind) }}
+                        onClick={() => qr.ref.current?.click()}
+                        className={`group relative w-full rounded-[12px] border border-dashed p-4 cursor-pointer text-center transition-all ${dragOver === qr.kind ? 'border-[#D4AF37] bg-[#D4AF37]/10' : 'border-[#3a3a3c] bg-[#1A1A1C] hover:border-[#555]'}`}
+                      >
+                        <input ref={qr.ref} type="file" accept="image/png,image/jpeg,image/jpg,image/webp" className="hidden" onChange={(e) => { const files = e.target.files; handleQrUpload(files, qr.kind); e.target.value = '' }} />
+                        {qr.url ? (
+                          <div className="flex items-center gap-3">
+                            <img src={qr.url} alt={qr.label} className="w-12 h-12 rounded-[8px] object-contain bg-white p-1 shrink-0" />
+                            <div className="flex-1 min-w-0 text-left">
+                              <p className="text-[12px] font-semibold text-white truncate">{uploading === qr.kind ? 'Uploading...' : 'QR uploaded'}</p>
+                              <p className="text-[10px] text-[#D4AF37] mt-0.5">Click or drag to replace</p>
+                            </div>
+                            <button
+                              type="button"
+                              onClick={(e) => { e.stopPropagation(); setEditForm((p) => ({ ...p, [qr.key]: '' })) }}
+                              className="text-[11px] text-red-300 hover:text-red-200 px-2 py-1 rounded-md bg-red-500/10 border border-red-500/25 shrink-0"
+                            >
+                              Remove
+                            </button>
+                          </div>
+                        ) : (
+                          <div className="flex flex-col items-center">
+                            <div className="w-8 h-8 rounded-full bg-[#2A2A2A] flex items-center justify-center mb-2">
+                              <i className="fa-solid fa-qrcode text-gray-400 text-[12px]" aria-hidden="true" />
+                            </div>
+                            <p className="text-[13px] font-semibold text-white">{uploading === qr.kind ? 'Uploading...' : `Drop ${qr.label} here`}</p>
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
             </div>
-            <div className="grid grid-cols-2 gap-3 mt-6">
-              <button onClick={() => setEditingProfile(null)} className="h-[44px] bg-[#1E1E20] border border-[#2A2A2A] rounded-[12px] text-white text-sm">Cancel</button>
-              <button onClick={handleSaveEdit} disabled={savingEdit} className="h-[44px] bg-[#E8C766] hover:bg-[#D4AF37] text-black rounded-[12px] font-bold text-sm disabled:opacity-50">{savingEdit ? 'Saving...' : 'Save Changes'}</button>
+
+            {/* Sticky footer */}
+            <div className="pt-4 border-t border-[#1E1E20] shrink-0">
+              <div className="grid grid-cols-2 gap-3">
+                <button onClick={() => setEditingProfile(null)} className="h-[44px] bg-[#1E1E20] border border-[#2A2A2A] rounded-[12px] text-white text-sm">Cancel</button>
+                <button
+                  onClick={handleSaveEdit}
+                  disabled={savingEdit || !!uploading}
+                  className="h-[44px] bg-[#E8C766] hover:bg-[#D4AF37] text-black rounded-[12px] font-bold text-sm disabled:opacity-50"
+                >
+                  {savingEdit ? 'Saving...' : uploading ? 'Uploading...' : 'Save Changes'}
+                </button>
+              </div>
+              <p className="text-[10px] text-gray-500 mt-3 text-center">Saves every field directly to this client&apos;s Supabase profile.</p>
             </div>
-            <p className="text-[10px] text-gray-500 mt-3 text-center">Need photos, gallery, theme or payment QR? <a href={`/dashboard?edit=${encodeURIComponent(editingProfile.username)}`} className="text-[#D4AF37] underline">Open full dashboard editor →</a></p>
           </div>
         </div>
       )}

@@ -1,6 +1,7 @@
 'use client'
 import { useState, useRef, useEffect } from 'react'
 import { createPortal } from 'react-dom' // <-- NEW IMPORT
+import SpotifyPlayer from './SpotifyPlayer'
 
 export default function TaplyTemplate({ profile }: { profile: any }) {
   const reelRef = useRef<HTMLDivElement>(null)
@@ -285,6 +286,11 @@ END:VCARD`
               />
               <div className="taply-bio" style={{ marginTop: '24px' }}>{profile.bio || 'Bio'}</div>
               {socialButtons.length > 0 && <a href="#socials" className="taply-primary-btn" style={{ marginTop: '16px', display: 'inline-flex' }}>Let's Connect ↓</a>}
+              {profile.spotify_url && (
+                <div style={{ marginTop: '18px' }}>
+                  <SpotifyPlayer spotifyUrl={profile.spotify_url} accentColor={accent} />
+                </div>
+              )}
             </div>
           </section>
 
