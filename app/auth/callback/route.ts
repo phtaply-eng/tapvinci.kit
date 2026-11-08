@@ -20,5 +20,9 @@ export async function GET(request: Request) {
     return NextResponse.redirect(new URL('/?auth_error=1', requestUrl.origin))
   }
 
-  return NextResponse.redirect(new URL('/dashboard', requestUrl.origin))
+  // Only allow local paths so ?next= cannot be used as an open redirect.
+  const next = requestUrl.searchParams.get('next')
+  const safeNext = next && next.startsWith('/') && !next.startsWith('//') ? next : '/dashboard'
+
+  return NextResponse.redirect(new URL(safeNext, requestUrl.origin))
 }
