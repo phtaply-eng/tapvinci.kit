@@ -20,16 +20,24 @@ export default function LoginPage() {
       setUserEmail(user?.email ?? null);
       if (user) {
         // Find the profile owned by this Google account
-        // Try claimed_by first, then id as fallback
+        // FIX: profiles has NO claimed_by column. Owner link is in cards:
+        // cards.claimed_by = user id, cards.profile_id = profiles.id
         let found: string | null = null;
-        const byClaimed = await supabase
-          .from("profiles")
-          .select("username")
+        const card = await supabase
+          .from("cards")
+          .select("profile_id")
           .eq("claimed_by", user.id)
           .maybeSingle();
-        if (byClaimed.data?.username) {
-          found = byClaimed.data.username;
-        } else {
+        if (card.data?.profile_id) {
+          const prof = await supabase
+            .from("profiles")
+            .select("username")
+            .eq("id", card.data.profile_id)
+            .maybeSingle();
+          if (prof.data?.username) found = prof.data.username;
+        }
+        if (!found) {
+          // Fallback: profile id itself equals user id
           const byId = await supabase
             .from("profiles")
             .select("username")
