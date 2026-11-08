@@ -1363,3 +1363,45 @@ html:has(.tv-home) { scroll-behavior: smooth; }
 @keyframes acFade { from { opacity: 0; } to { opacity: 1; } }
 @keyframes acSlide { from { transform: translateX(-100%); } to { transform: translateX(0); } }
 @media (prefers-reduced-motion: reduce) { .ac-drawer, .ac-overlay { animation: none; } .ac-stat:hover { transform: none; } }
+
+/* ===== BUG FIX: Android Brave - logo off-center + sideways scroll for 2-3s on load - APPEND ONLY ===== */
+/* Root cause: IntroOverlay is OUTSIDE .tv-home, so .tv-home { overflow-x: clip } never applied to it. */
+/* The big TapV in IntroOverlay + .tv-bezel (150vw) pushed page wider during intro. Brave allows sideways scroll, iPhone clips it. */
+html, body {
+  max-width: 100vw;
+  overflow-x: clip;
+}
+
+/* Clip ANY intro / overlay - regardless of its class name from IntroOverlay.tsx */
+[class*="intro"], [class*="Intro"], [class*="overlay"], [class*="Overlay"] {
+  max-width: 100vw;
+  overflow-x: clip;
+  box-sizing: border-box;
+}
+
+/* The intro TapV text itself - never wider than viewport, always centered */
+[class*="intro"] [class*="logo"], [class*="Intro"] [class*="logo"],
+[class*="intro"] h1, [class*="Intro"] h1 {
+  max-width: 90vw;
+  width: 100%;
+  margin-inline: auto;
+  text-align: center;
+  overflow-wrap: break-word;
+  white-space: normal;
+}
+
+/* Bezel is 150vw by design - keep it clipped inside hero, never let it widen the page */
+.tv-hero, .tv-hero-art {
+  overflow: hidden;
+  max-width: 100vw;
+}
+.tv-bezel {
+  max-width: 100vw;
+  left: 50%;
+  transform: translateX(-50%);
+}
+/* tvSpin rotates - keep centering transform in the animation */
+@keyframes tvSpin {
+  from { transform: translateX(-50%) rotate(0deg); }
+  to { transform: translateX(-50%) rotate(360deg); }
+}

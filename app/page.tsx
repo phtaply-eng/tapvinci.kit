@@ -43,18 +43,18 @@ export default function Home() {
         <div className="tv-vignette" aria-hidden="true" />
 
         {/* 1. HERO */}
-        <section className="tv-hero" id="top">
+        <section className="tv-hero" id="top" style={{ overflowX: 'clip', maxWidth: '100vw' }}>
           <div className="tv-hero-art" aria-hidden="true">
             <span className="tv-orb" />
             <span className="tv-ripple" /><span className="tv-ripple" /><span className="tv-ripple" />
             <Dial className="tv-bezel" withTicks />
           </div>
-          <div className="tv-wrap tv-hero-inner">
+          <div className="tv-wrap tv-hero-inner" style={{ width: '100%', maxWidth: '100%', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', textAlign: 'center', overflowX: 'clip' }}>
             <p className="tv-est tv-in" style={{ ['--d' as string]: '0s' }}></p>
-           <div className="tv-logo tv-in" style={{ ['--d' as string]: '.15s', marginBottom: '12px' } as any} aria-label="TapVinci">
-              <Image src="/logo.png" alt="TapVinci" width={400} height={100} className="h-20 md:h-24 w-auto object-contain mx-auto" priority />
+           <div className="tv-logo tv-in" style={{ ['--d' as string]: '.15s', marginBottom: '12px', width: '100%', maxWidth: '100%', display: 'flex', justifyContent: 'center', alignItems: 'center' } as any} aria-label="TapVinci">
+              <Image src="/logo.png" alt="TapVinci" width={400} height={100} className="h-20 md:h-24 w-auto max-w-[85vw] object-contain mx-auto" style={{ maxWidth: '85vw' }} priority />
             </div>
-            <h1 className="tv-hero-h1 tv-in whitespace-nowrap" style={{ ['--d' as string]: '.26s', fontSize: 'clamp(48px, 6vw, 69px)' }}>
+            <h1 className="tv-hero-h1 tv-in" style={{ ['--d' as string]: '.26s', fontSize: 'clamp(34px, 9vw, 69px)', whiteSpace: 'normal', overflowWrap: 'break-word', wordBreak: 'keep-all', textAlign: 'center', maxWidth: '100%', lineHeight: 1.05 }}>
             <span>Tap.</span> <span>Connect.</span> <em>Remember.</em>
             </h1>
             <p className="tv-hero-sub tv-in" style={{ ['--d' as string]: '.4s' }}></p>
