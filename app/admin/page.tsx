@@ -134,10 +134,10 @@ type PackageId = keyof typeof PACKAGES
 const LEGACY_CARD_PRICE = 899
 const PAY_OPTIONS = ['paid', 'pending', 'failed'] as const
 type PayStatus = (typeof PAY_OPTIONS)[number]
-const FUL_OPTIONS = ['pending', 'printing', 'shipped', 'completed'] as const
+const FUL_OPTIONS = ['pending', 'printing', 'shipped', 'completed', 'vip'] as const
 type FulStatus = (typeof FUL_OPTIONS)[number]
-const FUL_NEXT: Record<FulStatus, FulStatus | null> = { pending: 'printing', printing: 'shipped', shipped: 'completed', completed: null }
-const MISSING_COLS = /package|payment_status|paid_at|fulfillment|fulfilled_at|is_active|deactivated_at|plan_tier|plan_amount|payment_method/
+const FUL_NEXT: Record<FulStatus, FulStatus | null> = { pending: 'printing', printing: 'shipped', shipped: 'completed', completed: null, vip: null }
+const MISSING_COLS = /package|payment_status|paid_at|fulfillment|fulfilled_at|is_active|deactivated_at|plan_tier|plan_amount|payment_method|is_demo/
 
 const pkgOf = (p: Row): PackageId => (p.package === 'digital' ? 'digital' : 'card')
 const planTierOf = (p: Row): PackageId => {
@@ -165,6 +165,7 @@ const PROTECTED_USERNAMES = ['shua', 'tapvinci', 'shuashushu']
 const isDemo = (p: Row) => p.is_demo === true
 type DemoFilter = 'all' | 'real' | 'demo'
 const DEMO_BADGE_STYLE = { background: 'rgba(255,194,28,0.2)', color: '#FFC21C' } as const
+const VIP_FUL_STYLE = { background: 'rgba(255,194,28,0.2)', color: '#FFC21C', borderColor: 'rgba(255,194,28,0.35)' } as const
 const DEMO_PAY_STYLE = { background: '#1E1E1E', color: '#A1A1A1', borderColor: '#2A2A2A' } as const
 
 function orderNo(p: Row) {
@@ -512,7 +513,7 @@ export default function AdminPage() {
 
   async function handleDelete(profile: Row) {
     if (PROTECTED_USERNAMES.includes((profile.username || '').toString().toLowerCase())) {
-      return showToast(`${profile.username} is a protected demo account - use Deactivate instead`)
+      return showToast(`${profile.username} is a protected VIP account - use Deactivate instead`)
     }
     setBusyAction(true)
     const username = profile.username
@@ -575,7 +576,7 @@ export default function AdminPage() {
   const orderStats = useMemo(() => {
     const paid = realClients.filter((p) => payOf(p) === 'paid')
     const scope = demoFilter === 'real' ? realClients : demoFilter === 'demo' ? activeProfiles.filter(isDemo) : activeProfiles
-    const byFul: Record<FulStatus, number> = { pending: 0, printing: 0, shipped: 0, completed: 0 }
+    const byFul: Record<FulStatus, number> = { pending: 0, printing: 0, shipped: 0, completed: 0, vip: 0 }
     scope.forEach((p) => { byFul[fulOf(p)] += 1 })
     return {
       revenue: paid.reduce((sum, p) => sum + amountOf(p), 0),
@@ -636,8 +637,17 @@ export default function AdminPage() {
   }
   
   const setPayment = (p: Row, v: PayStatus) => updateOrder(p, { payment_status: v, paid_at: v === 'paid' ? new Date().toISOString() : null }, `Payment: ${v.toUpperCase()}`)
-  const setFulfillment = (p: Row, v: FulStatus) => updateOrder(p, { fulfillment: v, fulfilled_at: new Date().toISOString() }, `Fulfillment: ${v.toUpperCase()}`)
+  // Fulfillment VIP = also sets is_demo, so it stays excluded from sales. Other stages leave is_demo alone.
+  const setFulfillment = (p: Row, v: FulStatus) => updateOrder(p, v === 'vip' ? { fulfillment: 'vip', is_demo: true, fulfilled_at: new Date().toISOString() } : { fulfillment: v, fulfilled_at: new Date().toISOString() }, `Fulfillment: ${v.toUpperCase()}`)
   const setPackage = (p: Row, v: PackageId) => updateOrder(p, { package: v, plan_tier: v, plan_amount: PLAN_META[v].price }, `Package: ${PACKAGES[v].label}`)
+  // VIP = is_demo in DB. Handled by Payment Status dropdown + Mark as VIP button in Fulfillment column.
+  const setDemo = (p: Row, v: boolean) => updateOrder(p, { is_demo: v, fulfillment: v ? 'vip' : (p.fulfillment === 'vip' ? 'pending' : p.fulfillment) }, v ? 'Set as VIP - excluded from sales' : 'Removed from VIP - now counts as real sale')
+  // Payment dropdown handler - VIP is an option that flips is_demo, not payment_status
+  const handlePaymentSelect = (p: Row, v: string) => {
+    if (v === 'demo') return setDemo(p, true)
+    if (isDemo(p)) return updateOrder(p, { is_demo: false, payment_status: v, paid_at: v === 'paid' ? new Date().toISOString() : null, fulfillment: p.fulfillment === 'vip' ? 'pending' : p.fulfillment }, `Payment: ${v.toUpperCase()} - removed from VIP`)
+    return setPayment(p, v as PayStatus)
+  }
 
   async function setSelectedActive(active: boolean) {
     if (selectedList.length === 0) return
@@ -752,7 +762,7 @@ export default function AdminPage() {
 
           <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-4 mb-6">
             {[
-              { label: 'Total Sales Revenue', value: money(orderStats.revenue), sub: realClients.length === 0 ? 'No real sales yet - demo accounts excluded' : 'Verified paid orders (demo accounts excluded)', icon: 'fa-wallet', tone: '#D4AF37' },
+              { label: 'Total Sales Revenue', value: money(orderStats.revenue), sub: realClients.length === 0 ? 'No real sales yet - VIP accounts excluded' : 'Verified paid orders (VIP accounts excluded)', icon: 'fa-wallet', tone: '#D4AF37' },
               { label: 'Completed Purchases', value: String(orderStats.completed), sub: 'Active paid and provisioned sites', icon: 'fa-circle-check', tone: '#00D632' },
               { label: 'Total Checkout Sessions', value: String(orderStats.sessions), sub: 'Active orders & buy now sessions', icon: 'fa-cart-shopping', tone: '#007DFE' },
               { label: 'Pending QR Scans', value: String(orderStats.pendingPay), sub: 'Awaiting GCash/Maya confirmation', icon: 'fa-qrcode', tone: '#FFC21C' },
@@ -787,7 +797,7 @@ export default function AdminPage() {
             <select value={demoFilter} onChange={(e) => setDemoFilter(e.target.value as DemoFilter)} aria-label="Filter real or demo accounts" className="ac-select h-11 px-3 rounded-xl">
               <option value="all">All accounts</option>
               <option value="real">Real Clients</option>
-              <option value="demo">Demo/Test ({demoCount})</option>
+              <option value="demo">VIP ({demoCount})</option>
             </select>
             <div className="relative">
               <button type="button" onClick={() => setGenOpen((v) => !v)} aria-expanded={genOpen} className="h-11 px-5 rounded-xl bg-[#FFC21C] text-black font-bold text-sm shadow-[0_8px_28px_rgba(255,194,28,0.35)] hover:brightness-105 transition">
@@ -849,7 +859,7 @@ export default function AdminPage() {
                     <tr><td colSpan={7} className="text-center text-gray-500 !py-8">Loading...</td></tr>
                   ) : orders.length === 0 ? (
                     <tr><td colSpan={7} className="text-center text-gray-500 !py-8">{demoFilter === 'real' && payFilter !== 'deleted' && !oQuery.trim() && fulFilter === 'all'
-                      ? 'No real orders yet. Demo accounts (shua, tapvinci) hidden from sales.'
+                      ? 'No real orders yet. VIP accounts (shua, tapvinci) hidden from sales.'
                       : profiles.length ? 'No orders match this search / filter.' : 'No orders yet.'}</td></tr>
                   ) : (
                     orders.map((p) => {
@@ -865,7 +875,7 @@ export default function AdminPage() {
                             <div className="flex items-start gap-3">
                               <input type="checkbox" checked={selected.has(p.username)} onChange={() => toggleSelected(p.username)} aria-label={`Select ${p.username}`} className="mt-1 accent-[#D4AF37]" />
                               <div>
-                                <p className="font-bold text-[#D4AF37] text-[12px] whitespace-nowrap">{orderNo(p)}{isDemo(p) && <span className="demo-badge ml-2 text-[9px] font-bold px-1.5 py-0.5 rounded-full align-middle" style={DEMO_BADGE_STYLE}>DEMO</span>}{p.is_active === false && <span className="ml-2 text-[9px] font-semibold bg-[#f59e0b]/20 text-[#f59e0b] px-1.5 py-0.5 rounded align-middle">DELETED</span>}</p>
+                                <p className="font-bold text-[#D4AF37] text-[12px] whitespace-nowrap">{orderNo(p)}{isDemo(p) && <span className="demo-badge ml-2 text-[9px] font-bold px-1.5 py-0.5 rounded-full align-middle" style={DEMO_BADGE_STYLE}>VIP</span>}{p.is_active === false && <span className="ml-2 text-[9px] font-semibold bg-[#f59e0b]/20 text-[#f59e0b] px-1.5 py-0.5 rounded align-middle">DELETED</span>}</p>
                                 <p className="text-[10px] text-[#A1A1A1] mt-0.5 whitespace-nowrap">{formatDateTime(p.created_at)} • Via {p.payment_method ? p.payment_method.toString().toUpperCase() : 'GCash/Maya'} QR Ph</p>
                               </div>
                             </div>
@@ -907,16 +917,25 @@ export default function AdminPage() {
                             <p className="text-[10px] text-[#A1A1A1] mt-0.5">{pkg.note}</p>
                           </td>
                           <td>
-                            <select value={pay} onChange={(e) => setPayment(p, e.target.value as PayStatus)} aria-label="Payment status" className={`ac-badge ac-pay-${pay}`} style={isDemo(p) ? DEMO_PAY_STYLE : undefined}>
-                              {PAY_OPTIONS.map((o) => <option key={o} value={o}>{isDemo(p) && o === pay ? `DEMO (${o.toUpperCase()})` : o.toUpperCase()}</option>)}
+                            <select value={isDemo(p) ? 'demo' : pay} onChange={(e) => handlePaymentSelect(p, e.target.value)} aria-label="Payment status" className={`ac-badge ac-pay-${pay}`} style={isDemo(p) ? DEMO_PAY_STYLE : undefined}>
+                              {PAY_OPTIONS.map((o) => <option key={o} value={o}>{o.toUpperCase()}</option>)}
+                              <option value="demo">VIP</option>
                             </select>
-                            <p className="text-[10px] text-[#A1A1A1] mt-1 whitespace-nowrap">{isDemo(p) ? 'Demo - not counted in sales' : pay === 'paid' ? formatDateTime(p.paid_at || p.created_at) : pay === 'pending' ? 'Awaiting confirmation' : 'Payment failed'}</p>
+                            <p className="text-[10px] text-[#A1A1A1] mt-1 whitespace-nowrap">{isDemo(p) ? 'VIP - not counted in sales' : pay === 'paid' ? formatDateTime(p.paid_at || p.created_at) : pay === 'pending' ? 'Awaiting confirmation' : 'Payment failed'}</p>
                           </td>
                           <td>
-                            <select value={ful} onChange={(e) => setFulfillment(p, e.target.value as FulStatus)} aria-label="Fulfillment" className={`ac-badge ac-ful-${ful}`}>
+                            <select value={ful} onChange={(e) => setFulfillment(p, e.target.value as FulStatus)} aria-label="Fulfillment" className={`ac-badge ac-ful-${ful}`} style={ful === 'vip' ? VIP_FUL_STYLE : undefined}>
                               {FUL_OPTIONS.map((o) => <option key={o} value={o}>{o.toUpperCase()}</option>)}
                             </select>
                             <p className="text-[10px] text-[#A1A1A1] mt-1 whitespace-nowrap">{p.fulfilled_at ? `Updated ${formatDateTime(p.fulfilled_at)}` : plan.tier === 'digital' ? 'No card to print' : 'Not started'}</p>
+                            {/* Mark as VIP - same flag as Payment Status VIP (is_demo in DB) */}
+                            <button
+                              onClick={() => setDemo(p, !isDemo(p))}
+                              title={isDemo(p) ? 'Remove VIP - this will count as a real sale again' : 'Mark as VIP - this will be excluded from Total Sales Revenue, same as DEMO'}
+                              className={isDemo(p) ? 'ac-mini mt-1.5' : 'ac-mini ac-mini-gold mt-1.5'}
+                            >
+                              {isDemo(p) ? 'Remove VIP' : 'Mark as VIP'}
+                            </button>
                           </td>
                           <td>
                             <div className="flex gap-1.5 flex-wrap max-w-[280px]">
@@ -946,6 +965,7 @@ export default function AdminPage() {
                               ) : next && (
                                 <button onClick={() => setFulfillment(p, next)} className="ac-mini ac-mini-gold">Mark {next.toUpperCase()} →</button>
                               )}
+
                             </div>
                           </td>
                         </tr>
@@ -1186,7 +1206,7 @@ export default function AdminPage() {
               <p className="text-gray-500 text-[10px] mt-1">Created: {formatDate(deleteConfirm.created_at)}</p>
             </div>
             {PROTECTED_USERNAMES.includes((deleteConfirm.username || '').toString().toLowerCase()) && (
-              <p className="text-[11px] text-[#FFC21C] mt-3">Protected demo account: permanent delete is blocked. Use Deactivate below if you need to hide it.</p>
+              <p className="text-[11px] text-[#FFC21C] mt-3">Protected VIP account: permanent delete is blocked. Use Deactivate below if you need to hide it.</p>
             )}
             <label className="block text-left text-[10px] uppercase tracking-widest text-gray-500 mt-4">
               Type <span className="text-white font-bold normal-case tracking-normal">{deleteConfirm.username}</span> to confirm
