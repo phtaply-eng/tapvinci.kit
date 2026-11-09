@@ -1,66 +1,18 @@
 'use client'
 import { useState, useEffect, useRef } from 'react'
 import TaplyTemplate from '../../components/TaplyTemplate'
-import StudentFieldsEditor from '../../components/students/StudentFieldsEditor'
+import StudentEditForm from '../../components/dashboard/StudentEditForm'
 import { supabase } from '../../lib/supabase'
 import HamburgerMenu from "@/components/HamburgerMenu"
 import PaymentModal, { type PaymentSubmission } from '../../components/PaymentModal'
-
-
-const DEFAULT_SOCIALS = {
-  facebook: 'https://facebook.com/',
-  instagram: 'https://instagram.com/',
-  tiktok: 'https://www.tiktok.com/',
-  messenger: 'https://m.me/',
-  linkedin: '',
-  youtube: '',
-  whatsapp: '',
-  website: ''
-}
-
-const DEFAULT_VISIBLE = {
-  facebook: true,
-  instagram: true,
-  tiktok: true,
-  messenger: true,
-  linkedin: true,
-  youtube: true,
-  whatsapp: true,
-  website: true,
-  google_maps: true,
-  call: true,
-  text: true,
-  email_btn: true,
-  save_contact: true,
-  share_card: true,
-  gcash_qr: true,
-  maya_qr: true
-}
-
-const SOCIALS_CONFIG = [
-  { key: 'facebook', label: 'Facebook', color: 'text-blue-400', placeholder: 'https://facebook.com/...' },
-  { key: 'instagram', label: 'Instagram', color: 'text-pink-400', placeholder: 'https://instagram.com/...' },
-  { key: 'tiktok', label: 'TikTok', color: 'text-white', placeholder: 'https://tiktok.com/@...' },
-  { key: 'messenger', label: 'Messenger', color: 'text-blue-400', placeholder: 'https://m.me/...' },
-  { key: 'linkedin', label: 'LinkedIn', color: 'text-blue-300', placeholder: 'https://linkedin.com/in/...' },
-  { key: 'youtube', label: 'YouTube', color: 'text-red-400', placeholder: 'https://youtube.com/@...' },
-  { key: 'whatsapp', label: 'WhatsApp', color: 'text-green-400', placeholder: 'https://wa.me/639...' },
-  { key: 'website', label: 'Website', color: 'text-zinc-400', placeholder: 'https://yourwebsite.com' },
-]
-
-const THEMES = [
-  { id: 'gold', name: 'Black Gold', hex: '#D4AF37', desc: 'Default luxury' },
-  { id: 'purple', name: 'Midnight Purple', hex: '#a855f7', desc: 'Creative / Tour' },
-  { id: 'blue', name: 'Ocean Blue', hex: '#2563eb', desc: 'Professional' },
-  { id: 'green', name: 'Forest Green', hex: '#22c55e', desc: 'Fresh / Nature' },
-  { id: 'pink', name: 'Sunset Pink', hex: '#ec4899', desc: 'Bold / Creator' },
-  { id: 'orange', name: 'Sunrise Orange', hex: '#f97316', desc: 'Energetic' },
-]
-
-const SPOTIFY_URL_PATTERN =
-  /^(spotify:(track|album|playlist|episode|show|artist):[A-Za-z0-9]+|https?:\/\/(?:open|play)\.spotify\.com\/(?:intl-[a-z-]+\/)?(?:embed\/)?(track|album|playlist|episode|show|artist)\/[A-Za-z0-9]+)/i
-
-const isValidSpotifyUrl = (value: string) => !value.trim() || SPOTIFY_URL_PATTERN.test(value.trim())
+import {
+  DEFAULT_SOCIALS,
+  DEFAULT_VISIBLE,
+  SOCIALS_CONFIG,
+  THEMES,
+  isValidSpotifyUrl,
+} from '../../lib/profile-config'
+import { mergeStudentProfileData, resolveProfileRole, type ProfileRole } from '../../lib/profile-role'
 
 const BUCKET = 'profile-images'
 const RECEIPT_BUCKET = 'payment-proofs'
@@ -135,25 +87,25 @@ export default function Dashboard() {
     gcash_number: '',
     maya_number: '',
   })
-  // --- Phase 3 Part C: Student-only helpers ---
-  // Professional profiles are untouched. This only activates when the loaded profile has tier === 'student'.
-  const isStudent = (profile as any)?.tier === 'student'
-  const studentProfile = {
-    id: (profile as any)?.id || '',
-    username: profile.username || '',
-    name: profile.name || null,
-    tier: (profile as any)?.tier || null,
-    school: (profile as any)?.school || null,
-    course: (profile as any)?.course || null,
-    year_level: (profile as any)?.year_level || null,
-    spotify_url: profile.spotify_url || null,
-    tap_count: (profile as any)?.tap_count ?? null,
-    streak_count: (profile as any)?.streak_count ?? null,
-    last_tap_date: (profile as any)?.last_tap_date || null,
-  }
+  // Role routing. `role` is the new source of truth; `tier` keeps existing
+  // student cards working until the SQL migration has been applied.
+  const actualRole = resolveProfileRole(profile)
+  const [viewMode, setViewMode] = useState<ProfileRole | null>(null)
+
+  // Only the profile row flagged in Supabase can skip checkout. Do not use the
+  // editable `email` field for this check: any user could type the admin email.
+  const isAdmin =
+    profile.is_admin === true ||
+    String(profile.role || '').toLowerCase() === 'admin'
+
+  // Admins can preview either experience without leaving the dashboard.
+  // Everyone else is locked to their real role.
+  const effectiveRole: ProfileRole = isAdmin ? (viewMode ?? actualRole) : actualRole
+  const showStudentForm = effectiveRole === 'student'
+
   const reloadProfileAfterStudentSave = async () => {
-    // StudentFieldsEditor already saved to Supabase. Re-fetch so dashboard state stays in sync,
-    // including a username change via set_my_username.
+    // StudentEditForm already saved to Supabase. Re-fetch so dashboard state stays in sync,
+    // including a username change.
     const id = (profile as any)?.id
     const query = id
       ? supabase.from('profiles').select('*').eq('id', id).single()
@@ -216,7 +168,7 @@ export default function Dashboard() {
       clearTimeout(t)
       ro?.disconnect()
     }
-  }, [showLive, profile])
+  }, [showLive, profile, effectiveRole])
 
   const showToast = (msg: string) => {
     setToast(msg)
@@ -230,9 +182,22 @@ export default function Dashboard() {
       const DEFAULT_USERNAME = (editParam || process.env.NEXT_PUBLIC_DEFAULT_USERNAME || 'TapVinci').toLowerCase()
       const { data } = await supabase.from('profiles').select('*').eq('username', DEFAULT_USERNAME).single()
       if (data) {
-        const mergedSocials = { ...DEFAULT_SOCIALS, ...(data.socials || {}) }
-        const mergedVisible = { ...DEFAULT_VISIBLE, ...(data.socials_visible || {}) }
-        setProfile((p:any) => ({ ...p, ...data, socials: mergedSocials, socials_visible: mergedVisible }))
+        let mergedData: any = data
+
+        // Existing student cards keep school/course/counts in student_profiles.
+        // Fill those gaps until the SQL migration has been run.
+        if (resolveProfileRole(data) === 'student' && (data as any).id) {
+          const { data: studentData } = await supabase
+            .from('student_profiles')
+            .select('*')
+            .eq('id', (data as any).id)
+            .maybeSingle()
+          mergedData = mergeStudentProfileData(data, studentData)
+        }
+
+        const mergedSocials = { ...DEFAULT_SOCIALS, ...(mergedData.socials || {}) }
+        const mergedVisible = { ...DEFAULT_VISIBLE, ...(mergedData.socials_visible || {}) }
+        setProfile((p:any) => ({ ...p, ...mergedData, socials: mergedSocials, socials_visible: mergedVisible }))
       }
     }
     load()
@@ -331,12 +296,6 @@ export default function Dashboard() {
   }
 
   const SITE_URL = (process.env.NEXT_PUBLIC_SITE_URL || 'https://tapvinci.vercel.app').replace(/\/+$/, '')
-
-  // Only the profile row flagged in Supabase can skip checkout. Do not use the
-  // editable `email` field for this check: any user could type the admin email.
-  const isAdmin =
-    profile.is_admin === true ||
-    String(profile.role || '').toLowerCase() === 'admin'
 
   const validateProfile = () => {
     const username = (profile.username || '').trim().toLowerCase()
@@ -537,22 +496,32 @@ export default function Dashboard() {
             <div ref={editPanelRef} className="w-[50%] flex-shrink-0 px-1 lg:px-3 h-auto min-h-0" style={{ height: 'auto', minHeight: 0 }}>
               <div className="max-w-7xl mx-auto h-auto min-h-0" style={{ height: 'auto', minHeight: 0 }}>
 <div ref={editTopRef} className="edit-panel space-y-4 bg-zinc-900 p-6 rounded-2xl h-auto min-h-0 pb-6" style={{ height: 'auto', minHeight: 0 }}>
-          <div className="flex items-center justify-between gap-3">
-            <h1 className="text-xl font-bold">Edit Profile</h1>
+          <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+            <div>
+              <p className="text-[10px] font-bold uppercase tracking-[0.22em] text-zinc-500">
+                {showStudentForm ? 'Student experience' : 'Professional experience'}
+              </p>
+              <h1 className="mt-0.5 text-xl font-bold">
+                {showStudentForm ? 'Edit Student Profile' : 'Edit Profile'}
+              </h1>
+            </div>
             {isAdmin && (
-              <span className="rounded-full border px-2.5 py-1 text-[9px] font-bold uppercase tracking-widest" style={{ borderColor: '#D4AF3755', background: '#D4AF3715', color: '#D4AF37' }}>
-                Admin · Payment skipped
-              </span>
+              <button
+                type="button"
+                onClick={() => setViewMode(showStudentForm ? 'professional' : 'student')}
+                title="Preview the other edit experience without leaving this page"
+                className="inline-flex items-center justify-center gap-2 rounded-full border border-emerald-500/30 bg-emerald-500/10 px-4 py-2 text-[10px] font-bold uppercase tracking-widest text-emerald-300 transition hover:border-emerald-400/50 hover:bg-emerald-500/20"
+              >
+                <i className={`fa-solid ${showStudentForm ? 'fa-briefcase' : 'fa-graduation-cap'}`} />
+                {showStudentForm ? 'Switch to Professional View' : 'Switch to Student View'}
+              </button>
             )}
           </div>
-          
-          {/* Phase 3 Part C: Student editor - only for tier === 'student'. Professional profiles never see this. */}
-          {isStudent && profile.id && (
-            <div className="border-t border-zinc-800 pt-4">
-              <StudentFieldsEditor profile={studentProfile} onSaved={reloadProfileAfterStudentSave} />
-            </div>
-          )}
 
+          {showStudentForm ? (
+            <StudentEditForm profile={profile} onSaved={reloadProfileAfterStudentSave} />
+          ) : (
+            <>
           <label className="block text-[11px] tracking-widest text-zinc-400 uppercase">Username<input value={profile.username} onChange={e => setProfile({...profile, username: e.target.value.toLowerCase()})} className={inputCls} /></label>
           <label className="block text-[11px] tracking-widest text-zinc-400 uppercase">Name<input value={profile.name} onChange={e => setProfile({...profile, name: e.target.value})} className={inputCls} /></label>
           
@@ -821,13 +790,15 @@ export default function Dashboard() {
           <button onClick={handleSaveProfile} disabled={saving || heroUploading || galleryUploading || gcashUploading || mayaUploading} className="w-full py-3 rounded-xl font-bold hover:brightness-110 disabled:opacity-50" style={{background: profile.accent_color, color: 'black'}}>
             {saving ? 'Saving...' : isAdmin ? 'Save Profile (Admin)' : 'Save Profile'}
           </button>
+            </>
+          )}
         </div>
               </div>
             </div>
             <div className="w-[50%] flex-shrink-0 px-1 lg:px-3 h-auto min-h-0">
               <div className="max-w-7xl mx-auto h-auto min-h-0">
                 <div ref={livePreviewRef} id="live-preview-section" className="live-panel scroll-mt-24 h-auto min-h-0 pb-6">
-                  <TaplyTemplate profile={profile} />
+                  <TaplyTemplate profile={profile} viewAs={effectiveRole} />
                 </div>
               </div>
             </div>

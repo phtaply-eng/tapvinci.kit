@@ -1,17 +1,23 @@
-import { displayStreak, displayTapCount } from '../../lib/students/student'
-import type { StudentProfile } from '../../lib/students/student'
+import { getStreakCount, getTapCount } from '../../lib/profile-role'
 
-export default function StudentStats({ profile }: { profile: StudentProfile }) {
+/**
+ * Small badges shown directly under the student's name/title.
+ * Taps + streak are intentionally tiny pills, not a full stats grid.
+ */
+export default function StudentStats({ profile }: { profile: any }) {
+  const taps = getTapCount(profile)
+  const streak = getStreakCount(profile)
+
   return (
-    <div className="grid grid-cols-2 gap-3">
-      <div className="rounded-2xl border p-4 text-center">
-        <p className="text-2xl font-bold">{displayTapCount(profile.tap_count)}</p>
-        <p className="text-sm opacity-70">Total taps</p>
-      </div>
-      <div className="rounded-2xl border p-4 text-center">
-        <p className="text-2xl font-bold">{profile.streak_count ?? 0}</p>
-        <p className="text-sm opacity-70">{displayStreak(profile.streak_count)}</p>
-      </div>
+    <div className="student-stat-pills" aria-label="Student activity">
+      <span className="student-stat-pill">
+        <i className="fa-solid fa-hand-pointer" aria-hidden="true" />
+        {taps} {taps === 1 ? 'tap' : 'taps'}
+      </span>
+      <span className="student-stat-pill student-stat-pill-fire">
+        <i className="fa-solid fa-fire" aria-hidden="true" />
+        {streak} day streak
+      </span>
     </div>
   )
 }

@@ -65,9 +65,19 @@ type SpotifyPlayerProps = {
   /** Matches the profile theme. Defaults to TapVinci gold. */
   accentColor?: string
   className?: string
+  /** Smaller album art / padding, used by the student profile. */
+  compact?: boolean
+  /** `student` adds the blue Spotify skin shown on student cards. */
+  variant?: 'default' | 'student'
 }
 
-export default function SpotifyPlayer({ spotifyUrl, accentColor = '#D4AF37', className }: SpotifyPlayerProps) {
+export default function SpotifyPlayer({
+  spotifyUrl,
+  accentColor = '#D4AF37',
+  className,
+  compact = false,
+  variant = 'default',
+}: SpotifyPlayerProps) {
   const parsed = useMemo(() => parseSpotifyUrl(spotifyUrl), [spotifyUrl])
 
   // useMemo above always runs, so this early return is hooks-safe.
@@ -75,7 +85,13 @@ export default function SpotifyPlayer({ spotifyUrl, accentColor = '#D4AF37', cla
 
   return (
     <SpotifyBoundary key={parsed.url}>
-      <SpotifyPlayerCard parsed={parsed} accentColor={accentColor || '#D4AF37'} className={className} />
+      <SpotifyPlayerCard
+        parsed={parsed}
+        accentColor={accentColor || '#D4AF37'}
+        className={className}
+        compact={compact}
+        variant={variant}
+      />
     </SpotifyBoundary>
   )
 }
@@ -84,10 +100,14 @@ function SpotifyPlayerCard({
   parsed,
   accentColor,
   className,
+  compact,
+  variant,
 }: {
   parsed: ParsedSpotify
   accentColor: string
   className?: string
+  compact: boolean
+  variant: 'default' | 'student'
 }) {
   const [meta, setMeta] = useState<SpotifyOEmbed | null>(null)
   const [loading, setLoading] = useState(true)
@@ -165,30 +185,39 @@ function SpotifyPlayerCard({
   const thumbnail = asSafeString(meta?.thumbnail_url)
   const showArt = !!thumbnail && !artFailed
   const embedHeight = parsed.type === 'track' || parsed.type === 'episode' ? 80 : 152
+  const isStudentSkin = variant === 'student'
 
   const shellClass = [
-    'relative w-full overflow-hidden rounded-2xl border border-white/10 bg-[#121214]/80 p-3 text-left shadow-[0_8px_30px_rgba(0,0,0,0.45)] backdrop-blur-xl',
+    'relative w-full overflow-hidden border text-left backdrop-blur-xl',
+    compact
+      ? 'rounded-xl border-white/10 bg-[#121214]/80 p-2.5 shadow-[0_6px_22px_rgba(0,0,0,0.35)]'
+      : 'rounded-2xl border-white/10 bg-[#121214]/80 p-3 shadow-[0_8px_30px_rgba(0,0,0,0.45)]',
+    isStudentSkin ? 'student-spotify-card' : 'border-white/10',
     className || '',
   ]
     .filter(Boolean)
     .join(' ')
 
+  const shellStyle = isStudentSkin ? undefined : { borderColor: `${accentColor}33` }
+  const artClass = compact ? 'h-10 w-10 rounded-lg' : 'h-14 w-14 rounded-xl'
+  const playClass = compact ? 'h-9 w-9' : 'h-11 w-11'
+
   if (loading) {
     return (
       <div
         className={shellClass}
-        style={{ borderColor: `${accentColor}33` }}
+        style={shellStyle}
         aria-busy="true"
         aria-label="Loading Spotify track"
       >
-        <div className="flex items-center gap-3">
-          <div className="h-14 w-14 shrink-0 animate-pulse rounded-xl bg-white/10" />
+        <div className={`flex items-center ${compact ? 'gap-2.5' : 'gap-3'}`}>
+          <div className={`${artClass} shrink-0 animate-pulse bg-white/10`} />
           <div className="min-w-0 flex-1 space-y-2">
             <div className="h-2 w-16 animate-pulse rounded-full bg-white/10" />
             <div className="h-3.5 w-3/4 animate-pulse rounded-full bg-white/10" />
             <div className="h-2.5 w-1/3 animate-pulse rounded-full bg-white/10" />
           </div>
-          <div className="h-11 w-11 shrink-0 animate-pulse rounded-full bg-white/10" />
+          <div className={`${playClass} shrink-0 animate-pulse rounded-full bg-white/10`} />
         </div>
       </div>
     )
@@ -197,7 +226,7 @@ function SpotifyPlayerCard({
   return (
     <div
       className={shellClass}
-      style={{ borderColor: `${accentColor}33` }}
+      style={shellStyle}
       aria-label={`Spotify player for ${displayTitle}`}
     >
       {/* Subtle themed glow */}
@@ -207,41 +236,53 @@ function SpotifyPlayerCard({
         style={{ background: `radial-gradient(140px circle at 0% 0%, ${accentColor}1F, transparent 70%)` }}
       />
 
-      <div className="relative flex items-center gap-3">
+      <div className={`relative flex items-center ${compact ? 'gap-2.5' : 'gap-3'}`}>
         {/* Album art (falls back to the Spotify glyph if the CDN image fails) */}
         {showArt ? (
           <img
             src={thumbnail}
             alt={`${displayTitle} album art`}
-            width={56}
-            height={56}
+            width={compact ? 40 : 56}
+            height={compact ? 40 : 56}
             loading="lazy"
             referrerPolicy="no-referrer"
             onError={() => setArtFailed(true)}
-            className="h-14 w-14 shrink-0 rounded-xl object-cover shadow-[0_4px_14px_rgba(0,0,0,0.5)]"
+            className={`${artClass} shrink-0 object-cover shadow-[0_4px_14px_rgba(0,0,0,0.5)]`}
           />
         ) : (
           <div
-            className="grid h-14 w-14 shrink-0 place-items-center rounded-xl border border-white/10 bg-white/5 text-white/50"
+            className={`${artClass} grid shrink-0 place-items-center border border-white/10 bg-white/5 text-white/50`}
             aria-hidden="true"
           >
-            <SpotifyIcon className="h-6 w-6" />
+            <SpotifyIcon className={compact ? 'h-5 w-5' : 'h-6 w-6'} />
           </div>
         )}
 
         {/* Track info */}
         <div className="min-w-0 flex-1">
           <p
-            className="mb-0.5 flex items-center gap-1.5 text-[9px] font-bold uppercase tracking-[0.18em]"
+            className={`student-spotify-label mb-0.5 flex items-center gap-1.5 font-bold uppercase tracking-[0.18em] ${
+              compact ? 'text-[8px]' : 'text-[9px]'
+            }`}
             style={{ color: accentColor }}
           >
             <SpotifyIcon className="h-2.5 w-2.5 shrink-0" />
             {expanded ? 'Now Playing' : 'Spotify'}
           </p>
-          <p className="truncate text-[13px] font-bold leading-tight text-white" title={displayTitle}>
+          <p
+            className={`student-spotify-title truncate font-bold leading-tight text-white ${
+              compact ? 'text-[12px]' : 'text-[13px]'
+            }`}
+            title={displayTitle}
+          >
             {displayTitle}
           </p>
-          <p className="mt-0.5 truncate text-[10px] font-medium text-zinc-400" title={subtitle}>
+          <p
+            className={`student-spotify-subtitle mt-0.5 truncate font-medium text-zinc-400 ${
+              compact ? 'text-[9.5px]' : 'text-[10px]'
+            }`}
+            title={subtitle}
+          >
             {failed ? 'Preview unavailable' : subtitle}
           </p>
         </div>
@@ -252,7 +293,7 @@ function SpotifyPlayerCard({
           onClick={() => setExpanded((v) => !v)}
           aria-expanded={expanded}
           aria-label={expanded ? 'Hide Spotify player' : `Play ${displayTitle} on Spotify`}
-          className="grid h-11 w-11 shrink-0 place-items-center rounded-full text-black transition-transform duration-200 hover:scale-105 active:scale-95"
+          className={`${playClass} grid shrink-0 place-items-center rounded-full text-black transition-transform duration-200 hover:scale-105 active:scale-95`}
           style={{ background: accentColor, boxShadow: `0 6px 18px ${accentColor}55` }}
         >
           {expanded ? <PauseIcon /> : <PlayIcon />}

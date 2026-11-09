@@ -5,8 +5,16 @@ import SpotifyPlayer from './SpotifyPlayer'
 import StudentStats from './students/StudentStats'
 import StudentEducation from './students/StudentEducation'
 import StudentSpotify from './students/StudentSpotify'
+import { getTapCount, resolveProfileRole } from '../lib/profile-role'
 
-export default function TaplyTemplate({ profile }: { profile: any }) {
+export default function TaplyTemplate({
+  profile,
+  viewAs,
+}: {
+  profile: any
+  /** Dashboard preview override. Public pages resolve the role from the row. */
+  viewAs?: 'student' | 'professional'
+}) {
   const reelRef = useRef<HTMLDivElement>(null)
   const [current, setCurrent] = useState(1)
   const [isDark, setIsDark] = useState(true)
@@ -22,9 +30,10 @@ export default function TaplyTemplate({ profile }: { profile: any }) {
   const [showPaymentModal, setShowPaymentModal] = useState(false)
   const [activeTab, setActiveTab] = useState<'gcash' | 'maya'>('gcash')
   
-  const accent = profile.accent_color || '#D4AF37'
-  // Phase 3 Part C: Only student profiles show the student section. Professional profiles are untouched.
-  const isStudent = profile?.tier === 'student'
+  // Student cards always use the green experience from the student layout.
+  // Professional cards keep the theme picked in the dashboard.
+  const isStudent = viewAs ? viewAs === 'student' : resolveProfileRole(profile) === 'student'
+  const accent = isStudent ? '#22c55e' : profile.accent_color || '#D4AF37'
   
   useEffect(() => {
     setMounted(true)
@@ -214,6 +223,64 @@ END:VCARD`
     URL.revokeObjectURL(url)
   }
 
+  const shareCard = async () => {
+    if (typeof window === 'undefined') return
+    const url = window.location.href
+    const shareData = {
+      title: profile.name || 'My TapVinci card',
+      text: profile.title || 'Tap my TapVinci card',
+      url,
+    }
+
+    if (navigator.share) {
+      try {
+        await navigator.share(shareData)
+        return
+      } catch {
+        // User cancelled or the browser refused the share sheet. Fall through
+        // to copying the link so the button always does something useful.
+      }
+    }
+
+    try {
+      await navigator.clipboard.writeText(url)
+      alert('Link copied!')
+    } catch {
+      window.prompt('Copy this link:', url)
+    }
+  }
+
+  const socialsSection = socialButtons.length > 0 ? (
+    <section className="taply-section" id="socials">
+      <h2><i className="fa-solid fa-link"></i> Social Media</h2>
+      {socialButtons.map((s) => (
+        <a key={s.id} className="taply-social-btn" data-href={s.id} href={s.href} target="_blank" rel="noreferrer">
+          <i className={`fa-brands ${s.icon}`}></i> {s.label}
+        </a>
+      ))}
+    </section>
+  ) : null
+
+  const footerSection = (
+    <footer className="taply-footer" style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '8px' }}>
+      <p suppressHydrationWarning style={{ margin: 0 }}>© {new Date().getFullYear()} {profile.name}. All rights reserved.</p>
+
+      {isStudent ? (
+        <div style={{ display: 'inline-flex', alignItems: 'center', gap: '6px', fontSize: '10px', color: '#22c55e', opacity: 0.9 }}>
+          <i className="fa-solid fa-hand-pointer" />
+          <span>{getTapCount(profile)} {getTapCount(profile) === 1 ? 'tap' : 'taps'}</span>
+        </div>
+      ) : (
+        <div style={{ display: 'inline-flex', alignItems: 'center', gap: '6px', fontSize: '10px', color: '#D4AF37', opacity: 0.8 }}>
+          <i className="fa-regular fa-eye"></i>
+          <span suppressHydrationWarning>
+            {profile.views || 0} {profile.views === 1 ? 'view' : 'views'}
+          </span>
+        </div>
+      )}
+    </footer>
+  )
+
   if (!mounted) {
     return (
       <div className="taply-gold-wrapper" style={{ background: '#050505' }}>
@@ -269,7 +336,7 @@ END:VCARD`
                   lineHeight: '1.4',
                   letterSpacing: '1px',
                   textTransform: 'uppercase',
-                  color: '#D4AF37',
+                  color: isStudent ? '#22c55e' : '#D4AF37',
                   textAlign: 'center',
                   margin: '0 auto 18px',
                   maxWidth: '420px'
@@ -277,15 +344,21 @@ END:VCARD`
               >
                 {profile.title || 'Your Title'}
               </p>
+
+              {/* Student-only: taps + streak sit directly under the title. */}
+              {isStudent && <StudentStats profile={profile} />}
+
               <div 
                 className="gold-line-divider"
                 style={{
                   width: '60px',
                   height: '1.5px',
-                  background: 'linear-gradient(90deg, transparent 0%, #D4AF37 20%, #E8C766 50%, #D4AF37 80%, transparent 100%)',
+                  background: isStudent
+                    ? 'linear-gradient(90deg, transparent 0%, #22c55e 20%, #86efac 50%, #22c55e 80%, transparent 100%)'
+                    : 'linear-gradient(90deg, transparent 0%, #D4AF37 20%, #E8C766 50%, #D4AF37 80%, transparent 100%)',
                   margin: '12px auto 0 auto',
                   borderRadius: '2px',
-                  boxShadow: '0 0 8px rgba(212,175,55,0.5)',
+                  boxShadow: isStudent ? '0 0 8px rgba(34,197,94,0.45)' : '0 0 8px rgba(212,175,55,0.5)',
                   opacity: 0.9
                 }}
               />
@@ -299,90 +372,90 @@ END:VCARD`
             </div>
           </section>
 
-          {profile.about && (<section className="taply-section"><h2><i className="fa-regular fa-user"></i> About Me</h2><p>{profile.about}</p></section>)}
+          {isStudent ? (
+            <>
+              {(profile.school || profile.course || profile.year_level || profile.spotify_url) && (
+                <section className="taply-section student-section">
+                  <StudentEducation profile={profile} />
+                  {profile.spotify_url && <StudentSpotify spotifyUrl={profile.spotify_url} />}
+                </section>
+              )}
 
-          {/* Phase 3 Part C: Student section - only when tier === 'student'. Professional profiles never see this. */}
-          {isStudent && (
-            <section className="taply-section">
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
-                <StudentStats profile={profile} />
-                <StudentEducation profile={profile} />
-                <StudentSpotify spotifyUrl={profile.spotify_url} />
-              </div>
-            </section>
-          )}
-
-          {gallery.length > 0 && (
-            <section className="taply-section">
-              <h2><i className="fa-regular fa-images"></i> Gallery </h2>
-              <div className="taply-carousel">
-                <div className="taply-reel" ref={reelRef}>
-                  {gallery.map((item:any,i:number)=>(
-                    <figure key={i} onClick={() => openLightbox(i)}>
-                      <img src={item.src} alt={item.alt} loading="lazy" />
-                    </figure>
-                  ))}
+              <section className="taply-section">
+                <h2><i className="fa-solid fa-bolt"></i> Quick Actions</h2>
+                <div className="student-quick-actions">
+                  <button className="taply-action-btn small" onClick={saveContact}>
+                    <span className="ico"><i className="fa-solid fa-address-card"></i></span>
+                    <span className="lbl">Save Contact</span>
+                  </button>
+                  <button className="taply-action-btn small" onClick={shareCard}>
+                    <span className="ico"><i className="fa-solid fa-share-nodes"></i></span>
+                    <span className="lbl">Share My Card</span>
+                  </button>
                 </div>
-                <button className="taply-carousel-btn prev" onClick={()=>scroll(-1)}><i className="fa-solid fa-chevron-left"></i></button>
-                <button className="taply-carousel-btn next" onClick={()=>scroll(1)}><i className="fa-solid fa-chevron-right"></i></button>
-                <p className="taply-carousel-count">{current} / {gallery.length} </p>
-              </div>
-            </section>
-          )}
+              </section>
 
-          {socialButtons.length > 0 && (
-            <section className="taply-section" id="socials">
-              <h2><i className="fa-solid fa-link"></i> Social Media</h2>
-              {socialButtons.map((s) => (
-                <a key={s.id} className="taply-social-btn" data-href={s.id} href={s.href} target="_blank" rel="noreferrer">
-                  <i className={`fa-brands ${s.icon}`}></i> {s.label}
-                </a>
-              ))}
-            </section>
-          )}
+              {socialsSection}
+            </>
+          ) : (
+            <>
+              {profile.about && (<section className="taply-section"><h2><i className="fa-regular fa-user"></i> About Me</h2><p>{profile.about}</p></section>)}
 
-          <section className="taply-section">
-            <h2><i className="fa-solid fa-bolt"></i> Quick Actions</h2>
-            <div className="taply-pills">
-              {profile.phone && <a className="taply-action-btn" href={`tel:${profile.phone}`}><span className="ico"><i className="fa-solid fa-phone"></i></span><span className="lbl">Call Me</span></a>}
-              {profile.phone && <a className="taply-action-btn" href={`sms:${profile.phone}`}><span className="ico"><i className="fa-solid fa-comment-sms"></i></span><span className="lbl">Text / SMS</span></a>}
-              {profile.email && <a className="taply-action-btn" href={`mailto:${profile.email}`}><span className="ico"><i className="fa-solid fa-envelope"></i></span><span className="lbl">Send Email</span></a>}
-            </div>
-            <div className="taply-secondary-pills quick-actions-row">
-              {profile.address && socialsVisible.google_maps !== false && (
-                <a className="taply-action-btn small google-maps" href={profile.mapsLink || `https://maps.google.com/?q=${encodeURIComponent(profile.address)}`} target="_blank" rel="noreferrer">
-                  <span className="ico"><i className="fa-solid fa-location-dot" style={{ color: '#E53935' }}></i></span><span className="lbl">Google Maps</span>
-                </a>
-              )}
-              <button className="taply-action-btn small gold" onClick={saveContact}><span className="ico"><i className="fa-solid fa-address-card"></i></span><span className="lbl">Save Contact</span></button>
-              
-              {(gcashQR || mayaQR) && (
-                <button className="taply-action-btn small gold" onClick={() => setShowPaymentModal(true)}>
-                  <span className="ico"><i className="fa-solid fa-qrcode"></i></span><span className="lbl">Payment</span>
-                </button>
+              {gallery.length > 0 && (
+                <section className="taply-section">
+                  <h2><i className="fa-regular fa-images"></i> Gallery </h2>
+                  <div className="taply-carousel">
+                    <div className="taply-reel" ref={reelRef}>
+                      {gallery.map((item:any,i:number)=>(
+                        <figure key={i} onClick={() => openLightbox(i)}>
+                          <img src={item.src} alt={item.alt} loading="lazy" />
+                        </figure>
+                      ))}
+                    </div>
+                    <button className="taply-carousel-btn prev" onClick={()=>scroll(-1)}><i className="fa-solid fa-chevron-left"></i></button>
+                    <button className="taply-carousel-btn next" onClick={()=>scroll(1)}><i className="fa-solid fa-chevron-right"></i></button>
+                    <p className="taply-carousel-count">{current} / {gallery.length} </p>
+                  </div>
+                </section>
               )}
 
-              <button className="taply-action-btn small gold" onClick={()=>{if(typeof window!=='undefined'){navigator.clipboard.writeText(window.location.href).then(()=>alert('Link copied!'))}}}><span className="ico"><i className="fa-solid fa-share-nodes"></i></span><span className="lbl">Share My Card</span></button>
-            </div>
-          </section>
+              {socialsSection}
 
-          <section className="taply-contact">
-            <h2><i className="fa-solid fa-address-book"></i> Contact</h2>
-            {profile.phone && <div className="taply-contact-item"><span className="taply-contact-icon"><i className="fa-solid fa-mobile-screen-button"></i></span><div><small>Phone</small><a href={`tel:${profile.phone}`}>{profile.phone}</a></div></div>}
-            {profile.email && <div className="taply-contact-item"><span className="taply-contact-icon"><i className="fa-regular fa-envelope"></i></span><div><small>Email</small><a href={`mailto:${profile.email}`}>{profile.email}</a></div></div>}
-            {profile.address && <div className="taply-contact-item"><span className="taply-contact-icon"><i className="fa-solid fa-location-dot"></i></span><div><small>Address</small><p>{profile.address}</p></div></div>}
-          </section>
+              <section className="taply-section">
+                <h2><i className="fa-solid fa-bolt"></i> Quick Actions</h2>
+                <div className="taply-pills">
+                  {profile.phone && <a className="taply-action-btn" href={`tel:${profile.phone}`}><span className="ico"><i className="fa-solid fa-phone"></i></span><span className="lbl">Call Me</span></a>}
+                  {profile.phone && <a className="taply-action-btn" href={`sms:${profile.phone}`}><span className="ico"><i className="fa-solid fa-comment-sms"></i></span><span className="lbl">Text / SMS</span></a>}
+                  {profile.email && <a className="taply-action-btn" href={`mailto:${profile.email}`}><span className="ico"><i className="fa-solid fa-envelope"></i></span><span className="lbl">Send Email</span></a>}
+                </div>
+                <div className="taply-secondary-pills quick-actions-row">
+                  {profile.address && socialsVisible.google_maps !== false && (
+                    <a className="taply-action-btn small google-maps" href={profile.mapsLink || `https://maps.google.com/?q=${encodeURIComponent(profile.address)}`} target="_blank" rel="noreferrer">
+                      <span className="ico"><i className="fa-solid fa-location-dot" style={{ color: '#E53935' }}></i></span><span className="lbl">Google Maps</span>
+                    </a>
+                  )}
+                  <button className="taply-action-btn small gold" onClick={saveContact}><span className="ico"><i className="fa-solid fa-address-card"></i></span><span className="lbl">Save Contact</span></button>
+                  
+                  {(gcashQR || mayaQR) && (
+                    <button className="taply-action-btn small gold" onClick={() => setShowPaymentModal(true)}>
+                      <span className="ico"><i className="fa-solid fa-qrcode"></i></span><span className="lbl">Payment</span>
+                    </button>
+                  )}
 
-          <footer className="taply-footer" style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '8px' }}>
-            <p suppressHydrationWarning style={{ margin: 0 }}>© {new Date().getFullYear()} {profile.name}. All rights reserved.</p>
-            
-            <div style={{ display: 'inline-flex', alignItems: 'center', gap: '6px', fontSize: '10px', color: '#D4AF37', opacity: 0.8 }}>
-              <i className="fa-regular fa-eye"></i>
-              <span suppressHydrationWarning>
-                {profile.views || 0} {profile.views === 1 ? 'view' : 'views'}
-              </span>
-            </div>
-          </footer>
+                  <button className="taply-action-btn small gold" onClick={shareCard}><span className="ico"><i className="fa-solid fa-share-nodes"></i></span><span className="lbl">Share My Card</span></button>
+                </div>
+              </section>
+
+              <section className="taply-contact">
+                <h2><i className="fa-solid fa-address-book"></i> Contact</h2>
+                {profile.phone && <div className="taply-contact-item"><span className="taply-contact-icon"><i className="fa-solid fa-mobile-screen-button"></i></span><div><small>Phone</small><a href={`tel:${profile.phone}`}>{profile.phone}</a></div></div>}
+                {profile.email && <div className="taply-contact-item"><span className="taply-contact-icon"><i className="fa-regular fa-envelope"></i></span><div><small>Email</small><a href={`mailto:${profile.email}`}>{profile.email}</a></div></div>}
+                {profile.address && <div className="taply-contact-item"><span className="taply-contact-icon"><i className="fa-solid fa-location-dot"></i></span><div><small>Address</small><p>{profile.address}</p></div></div>}
+              </section>
+            </>
+          )}
+
+          {footerSection}
         </main>
       </div>
     </div>

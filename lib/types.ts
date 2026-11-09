@@ -24,6 +24,14 @@ export type Profile = {
   spotify_url?: string | null
   is_admin?: boolean
   role?: string | null
+  tier?: string | null
+  school?: string | null
+  course?: string | null
+  year_level?: string | null
+  taps?: number | null
+  streak?: number | null
+  tap_count?: number | null
+  streak_count?: number | null
   is_active?: boolean
   payment_status?: string | null
   created_at?: string

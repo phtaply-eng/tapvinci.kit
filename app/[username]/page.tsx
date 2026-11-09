@@ -7,6 +7,7 @@ import type { Profile } from '../../lib/types'
 import ViewTracker from '../../components/ViewTracker'
 import StudentTapTracker from '../../components/students/StudentTapTracker'
 import IntroWrapper from '../../components/IntroWrapper' // <-- IMPORT INTRO WRAPPER
+import { isStudentProfile, mergeStudentProfileData } from '../../lib/profile-role'
 
 export const dynamic = 'force-dynamic'
 export const revalidate = 0
@@ -18,26 +19,25 @@ async function getProfile(username: string): Promise<Profile | null> {
   if (!data) return null
   if ((data as { is_active?: boolean | null }).is_active === false) return null
 
-  // Phase 3 Fix: Student data lives in student_profiles, not profiles.
-  // Merge it so StudentStats / StudentEducation / StudentSpotify inside TaplyTemplate
-  // see the real tap_count, streak_count, school, course, year_level, spotify_url.
-  // We only overwrite with non-null values, so a NULL in student_profiles
-  // never wipes a real value from profiles.
-  if ((data as any)?.tier === 'student') {
+  // Student data can live in the new profiles columns (role/school/course/
+  // year_level/taps/streak) or the legacy student_profiles table. Prefer the
+  // profiles values, then fill only the gaps from the legacy row so a stale
+  // student_profiles value can never overwrite a newer profile value.
+  if (isStudentProfile(data)) {
     const { data: studentData } = await supabase
       .from('student_profiles')
       .select('*')
       .eq('id', (data as any).id)
       .maybeSingle()
-    if (studentData) {
-      const merged: any = { ...(data as any) }
-      for (const [key, value] of Object.entries(studentData as any)) {
-        if (value !== null && value !== undefined) {
-          merged[key] = value
-        }
-      }
-      return merged as Profile
-    }
+
+    const merged: any = mergeStudentProfileData(data, studentData)
+
+    // Legacy counts used by the existing record_student_tap RPC.
+    merged.taps = merged.taps ?? merged.tap_count ?? 0
+    merged.streak = merged.streak ?? merged.streak_count ?? 1
+    merged.role = merged.role || 'student'
+
+    return merged as Profile
   }
 
   return data as Profile
@@ -58,8 +58,9 @@ export default async function UserPage({ params }: { params: { username: string 
   if (!profile) notFound()
 
   const isDemo = params.username.toLowerCase() === DEMO_USERNAME
-  // Phase 3 Part C: Student pages count taps only, professional pages count views only. Never both, so no double-count.
-  const isStudent = (profile as any)?.tier === 'student'
+  // Student pages count taps only, professional pages count views only.
+  // Never both, so there is no double-count.
+  const isStudent = isStudentProfile(profile)
 
   return (
     <IntroWrapper>

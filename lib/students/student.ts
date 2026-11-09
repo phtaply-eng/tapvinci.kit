@@ -12,6 +12,11 @@ export type StudentProfile = {
   last_tap_date: string | null
   avatar_url?: string | null
   bio?: string | null
+  role?: string | null
+  taps?: number | null
+  streak?: number | null
+  socials?: Record<string, string> | null
+  socials_visible?: Record<string, boolean> | null
 }
 
 export function displayStreak(streak: number | null | undefined): string {

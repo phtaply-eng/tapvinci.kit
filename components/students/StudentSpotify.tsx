@@ -1,7 +1,12 @@
 'use client'
 
-import { parseSpotifyUrl } from '../../lib/students/spotify'
+import SpotifyPlayer from '../SpotifyPlayer'
 
+/**
+ * Compact student Spotify card. The regular professional player stays large;
+ * this variant uses a smaller album art, tighter padding and a blue student
+ * skin so it can sit between Education and Quick Actions.
+ */
 export default function StudentSpotify({
   spotifyUrl,
 }: {
@@ -9,20 +14,12 @@ export default function StudentSpotify({
 }) {
   if (!spotifyUrl) return null
 
-  const parsed = parseSpotifyUrl(spotifyUrl)
-  if (!parsed.embedUrl) return null
-
   return (
-    <div className="rounded-2xl border p-4">
-      <p className="mb-3 text-sm font-semibold uppercase tracking-wide opacity-70">Now playing</p>
-      <iframe
-        src={parsed.embedUrl}
-        width="100%"
-        height="152"
-        allow="autoplay; clipboard-write; encrypted-media; fullscreen; picture-in-picture"
-        loading="lazy"
-        className="rounded-xl"
-      />
-    </div>
+    <SpotifyPlayer
+      spotifyUrl={spotifyUrl}
+      accentColor="#38bdf8"
+      compact
+      variant="student"
+    />
   )
 }
