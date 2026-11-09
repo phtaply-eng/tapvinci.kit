@@ -112,23 +112,30 @@ type ClaimError = {
 }
 
 /**
- * Client-side claim button. The RPC is invoked from the browser so the real
+ * Client-side claim button with PIN. The RPC is invoked from the browser so the real
  * Postgres error (message/code/details/hint) can be logged and shown in the UI
  * instead of being swallowed by a server action redirect.
+ * Calls claim_card(p_code, p_pin) from Step 1, which checks the PIN in card_secrets.
  */
 export function ClaimCardButton({ code }: { code: string }) {
   const [supabase] = useState(() => createClient())
   const [busy, setBusy] = useState(false)
+  const [pin, setPin] = useState('')
   const [claimError, setClaimError] = useState<ClaimError | null>(null)
   const router = useRouter()
 
   const handleClaim = async () => {
     if (busy) return
+    const cleanPin = pin.replace(/\D/g, '').slice(0, 6)
+    if (cleanPin.length !== 6) {
+      setClaimError({ message: 'Enter the 6-digit PIN from the pouch.' })
+      return
+    }
     setBusy(true)
     setClaimError(null)
 
     try {
-      const { data, error } = await supabase.rpc('claim_student_card', { p_code: code })
+      const { data, error } = await supabase.rpc('claim_card', { p_code: code, p_pin: cleanPin })
 
       if (error) {
         const detail = {
@@ -137,12 +144,12 @@ export function ClaimCardButton({ code }: { code: string }) {
           details: error.details,
           hint: error.hint,
         }
-        console.error('[claim_student_card] RPC failed', { ...detail, raw: error })
+        console.error('[claim_card] RPC failed', { ...detail, raw: error })
         setClaimError(detail)
         return
       }
 
-      console.log('[claim_student_card] RPC result', data)
+      console.log('[claim_card] RPC result', data)
 
       // The function returns 'claimed' / 'owned_by_you' on success.
       if (data === 'claimed' || data === 'owned_by_you') {
@@ -151,15 +158,28 @@ export function ClaimCardButton({ code }: { code: string }) {
         return
       }
 
+      const friendly: Record<string, string> = {
+        bad_pin: 'Wrong PIN. Check the 6-digit PIN in the pouch and try again.',
+        locked: 'Too many wrong PIN tries. Wait 15 minutes and try again.',
+        already_claimed: 'This card has already been claimed.',
+        already_have_card: 'You already have a card linked to your account.',
+        not_activated: 'This card has not been activated yet. If you just received it, wait a moment and try again.',
+        not_found: 'Card not found. Check the code and try again.',
+      }
+      if (typeof data === 'string' && friendly[data]) {
+        setClaimError({ message: friendly[data] })
+        return
+      }
+
       setClaimError({
         message:
           data == null
-            ? 'claim_student_card returned no data (null) with no error.'
-            : `claim_student_card returned "${String(data)}"`,
+            ? 'claim_card returned no data (null) with no error.'
+            : `claim_card returned "${String(data)}"`,
       })
     } catch (err) {
       const message = err instanceof Error ? err.message : String(err)
-      console.error('[claim_student_card] unexpected error', { message, error: err })
+      console.error('[claim_card] unexpected error', { message, error: err })
       setClaimError({ message })
     } finally {
       setBusy(false)
@@ -168,6 +188,26 @@ export function ClaimCardButton({ code }: { code: string }) {
 
   return (
     <>
+      <label
+        htmlFor="claim-pin"
+        style={{ display: 'block', marginBottom: '8px', color: '#77726a', fontSize: '9px', letterSpacing: '0.18em', textTransform: 'uppercase', textAlign: 'left' }}
+      >
+        PIN from the pouch
+      </label>
+      <input
+        id="claim-pin"
+        type="text"
+        inputMode="numeric"
+        autoComplete="one-time-code"
+        maxLength={6}
+        placeholder="123456"
+        value={pin}
+        onChange={(e) => setPin(e.target.value.replace(/\D/g, '').slice(0, 6))}
+        style={{ ...inputStyle, textAlign: 'center', fontSize: '18px', letterSpacing: '0.35em', fontWeight: 700 }}
+      />
+      <p style={{ margin: '8px 0 16px', color: '#635e55', fontSize: '11px', lineHeight: 1.5, textAlign: 'left' }}>
+        Find the 6-digit PIN inside the card pouch. You have 5 tries before it locks for 15 minutes.
+      </p>
       <button
         type="button"
         onClick={() => void handleClaim()}

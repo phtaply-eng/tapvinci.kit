@@ -20,11 +20,12 @@ const MESSAGES: Record<string, string> = {
   error: 'Something went wrong. Please try again.',
 }
 
-type CardRecord = {
-  id: string
-  card_code: string
-  claimed_by: string | null
-  claimed_at: string | null
+type CardStatus = {
+  found: boolean
+  claimed: boolean
+  activated: boolean
+  owned_by_me: boolean
+  username: string | null
 }
 
 type CardPageProps = {
@@ -268,6 +269,36 @@ function ClaimedPanel({ code, claimedOn }: { code: string; claimedOn: string | n
   )
 }
 
+function NotActivatedPanel() {
+  return (
+    <div style={panelStyle}>
+      <div
+        style={{
+          width: '58px',
+          height: '58px',
+          margin: '0 auto 22px',
+          borderRadius: '50%',
+          display: 'grid',
+          placeItems: 'center',
+          border: '1px solid rgba(212,175,55,0.26)',
+          background: 'rgba(212,175,55,0.08)',
+          color: GOLD,
+          fontSize: '20px',
+        }}
+      >
+        <i className="fa-solid fa-hourglass-half" />
+      </div>
+      <h1 style={titleStyle}>Not activated yet</h1>
+      <p style={copyStyle}>
+        This card has not been activated yet. If you just bought it, it will be activated after your payment is checked. If you already received it, check the code and try again.
+      </p>
+      <Link href="/" style={{ ...goldButton, marginTop: '26px' }}>
+        Back to TapVinci
+      </Link>
+    </div>
+  )
+}
+
 function ClaimPanel({
   code,
   email,
@@ -325,26 +356,16 @@ export default async function CardPage({ params, searchParams }: CardPageProps) 
   const code = rawCode.toUpperCase()
   const supabase = createClient()
 
-  let card: CardRecord | null = null
-
+  // 4C FIX: Do NOT query cards directly. After Step 1, cards has no public policy,
+  // so a direct query fails for anonymous taps. Use the safe get_card_status function,
+  // which is granted to anon + authenticated and only returns found / claimed / activated / owned_by_me.
+  let status: CardStatus | null = null
   if (code) {
-    const { data, error } = await supabase
-      .from('cards')
-      .select('id, card_code, claimed_by, claimed_at')
-      .eq('card_code', code)
-      .maybeSingle()
-
-    if (error) console.error('[Card page] Card lookup failed:', error.message)
-    card = (data as CardRecord | null) ?? null
-
-    // Fall back to the exact casing if the card was stored differently.
-    if (!card && rawCode !== code) {
-      const { data: exact } = await supabase
-        .from('cards')
-        .select('id, card_code, claimed_by, claimed_at')
-        .eq('card_code', rawCode)
-        .maybeSingle()
-      card = (exact as CardRecord | null) ?? null
+    const { data, error } = await supabase.rpc('get_card_status', { p_code: code })
+    if (error) {
+      console.error('[Card page] get_card_status failed:', error.message)
+    } else {
+      status = data as CardStatus | null
     }
   }
 
@@ -352,7 +373,7 @@ export default async function CardPage({ params, searchParams }: CardPageProps) 
     data: { user },
   } = await supabase.auth.getUser()
 
-  if (!card) {
+  if (!status || !status.found) {
     return (
       <Shell>
         <NotFoundPanel />
@@ -360,18 +381,18 @@ export default async function CardPage({ params, searchParams }: CardPageProps) 
     )
   }
 
-  if (card.claimed_by) {
-    const claimedOn = card.claimed_at
-      ? new Date(card.claimed_at).toLocaleDateString('en-US', {
-          month: 'short',
-          day: 'numeric',
-          year: 'numeric',
-        })
-      : null
-
+  if (status.claimed) {
     return (
       <Shell>
-        <ClaimedPanel code={card.card_code} claimedOn={claimedOn} />
+        <ClaimedPanel code={code} claimedOn={null} />
+      </Shell>
+    )
+  }
+
+  if (!status.activated) {
+    return (
+      <Shell>
+        <NotActivatedPanel />
       </Shell>
     )
   }
@@ -383,14 +404,14 @@ export default async function CardPage({ params, searchParams }: CardPageProps) 
   if (!user) {
     return (
       <Shell>
-        <ClaimScreen code={card.card_code} message={message} />
+        <ClaimScreen code={code} message={message} />
       </Shell>
     )
   }
 
   return (
     <Shell>
-      <ClaimPanel code={card.card_code} email={user.email} message={message} wantsClaim={wantsClaim} />
+      <ClaimPanel code={code} email={user.email} message={message} wantsClaim={wantsClaim} />
     </Shell>
   )
 }
