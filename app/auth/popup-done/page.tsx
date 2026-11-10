@@ -13,16 +13,19 @@ export default function PopupDone() {
       channel.close()
     } catch {}
 
-    // 2. Fallback: Tell the main page using window.postMessage
     try {
       window.opener?.postMessage('tapvinci-signed-in', window.location.origin)
     } catch {}
 
-    // 3. Try to close the window
-    const closeTimer = setTimeout(() => window.close(), 250)
-    
-    // 4. If it can't close (common on mobile browsers), show a message
-    const stuckTimer = setTimeout(() => setStuck(true), 1200)
+    // 2. Try to close automatically after 1.5 seconds
+    const closeTimer = setTimeout(() => {
+      window.close()
+    }, 1500)
+
+    // 3. If it can't close (mobile block), show the manual close button after 1.8 seconds
+    const stuckTimer = setTimeout(() => {
+      setStuck(true)
+    }, 1800)
 
     return () => {
       clearTimeout(closeTimer)
@@ -30,11 +33,21 @@ export default function PopupDone() {
     }
   }, [])
 
+  const handleClose = () => {
+    window.close()
+    // Fallback if window.close() is completely blocked by the browser
+    // We redirect to the root, which will reload their profile
+    if (window.opener) {
+      window.opener.focus()
+    }
+  }
+
   return (
     <main
       style={{
         minHeight: '100vh',
         display: 'flex',
+        flexDirection: 'column',
         alignItems: 'center',
         justifyContent: 'center',
         padding: '24px',
@@ -42,30 +55,77 @@ export default function PopupDone() {
         color: '#F5F1E8',
         textAlign: 'center',
         fontFamily: 'system-ui, -apple-system, Segoe UI, sans-serif',
+        position: 'relative',
       }}
     >
+      {/* Top Right X Button */}
+      <button
+        onClick={handleClose}
+        style={{
+          position: 'absolute',
+          top: '20px',
+          right: '20px',
+          width: '40px',
+          height: '40px',
+          borderRadius: '50%',
+          background: '#1E1E20',
+          color: '#A1A1A1',
+          border: '1px solid #2A2A2A',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          fontSize: '20px',
+          cursor: 'pointer',
+        }}
+      >
+        ✕
+      </button>
+
       <div>
         <div
           style={{
-            width: 56,
-            height: 56,
-            margin: '0 auto 16px',
+            width: 64,
+            height: 64,
+            margin: '0 auto 20px',
             borderRadius: '50%',
             border: '1px solid rgba(212,175,55,0.4)',
             background: 'rgba(212,175,55,0.1)',
             color: '#D4AF37',
-            fontSize: 24,
-            lineHeight: '54px',
+            fontSize: 28,
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
           }}
         >
           ✓
         </div>
-        <h1 style={{ fontSize: 20, fontWeight: 700, margin: 0 }}>You&apos;re signed in</h1>
-        <p style={{ marginTop: 8, fontSize: 13, color: '#A1A1A1' }}>
+        <h1 style={{ fontSize: 24, fontWeight: 700, margin: 0 }}>You&apos;re signed in</h1>
+        
+        <p style={{ marginTop: 12, fontSize: 14, color: '#A1A1A1', maxWidth: '300px', margin: '12px auto 0 auto', lineHeight: 1.5 }}>
           {stuck
-            ? 'You can close this window and go back to your card.'
+            ? 'Please tap the button below to close this window and return to your card.'
             : 'Taking you back to your card…'}
         </p>
+
+        {stuck && (
+          <button
+            onClick={handleClose}
+            style={{
+              marginTop: '24px',
+              padding: '14px 28px',
+              borderRadius: '999px',
+              background: '#D4AF37',
+              color: '#050505',
+              fontWeight: 700,
+              fontSize: '14px',
+              border: 'none',
+              cursor: 'pointer',
+              boxShadow: '0 4px 15px rgba(212,175,55,0.3)',
+            }}
+          >
+            Close Window
+          </button>
+        )}
       </div>
     </main>
   )
