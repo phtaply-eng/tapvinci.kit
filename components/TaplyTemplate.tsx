@@ -1,7 +1,6 @@
 'use client'
 
-import { useState, useEffect } from 'react'
-import Link from 'next/link'
+import { useState, useEffect, useRef } from 'react'
 import { createPortal } from 'react-dom'
 import StudentStats from '@/components/students/StudentStats'
 import StudentEducation from '@/components/students/StudentEducation'
@@ -9,6 +8,11 @@ import StudentSpotify from '@/components/students/StudentSpotify'
 import LoginModal from '@/components/LoginModal'
 import { getTapCount, getVisibleEducation, resolveProfileRole } from '../lib/profile-role'
 import { createClient } from '../lib/supabase-browser'
+import dynamic from 'next/dynamic'
+import { useRouter } from 'next/navigation'
+import ToastView from '@/components/ToastView'
+
+const EditDrawer = dynamic(() => import('@/components/EditDrawer'), { ssr: false })
 
 export default function TaplyTemplate({
   profile,
@@ -25,76 +29,131 @@ export default function TaplyTemplate({
   const [dragStart, setDragStart] = useState({ x: 0, y: 0 })
   const [mounted, setMounted] = useState(false)
 
-  // Payment modal state
   const [showPaymentModal, setShowPaymentModal] = useState(false)
   const [activeTab, setActiveTab] = useState<'gcash' | 'maya'>('gcash')
 
-  // Auth state
+  const router = useRouter()
   const [isLoginModalOpen, setIsLoginModalOpen] = useState(false)
   const [currentUserId, setCurrentUserId] = useState<string | null>(null)
   const [isCardOwner, setIsCardOwner] = useState(false)
   const [authReady, setAuthReady] = useState(false)
+  const [isEditDrawerOpen, setIsEditDrawerOpen] = useState(false)
+  const [drawerMounted, setDrawerMounted] = useState(false)
+  const [notice, setNotice] = useState('')
+  const noticeTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
 
-  // 1. Initial auth check
+  const awaitingSignIn = useRef(false)
+
+  const showNotice = (message: string) => {
+    setNotice(message)
+    if (noticeTimer.current) clearTimeout(noticeTimer.current)
+    noticeTimer.current = setTimeout(() => setNotice(''), 3500)
+  }
+
+  const openEditor = () => {
+    setDrawerMounted(true)
+    setIsEditDrawerOpen(true)
+  }
+
+  const checkOwnership = async (userId: string): Promise<boolean> => {
+    if (userId === profile.owner_id || userId === profile.claimed_by) return true
+    if (!profile.id) return false
+    const supabase = createClient()
+    const { data } = await supabase
+      .from('cards')
+      .select('profile_id')
+      .eq('claimed_by', userId)
+      .eq('profile_id', profile.id)
+      .maybeSingle()
+    return !!data?.profile_id
+  }
+
+  const handleAuthResult = async () => {
+    try {
+      const supabase = createClient()
+      const { data } = await supabase.auth.getUser()
+      const user = data?.user ?? null
+      setCurrentUserId(user?.id ?? null)
+      if (!user) {
+        setIsCardOwner(false)
+        return
+      }
+      const owner = await checkOwnership(user.id)
+      setIsCardOwner(owner)
+      if (awaitingSignIn.current) {
+        setIsLoginModalOpen(false)
+        if (owner) openEditor()
+        else showNotice('You are not the owner of this profile.')
+      }
+    } catch (error) {
+      console.error('[Auth] ownership check failed:', error)
+    } finally {
+      awaitingSignIn.current = false
+    }
+  }
+  const authResultRef = useRef(handleAuthResult)
+  authResultRef.current = handleAuthResult
+
   useEffect(() => {
     let alive = true
-    const supabase = createClient()
+    const params = new URLSearchParams(window.location.search)
+    const wantsEdit = params.get('edit_profile') === '1'
 
-    supabase.auth
-      .getUser()
-      .then(({ data }) => {
+    const run = async () => {
+      try {
+        const supabase = createClient()
+        const { data } = await supabase.auth.getUser()
         if (!alive) return
         const user = data?.user ?? null
         setCurrentUserId(user?.id ?? null)
-        setAuthReady(true)
 
-        if (user && profile.id) {
-          supabase
-            .from('cards')
-            .select('profile_id')
-            .eq('claimed_by', user.id)
-            .eq('profile_id', profile.id)
-            .maybeSingle()
-            .then(({ data: card }) => {
-              if (alive && card?.profile_id) setIsCardOwner(true)
-            })
+        const owner = user ? await checkOwnership(user.id) : false
+        if (!alive) return
+        setIsCardOwner(owner)
+
+        if (wantsEdit) {
+          params.delete('edit_profile')
+          const qs = params.toString()
+          window.history.replaceState(
+            null,
+            '',
+            window.location.pathname + (qs ? `?${qs}` : '') + window.location.hash
+          )
+          if (!user) {
+            awaitingSignIn.current = true
+            setIsLoginModalOpen(true)
+          } else if (owner) {
+            openEditor()
+          } else {
+            showNotice('You are not the owner of this profile.')
+          }
         }
-      })
-      .catch(() => {
+      } catch {
+      } finally {
         if (alive) setAuthReady(true)
-      })
+      }
+    }
+    void run()
 
     return () => {
       alive = false
     }
   }, [profile.id])
 
-  // 2. Auth state listener
   useEffect(() => {
     const supabase = createClient()
 
     const {
       data: { subscription },
-    } = supabase.auth.onAuthStateChange((event, session) => {
-      if (event === 'SIGNED_IN' && session?.user) {
-        setCurrentUserId(session.user.id)
-
-        supabase
-          .from('cards')
-          .select('profile_id')
-          .eq('claimed_by', session.user.id)
-          .eq('profile_id', profile.id)
-          .maybeSingle()
-          .then(({ data: card }) => {
-            if (card?.profile_id) {
-              setIsCardOwner(true)
-              setIsLoginModalOpen(false)
-            }
-          })
-      }
+    } = supabase.auth.onAuthStateChange((event) => {
       if (event === 'SIGNED_OUT') {
         setCurrentUserId(null)
         setIsCardOwner(false)
+        setIsEditDrawerOpen(false)
+        return
+      }
+      if (event === 'SIGNED_IN' && awaitingSignIn.current) {
+        setTimeout(() => void authResultRef.current(), 0)
       }
     })
 
@@ -112,7 +171,6 @@ export default function TaplyTemplate({
   const isStudent = resolveProfileRole(profile) === 'student'
   const accent = profile.accent_color || (isStudent ? '#22c55e' : '#D4AF37')
 
-  // Visibility checks (respecting the dashboard toggles)
   const visiblePhone = profile.show_phone !== false && profile.phone ? String(profile.phone) : ''
   const visibleEmail = profile.show_email !== false && profile.email ? String(profile.email) : ''
   const visibleAddress =
@@ -336,8 +394,6 @@ export default function TaplyTemplate({
     }
   }
 
-  // ---- Unified sections -------------------------------------------------
-
   const socialsSection =
     socialButtons.length > 0 ? (
       <section className="taply-section" id="socials">
@@ -345,7 +401,7 @@ export default function TaplyTemplate({
           <i className="fa-solid fa-link" style={{ color: '#D4AF37' }}></i> Social Media
         </h2>
         
-        <div className="mt-4 flex w-full flex-row flex-nowrap gap-4 overflow-x-auto px-4 pb-2 [&::-webkit-scrollbar]:hidden [-ms-overflow-style:none] [scrollbar-width:none] justify-start">
+        <div className="mt-4 flex w-full flex-row flex-nowrap gap-4 overflow-x-auto px-4 pb-2 [&::-webkit-scrollbar]:hidden [-ms-overflow-style:none] [scrollbar-width:none] justify-center">
           {socialButtons.map((s) => {
             let bgStyle: React.CSSProperties = { background: '#1E1E20' }
             if (s.id === 'facebook') bgStyle = { background: '#1877F2' }
@@ -373,10 +429,10 @@ export default function TaplyTemplate({
                 rel="noreferrer"
                 aria-label={s.label}
                 title={s.label}
-                className="flex h-14 w-14 flex-shrink-0 cursor-pointer items-center justify-center rounded-2xl text-white shadow-sm transition-transform hover:scale-105 active:scale-95"
+                className="flex h-16 w-16 flex-shrink-0 cursor-pointer items-center justify-center rounded-2xl text-white shadow-sm transition-transform hover:scale-105 active:scale-95"
                 style={bgStyle}
               >
-                <i className={`${iconClass} ${s.icon} text-2xl`}></i>
+                <i className={`${iconClass} ${s.icon} text-3xl`}></i>
               </a>
             )
           })}
@@ -574,8 +630,9 @@ export default function TaplyTemplate({
 
         {authReady &&
           (isOwner ? (
-            <Link
-              href={`/dashboard?edit=${encodeURIComponent(String(profile.username || ''))}`}
+            <button
+              type="button"
+              onClick={openEditor}
               style={{
                 display: 'inline-flex',
                 alignItems: 'center',
@@ -584,13 +641,16 @@ export default function TaplyTemplate({
                 fontWeight: 600,
                 letterSpacing: '0.05em',
                 textTransform: 'uppercase',
-                textDecoration: 'none',
+                background: 'transparent',
+                border: 'none',
+                padding: 0,
+                cursor: 'pointer',
                 color: isStudent ? '#22c55e' : '#D4AF37',
               }}
             >
               <i className="fa-solid fa-pen-to-square" style={{ fontSize: '9px' }} />
               Edit Profile
-            </Link>
+            </button>
           ) : (
             <button
               onClick={() => setIsLoginModalOpen(true)}
@@ -654,7 +714,28 @@ export default function TaplyTemplate({
 
   return (
     <>
-      <LoginModal isOpen={isLoginModalOpen} onClose={() => setIsLoginModalOpen(false)} />
+      <LoginModal
+        isOpen={isLoginModalOpen}
+        onClose={() => {
+          awaitingSignIn.current = false
+          setIsLoginModalOpen(false)
+        }}
+        onSignInStart={() => {
+          awaitingSignIn.current = true
+        }}
+        onAuthComplete={() => void authResultRef.current()}
+      />
+
+      {drawerMounted && (
+        <EditDrawer
+          isOpen={isEditDrawerOpen}
+          onClose={() => setIsEditDrawerOpen(false)}
+          profile={profile}
+          onSaved={() => router.refresh()}
+        />
+      )}
+
+      <ToastView message={notice} />
 
       <div
         suppressHydrationWarning
@@ -678,7 +759,6 @@ export default function TaplyTemplate({
               <i className={`fa-solid ${isDark ? 'fa-sun' : 'fa-moon'}`}></i>
             </button>
 
-            {/* 1. HERO / PROFILE */}
             <section suppressHydrationWarning className="taply-profile">
               <div className="taply-hero">
                 {/* eslint-disable-next-line @next/next/no-img-element */}
@@ -755,7 +835,6 @@ export default function TaplyTemplate({
               </div>
             </section>
 
-            {/* 2. ABOUT ME */}
             {profile.about && (
               <section className="taply-section">
                 <h2 style={{ color: '#D4AF37' }}>
@@ -765,7 +844,6 @@ export default function TaplyTemplate({
               </section>
             )}
 
-            {/* 3 & 4. Student Education + Spotify */}
             {isStudent && (
               <>
                 {visibleEducation.hasAny && (
@@ -781,18 +859,10 @@ export default function TaplyTemplate({
               </>
             )}
 
-            {/* 5. Gallery */}
             {gallerySection}
-            
-            {/* 6. Quick Actions */}
             {quickActionsSection}
-            
-            {/* 7. Social Media */}
             {socialsSection}
-            
-            {/* 8. Contact */}
             {contactSection}
-            
             {footerSection}
           </main>
         </div>

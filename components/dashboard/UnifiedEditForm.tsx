@@ -65,6 +65,10 @@ export type UnifiedEditFormProps = {
   demoCode: string
   setDemoCode: (value: string) => void
   showToast: (message: string) => void
+  /** Hide the form's own "Edit Profile" header (used inside the edit drawer). */
+  embedded?: boolean
+  /** Make the username read-only (professional cards are printed with it). */
+  lockUsername?: boolean
 }
 
 export default function UnifiedEditForm({
@@ -78,6 +82,8 @@ export default function UnifiedEditForm({
   demoCode,
   setDemoCode,
   showToast,
+  embedded = false,
+  lockUsername = false,
 }: UnifiedEditFormProps) {
   const heroInputRef = useRef<HTMLInputElement>(null)
   const galleryInputRef = useRef<HTMLInputElement>(null)
@@ -229,24 +235,28 @@ export default function UnifiedEditForm({
   return (
     <div className="space-y-4">
       {/* HEADER */}
-      <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
-        <div>
-          <p className="text-[10px] font-bold uppercase tracking-[0.22em] text-zinc-500">
-            {isStudent ? 'Student experience' : 'Professional experience'}
-          </p>
-          <h1 className="mt-0.5 text-xl font-bold">Edit Profile</h1>
+      {!embedded && (
+        <>
+        <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+          <div>
+            <p className="text-[10px] font-bold uppercase tracking-[0.22em] text-zinc-500">
+              {isStudent ? 'Student experience' : 'Professional experience'}
+            </p>
+            <h1 className="mt-0.5 text-xl font-bold">Edit Profile</h1>
+          </div>
+          <span
+            className={`inline-flex items-center gap-2 self-start rounded-full border px-3 py-1.5 text-[10px] font-bold uppercase tracking-widest ${
+              isStudent
+                ? 'border-[#00D632]/30 bg-[#00D632]/10 text-[#00D632]'
+                : 'border-[#D4AF37]/30 bg-[#D4AF37]/10 text-[#D4AF37]'
+            }`}
+          >
+            <i className={`fa-solid ${isStudent ? 'fa-graduation-cap' : 'fa-briefcase'}`} />
+            {isStudent ? 'Student' : 'Professional'}
+          </span>
         </div>
-        <span
-          className={`inline-flex items-center gap-2 self-start rounded-full border px-3 py-1.5 text-[10px] font-bold uppercase tracking-widest ${
-            isStudent
-              ? 'border-[#00D632]/30 bg-[#00D632]/10 text-[#00D632]'
-              : 'border-[#D4AF37]/30 bg-[#D4AF37]/10 text-[#D4AF37]'
-          }`}
-        >
-          <i className={`fa-solid ${isStudent ? 'fa-graduation-cap' : 'fa-briefcase'}`} />
-          {isStudent ? 'Student' : 'Professional'}
-        </span>
-      </div>
+        </>
+      )}
 
       {/* ACCOUNT */}
       <div className="grid gap-3 border-t border-zinc-800 pt-4 sm:grid-cols-2">
@@ -255,10 +265,17 @@ export default function UnifiedEditForm({
           <input
             value={profile.username || ''}
             onChange={(event) => patch({ username: event.target.value.toLowerCase() })}
-            className={inputCls}
+            className={`${inputCls} ${lockUsername ? 'cursor-not-allowed opacity-60' : ''}`}
             placeholder="your-name"
             autoComplete="username"
+            readOnly={lockUsername}
+            aria-readonly={lockUsername}
           />
+          {lockUsername && (
+            <span className="mt-1 block text-[10px] text-zinc-500">
+              Your card link uses this username, so it can’t be changed here.
+            </span>
+          )}
         </label>
         <label className="block">
           <span className={labelCls}>Name</span>

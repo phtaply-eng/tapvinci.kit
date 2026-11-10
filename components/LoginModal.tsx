@@ -1,19 +1,52 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { createPortal } from 'react-dom'
 import { createClient } from '@/lib/supabase-browser'
+
+const CHANNEL = 'tapvinci-auth'
+const POLL_MS = 1500
+const GIVE_UP_MS = 3 * 60 * 1000
+
+type LoginModalProps = {
+  isOpen: boolean
+  onClose: () => void
+  onSignInStart?: () => void
+  onAuthComplete?: () => void
+}
 
 export default function LoginModal({
   isOpen,
   onClose,
-}: {
-  isOpen: boolean
-  onClose: () => void
-}) {
+  onSignInStart,
+  onAuthComplete,
+}: LoginModalProps) {
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [mounted, setMounted] = useState(false)
+
+  const pollRef = useRef<ReturnType<typeof setInterval> | null>(null)
+  const giveUpRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+  const doneRef = useRef(false)
+  const completeRef = useRef(onAuthComplete)
+  completeRef.current = onAuthComplete
+
+  const stopWaiting = () => {
+    if (pollRef.current) clearInterval(pollRef.current)
+    if (giveUpRef.current) clearTimeout(giveUpRef.current)
+    pollRef.current = null
+    giveUpRef.current = null
+  }
+
+  const finish = () => {
+    if (doneRef.current) return
+    doneRef.current = true
+    stopWaiting()
+    setLoading(false)
+    completeRef.current?.()
+  }
+  const finishRef = useRef(finish)
+  finishRef.current = finish
 
   useEffect(() => {
     setMounted(true)
@@ -22,63 +55,129 @@ export default function LoginModal({
     return () => { document.body.style.overflow = '' }
   }, [isOpen])
 
+  useEffect(() => {
+    if (!isOpen) return
+
+    let channel: BroadcastChannel | null = null
+    try {
+      channel = new BroadcastChannel(CHANNEL)
+      channel.onmessage = (event) => {
+        if (event.data === 'signed-in') finishRef.current()
+      }
+    } catch {}
+
+    const onMessage = (event: MessageEvent) => {
+      if (event.origin === window.location.origin && event.data === 'tapvinci-signed-in') {
+        finishRef.current()
+      }
+    }
+    window.addEventListener('message', onMessage)
+
+    return () => {
+      channel?.close()
+      window.removeEventListener('message', onMessage)
+    }
+  }, [isOpen])
+
+  useEffect(() => {
+    if (!isOpen) {
+      stopWaiting()
+      setLoading(false)
+      setError(null)
+    }
+  }, [isOpen])
+
+  useEffect(() => {
+    return () => stopWaiting()
+  }, [])
+
   if (!mounted || !isOpen) return null
 
   const handleGoogleSignIn = async () => {
     setLoading(true)
     setError(null)
+    doneRef.current = false
+
     const supabase = createClient()
-    
-    // 1. Get the current path (e.g., /student)
-    const currentPath = window.location.pathname
-    
-    // 2. Force the absolute URL. Fallback to origin if env var is missing.
-    const siteUrl = process.env.NEXT_PUBLIC_SITE_URL || window.location.origin
-    const redirectTo = `${siteUrl}/auth/callback?next=${encodeURIComponent(currentPath)}`
-    
-    // Optional: Log this to your browser console to verify the URL is perfect
-    console.log("Redirecting to Supabase Callback:", redirectTo)
-    
-    // 3. Request the OAuth URL but skip the automatic full-page redirect
+
+    // 1. Set a cookie to tell the callback route to redirect to popup-done
+    document.cookie = "auth_next=/auth/popup-done; path=/; max-age=600; SameSite=Lax"
+
+    // 2. Clean redirect URL (no query params to confuse Supabase)
+    const origin = window.location.origin
+    const popupRedirect = `${origin}/auth/callback`
+
+    let startUserId: string | null = null
+    try {
+      const { data } = await supabase.auth.getUser()
+      startUserId = data?.user?.id ?? null
+    } catch {}
+
+    onSignInStart?.()
+
     const { data, error } = await supabase.auth.signInWithOAuth({
       provider: 'google',
       options: {
-        redirectTo,
+        redirectTo: popupRedirect,
         skipBrowserRedirect: true,
+        queryParams: { prompt: 'select_account' },
       },
     })
 
-    if (error) {
-      setError(error.message)
+    if (error || !data?.url) {
+      setError(error?.message ?? 'Could not start Google sign-in. Please try again.')
       setLoading(false)
       return
     }
 
-    // 4. Open the URL in a sleek popup window
-    if (data?.url) {
-      const popup = window.open(
-        data.url, 
-        'google-login', 
-        'width=500,height=600,scrollbars=yes,resizable=yes'
-      )
-      
-      if (!popup) {
-        setError("Popup blocked. Please allow popups for this site.")
+    const popup = window.open(
+      data.url,
+      'tapvinci-google-login',
+      'width=500,height=640,scrollbars=yes,resizable=yes'
+    )
+
+    if (!popup) {
+      // Fallback if popup is blocked
+      const backTo = `${window.location.pathname}?edit_profile=1`
+      const { error: fallbackError } = await supabase.auth.signInWithOAuth({
+        provider: 'google',
+        options: {
+          redirectTo: `${origin}/auth/callback`,
+          queryParams: { prompt: 'select_account' },
+        },
+      })
+      if (fallbackError) {
+        setError(fallbackError.message)
         setLoading(false)
       }
+      return
     }
+
+    pollRef.current = setInterval(async () => {
+      try {
+        const { data: current } = await supabase.auth.getUser()
+        const id = current?.user?.id ?? null
+        if (id && id !== startUserId) finishRef.current()
+      } catch {}
+    }, POLL_MS)
+
+    giveUpRef.current = setTimeout(() => {
+      stopWaiting()
+      setLoading(false)
+      setError('Sign-in took too long. Please try again.')
+    }, GIVE_UP_MS)
   }
 
   return createPortal(
-    <div 
-      className="fixed inset-0 z-[99999] bg-black/80 backdrop-blur-sm flex items-center justify-center p-4 animate-in fade-in duration-200" 
+    <div
+      className="fixed inset-0 z-[99999] bg-black/80 backdrop-blur-sm flex items-center justify-center p-4 animate-in fade-in duration-200"
       onClick={onClose}
     >
-      <div 
+      <div
         className="bg-[#121214] border border-[#2A2A2A] rounded-3xl w-full max-w-[360px] p-6 relative shadow-[0_0_80px_rgba(0,0,0,0.8)]"
-        onClick={e => e.stopPropagation()}
+        onClick={(e) => e.stopPropagation()}
       >
-        <button 
+        <button
           onClick={onClose}
           className="absolute top-4 right-4 w-8 h-8 rounded-full bg-[#1E1E20] text-gray-400 hover:text-white flex items-center justify-center transition-colors"
         >
