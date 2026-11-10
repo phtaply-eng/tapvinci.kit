@@ -1,30 +1,48 @@
+import { createServerClient, type CookieOptions } from '@supabase/ssr'
+import { cookies } from 'next/headers'
 import { NextResponse } from 'next/server'
-import { createClient } from '../../../lib/supabase-server'
 
 export async function GET(request: Request) {
-  const requestUrl = new URL(request.url)
-  // Always derive the app origin from this request - never from an env var.
-  const origin = requestUrl.origin
-  const code = requestUrl.searchParams.get('code')
+  const { searchParams, origin } = new URL(request.url)
+  const code = searchParams.get('code')
+  const next = searchParams.get('next') ?? '/'
 
-  if (!code) {
-    return NextResponse.redirect(new URL('/?auth_error=1', origin))
-  }
+  if (code) {
+    const cookieStore = cookies()
+    
+    const supabase = createServerClient(
+      process.env.NEXT_PUBLIC_SUPABASE_URL!,
+      process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
+      {
+        cookies: {
+          get(name: string) {
+            return cookieStore.get(name)?.value
+          },
+          set(name: string, value: string, options: CookieOptions) {
+            cookieStore.set({ name, value, ...options })
+          },
+          remove(name: string, options: CookieOptions) {
+            cookieStore.set({ name, value: '', ...options })
+          },
+        },
+      }
+    )
 
-  try {
-    const supabase = createClient()
     const { error } = await supabase.auth.exchangeCodeForSession(code)
-
-    if (error) {
-      return NextResponse.redirect(new URL('/?auth_error=1', origin))
+    
+    if (!error) {
+      const forwardedHost = request.headers.get('x-forwarded-host')
+      const isLocalEnv = process.env.NODE_ENV === 'development'
+      
+      if (isLocalEnv) {
+        return NextResponse.redirect(`${origin}${next}`)
+      } else if (forwardedHost) {
+        return NextResponse.redirect(`https://${forwardedHost}${next}`)
+      } else {
+        return NextResponse.redirect(`${origin}${next}`)
+      }
     }
-  } catch {
-    return NextResponse.redirect(new URL('/?auth_error=1', origin))
   }
 
-  // Only allow local paths so ?next= cannot be used as an open redirect.
-  const next = requestUrl.searchParams.get('next')
-  const safeNext = next && next.startsWith('/') && !next.startsWith('//') ? next : '/dashboard'
-
-  return NextResponse.redirect(new URL(safeNext, origin))
+  return NextResponse.redirect(`${origin}/?error=auth-failed`)
 }

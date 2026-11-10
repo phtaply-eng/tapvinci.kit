@@ -1,22 +1,21 @@
 'use client'
-import { useState, useRef, useEffect } from 'react'
-import { createPortal } from 'react-dom' // <-- NEW IMPORT
-import SpotifyPlayer from './SpotifyPlayer'
-import StudentStats from './students/StudentStats'
-import StudentEducation from './students/StudentEducation'
-import StudentSpotify from './students/StudentSpotify'
-import { getTapCount, resolveProfileRole } from '../lib/profile-role'
+
+import { useState, useEffect } from 'react'
+import Link from 'next/link'
+import { createPortal } from 'react-dom'
+import StudentStats from '@/components/students/StudentStats'
+import StudentEducation from '@/components/students/StudentEducation'
+import StudentSpotify from '@/components/students/StudentSpotify'
+import LoginModal from '@/components/LoginModal'
+import { getTapCount, getVisibleEducation, resolveProfileRole } from '../lib/profile-role'
+import { createClient } from '../lib/supabase-browser'
 
 export default function TaplyTemplate({
   profile,
-  viewAs,
 }: {
   profile: any
-  /** Dashboard preview override. Public pages resolve the role from the row. */
   viewAs?: 'student' | 'professional'
 }) {
-  const reelRef = useRef<HTMLDivElement>(null)
-  const [current, setCurrent] = useState(1)
   const [isDark, setIsDark] = useState(true)
   const [lightboxOpen, setLightboxOpen] = useState(false)
   const [lightboxIndex, setLightboxIndex] = useState(0)
@@ -25,16 +24,104 @@ export default function TaplyTemplate({
   const [isDragging, setIsDragging] = useState(false)
   const [dragStart, setDragStart] = useState({ x: 0, y: 0 })
   const [mounted, setMounted] = useState(false)
-  
-  // Payment Modal State
+
+  // Payment modal state
   const [showPaymentModal, setShowPaymentModal] = useState(false)
   const [activeTab, setActiveTab] = useState<'gcash' | 'maya'>('gcash')
+
+  // Auth state
+  const [isLoginModalOpen, setIsLoginModalOpen] = useState(false)
+  const [currentUserId, setCurrentUserId] = useState<string | null>(null)
+  const [isCardOwner, setIsCardOwner] = useState(false)
+  const [authReady, setAuthReady] = useState(false)
+
+  // 1. Initial auth check
+  useEffect(() => {
+    let alive = true
+    const supabase = createClient()
+
+    supabase.auth
+      .getUser()
+      .then(({ data }) => {
+        if (!alive) return
+        const user = data?.user ?? null
+        setCurrentUserId(user?.id ?? null)
+        setAuthReady(true)
+
+        if (user && profile.id) {
+          supabase
+            .from('cards')
+            .select('profile_id')
+            .eq('claimed_by', user.id)
+            .eq('profile_id', profile.id)
+            .maybeSingle()
+            .then(({ data: card }) => {
+              if (alive && card?.profile_id) setIsCardOwner(true)
+            })
+        }
+      })
+      .catch(() => {
+        if (alive) setAuthReady(true)
+      })
+
+    return () => {
+      alive = false
+    }
+  }, [profile.id])
+
+  // 2. Auth state listener
+  useEffect(() => {
+    const supabase = createClient()
+
+    const {
+      data: { subscription },
+    } = supabase.auth.onAuthStateChange((event, session) => {
+      if (event === 'SIGNED_IN' && session?.user) {
+        setCurrentUserId(session.user.id)
+
+        supabase
+          .from('cards')
+          .select('profile_id')
+          .eq('claimed_by', session.user.id)
+          .eq('profile_id', profile.id)
+          .maybeSingle()
+          .then(({ data: card }) => {
+            if (card?.profile_id) {
+              setIsCardOwner(true)
+              setIsLoginModalOpen(false)
+            }
+          })
+      }
+      if (event === 'SIGNED_OUT') {
+        setCurrentUserId(null)
+        setIsCardOwner(false)
+      }
+    })
+
+    return () => {
+      subscription.unsubscribe()
+    }
+  }, [profile.id])
+
+  const isOwner =
+    !!currentUserId &&
+    (currentUserId === profile.owner_id ||
+      currentUserId === profile.claimed_by ||
+      isCardOwner)
+
+  const isStudent = resolveProfileRole(profile) === 'student'
+  const accent = profile.accent_color || (isStudent ? '#22c55e' : '#D4AF37')
+
+  // Visibility checks (respecting the dashboard toggles)
+  const visiblePhone = profile.show_phone !== false && profile.phone ? String(profile.phone) : ''
+  const visibleEmail = profile.show_email !== false && profile.email ? String(profile.email) : ''
+  const visibleAddress =
+    profile.show_address !== false && profile.address ? String(profile.address) : ''
+  const visibleEducation = getVisibleEducation(profile)
   
-  // Student cards always use the green experience from the student layout.
-  // Professional cards keep the theme picked in the dashboard.
-  const isStudent = viewAs ? viewAs === 'student' : resolveProfileRole(profile) === 'student'
-  const accent = isStudent ? '#22c55e' : profile.accent_color || '#D4AF37'
-  
+  const mapsVisible =
+    profile.socials_visible?.google_maps !== false && profile.show_google_maps !== false
+
   useEffect(() => {
     setMounted(true)
     const saved = localStorage.getItem('tapvinci-theme-mode')
@@ -46,11 +133,13 @@ export default function TaplyTemplate({
     setIsDark(newMode)
     localStorage.setItem('tapvinci-theme-mode', newMode ? 'dark' : 'light')
   }
-  
-  const gallery = (profile.gallery || []).map((item: any) => {
-    if (typeof item === 'string') return { src: item, alt: 'Gallery' }
-    return { src: item.src, alt: item.alt || 'Gallery' }
-  }).filter((g: any) => g.src)
+
+  const gallery = (profile.gallery || [])
+    .map((item: any) => {
+      if (typeof item === 'string') return { src: item, alt: 'Gallery' }
+      return { src: item.src, alt: item.alt || 'Gallery' }
+    })
+    .filter((g: any) => g.src)
 
   const heroImg = profile.hero_image || profile.avatar_url || ''
   const socials = profile.socials || {}
@@ -61,7 +150,7 @@ export default function TaplyTemplate({
     return !!socials[key]
   }
 
-  const socialButtons = []
+  const socialButtons: Array<{ id: string; href: string; icon: string; label: string }> = []
   if (isVisible('facebook')) socialButtons.push({ id: 'facebook', href: socials.facebook, icon: 'fa-facebook-f', label: 'Facebook' })
   if (isVisible('instagram')) socialButtons.push({ id: 'instagram', href: socials.instagram, icon: 'fa-instagram', label: 'Instagram' })
   if (isVisible('tiktok')) socialButtons.push({ id: 'tiktok', href: socials.tiktok, icon: 'fa-tiktok', label: 'TikTok' })
@@ -72,7 +161,6 @@ export default function TaplyTemplate({
   if (isVisible('website')) socialButtons.push({ id: 'website', href: socials.website, icon: 'fa-globe', label: 'Website' })
   if (isVisible('twitter') || isVisible('x')) socialButtons.push({ id: 'twitter', href: socials.twitter || socials.x, icon: 'fa-x-twitter', label: 'X / Twitter' })
 
-  // PAYMENT DATA
   const gcashQR = (profile as any).gcash_qr_url || (profile as any).gcash_qr
   const mayaQR = (profile as any).maya_qr_url || (profile as any).maya_qr
 
@@ -104,7 +192,7 @@ export default function TaplyTemplate({
         await navigator.share({
           title: `${type} QR - ${profile.name}`,
           text: `Scan my ${type} QR to pay`,
-          url: url
+          url,
         })
       } catch {}
     } else {
@@ -115,36 +203,38 @@ export default function TaplyTemplate({
   const getTheme = () => {
     const t = profile.theme || 'gold'
     if (!isDark) {
-      return { bg: '#f1f5f9', card: '#ffffff', glow: `radial-gradient(600px circle at 50% -10%, ${accent}22, transparent 60%)`, shadow: '0 10px 40px rgba(0,0,0,0.08)', light: true }
+      return {
+        bg: '#f1f5f9',
+        card: '#ffffff',
+        glow: `radial-gradient(600px circle at 50% -10%, ${accent}22, transparent 60%)`,
+        shadow: '0 10px 40px rgba(0,0,0,0.08)',
+        light: true,
+      }
     }
-    switch(t){
-      case 'purple': return { bg:'#050505', card:'#151515', glow:`radial-gradient(600px circle at 50% -10%, ${accent}44, transparent 60%)`, shadow:`0 20px 80px rgba(0,0,0,0.8), 0 0 60px ${accent}30`, light:false }
-      case 'blue': return { bg:'#050505', card:'#151515', glow:`radial-gradient(600px circle at 50% -10%, ${accent}44, transparent 60%)`, shadow:`0 20px 80px rgba(0,0,0,0.8), 0 0 60px ${accent}30`, light:false }
-      case 'green': return { bg:'#050505', card:'#151515', glow:`radial-gradient(600px circle at 50% -10%, ${accent}44, transparent 60%)`, shadow:`0 20px 80px rgba(0,0,0,0.8), 0 0 60px ${accent}30`, light:false }
-      case 'pink': return { bg:'#050505', card:'#151515', glow:`radial-gradient(600px circle at 50% -10%, ${accent}44, transparent 60%)`, shadow:`0 20px 80px rgba(0,0,0,0.8), 0 0 60px ${accent}30`, light:false }
-      case 'orange': return { bg:'#050505', card:'#151515', glow:`radial-gradient(600px circle at 50% -10%, ${accent}44, transparent 60%)`, shadow:`0 20px 80px rgba(0,0,0,0.8), 0 0 60px ${accent}30`, light:false }
-      default: return { bg:'#050505', card:'#151515', glow:`radial-gradient(600px circle at 50% -10%, ${accent}44, transparent 60%)`, shadow:`0 20px 80px rgba(0,0,0,0.8), 0 0 60px ${accent}30`, light:false }
+    switch (t) {
+      case 'purple':
+      case 'blue':
+      case 'green':
+      case 'pink':
+      case 'orange':
+        return {
+          bg: '#050505',
+          card: '#151515',
+          glow: `radial-gradient(600px circle at 50% -10%, ${accent}44, transparent 60%)`,
+          shadow: `0 20px 80px rgba(0,0,0,0.8), 0 0 60px ${accent}30`,
+          light: false,
+        }
+      default:
+        return {
+          bg: '#050505',
+          card: '#151515',
+          glow: `radial-gradient(600px circle at 50% -10%, ${accent}44, transparent 60%)`,
+          shadow: `0 20px 80px rgba(0,0,0,0.8), 0 0 60px ${accent}30`,
+          light: false,
+        }
     }
   }
   const th = getTheme()
-
-  useEffect(()=>{
-    const reel = reelRef.current; if(!reel) return
-    const h = () => {
-      const first = reel.firstElementChild as HTMLElement
-      const w = first ? first.offsetWidth + 14 : 300
-      setCurrent(Math.round(reel.scrollLeft / w) + 1)
-    }
-    reel.addEventListener('scroll', h, { passive:true })
-    return ()=> reel.removeEventListener('scroll', h)
-  },[gallery])
-
-  const scroll = (dir:number) => {
-    if(!reelRef.current) return
-    const first = reelRef.current.firstElementChild as HTMLElement
-    const w = first ? first.offsetWidth + 14 : 300
-    reelRef.current.scrollBy({ left: dir*w, behavior:'smooth' })
-  }
 
   const openLightbox = (index: number) => {
     setLightboxIndex(index)
@@ -153,34 +243,33 @@ export default function TaplyTemplate({
     setPan({ x: 0, y: 0 })
     document.body.style.overflow = 'hidden'
   }
-
   const closeLightbox = () => {
     setLightboxOpen(false)
     setZoom(1)
     setPan({ x: 0, y: 0 })
     document.body.style.overflow = ''
   }
-
   const nextImage = () => {
     setLightboxIndex((prev) => (prev + 1) % gallery.length)
     setZoom(1)
     setPan({ x: 0, y: 0 })
   }
-
   const prevImage = () => {
     setLightboxIndex((prev) => (prev - 1 + gallery.length) % gallery.length)
     setZoom(1)
     setPan({ x: 0, y: 0 })
   }
-
   const handleZoomIn = () => setZoom((z) => Math.min(z + 0.5, 4))
-  const handleZoomOut = () => setZoom((z) => {
-    const newZoom = Math.max(z - 0.5, 1)
-    if (newZoom === 1) setPan({ x: 0, y: 0 })
-    return newZoom
-  })
-  const handleReset = () => { setZoom(1); setPan({ x: 0, y: 0 }) }
-
+  const handleZoomOut = () =>
+    setZoom((z) => {
+      const newZoom = Math.max(z - 0.5, 1)
+      if (newZoom === 1) setPan({ x: 0, y: 0 })
+      return newZoom
+    })
+  const handleReset = () => {
+    setZoom(1)
+    setPan({ x: 0, y: 0 })
+  }
   const handleMouseDown = (e: any) => {
     if (zoom === 1) return
     setIsDragging(true)
@@ -191,7 +280,6 @@ export default function TaplyTemplate({
     setPan({ x: e.clientX - dragStart.x, y: e.clientY - dragStart.y })
   }
   const handleMouseUp = () => setIsDragging(false)
-
   const handleTouchStart = (e: any) => {
     if (zoom === 1) return
     const touch = e.touches[0]
@@ -205,16 +293,19 @@ export default function TaplyTemplate({
   }
 
   const saveContact = () => {
-    const vcard = `BEGIN:VCARD
-VERSION:3.0
-FN:${profile.name}
-ORG:${profile.title || ''}
-TEL:${profile.phone || ''}
-EMAIL:${profile.email || ''}
-ADR:${profile.address || ''}
-URL:${mounted && typeof window !== 'undefined' ? window.location.href : ''}
-END:VCARD`
-    const blob = new Blob([vcard], {type:'text/vcard'})
+    const lines = [
+      'BEGIN:VCARD',
+      'VERSION:3.0',
+      `FN:${profile.name}`,
+      `ORG:${profile.title || ''}`,
+      visiblePhone ? `TEL:${visiblePhone}` : '',
+      visibleEmail ? `EMAIL:${visibleEmail}` : '',
+      visibleAddress ? `ADR:${visibleAddress}` : '',
+      `URL:${mounted && typeof window !== 'undefined' ? window.location.href : ''}`,
+      'END:VCARD',
+    ].filter(Boolean)
+    const vcard = lines.join('\n')
+    const blob = new Blob([vcard], { type: 'text/vcard' })
     const url = URL.createObjectURL(blob)
     const a = document.createElement('a')
     a.href = url
@@ -231,17 +322,12 @@ END:VCARD`
       text: profile.title || 'Tap my TapVinci card',
       url,
     }
-
     if (navigator.share) {
       try {
         await navigator.share(shareData)
         return
-      } catch {
-        // User cancelled or the browser refused the share sheet. Fall through
-        // to copying the link so the button always does something useful.
-      }
+      } catch {}
     }
-
     try {
       await navigator.clipboard.writeText(url)
       alert('Link copied!')
@@ -250,34 +336,280 @@ END:VCARD`
     }
   }
 
-  const socialsSection = socialButtons.length > 0 ? (
-    <section className="taply-section" id="socials">
-      <h2><i className="fa-solid fa-link"></i> Social Media</h2>
-      {socialButtons.map((s) => (
-        <a key={s.id} className="taply-social-btn" data-href={s.id} href={s.href} target="_blank" rel="noreferrer">
-          <i className={`fa-brands ${s.icon}`}></i> {s.label}
-        </a>
-      ))}
+  // ---- Unified sections -------------------------------------------------
+
+  const socialsSection =
+    socialButtons.length > 0 ? (
+      <section className="taply-section" id="socials">
+        <h2 style={{ color: '#D4AF37' }}>
+          <i className="fa-solid fa-link" style={{ color: '#D4AF37' }}></i> Social Media
+        </h2>
+        
+        <div className="mt-4 flex w-full flex-row flex-nowrap gap-4 overflow-x-auto px-4 pb-2 [&::-webkit-scrollbar]:hidden [-ms-overflow-style:none] [scrollbar-width:none] justify-start">
+          {socialButtons.map((s) => {
+            let bgStyle: React.CSSProperties = { background: '#1E1E20' }
+            if (s.id === 'facebook') bgStyle = { background: '#1877F2' }
+            else if (s.id === 'instagram')
+              bgStyle = {
+                background:
+                  'linear-gradient(45deg, #f09433 0%,#e6683c 25%,#dc2743 50%,#cc2366 75%,#bc1888 100%)',
+              }
+            else if (s.id === 'tiktok') bgStyle = { background: '#000000', border: '1px solid #333' }
+            else if (s.id === 'messenger')
+              bgStyle = { background: 'linear-gradient(45deg, #0084FF, #7a5cff)' }
+            else if (s.id === 'linkedin') bgStyle = { background: '#0A66C2' }
+            else if (s.id === 'youtube') bgStyle = { background: '#FF0000' }
+            else if (s.id === 'whatsapp') bgStyle = { background: '#25D366' }
+            else if (s.id === 'twitter') bgStyle = { background: '#000000', border: '1px solid #333' }
+            else if (s.id === 'website') bgStyle = { background: '#3f3f46' }
+
+            const iconClass = s.id === 'website' ? 'fa-solid' : 'fa-brands'
+
+            return (
+              <a
+                key={s.id}
+                href={s.href}
+                target="_blank"
+                rel="noreferrer"
+                aria-label={s.label}
+                title={s.label}
+                className="flex h-14 w-14 flex-shrink-0 cursor-pointer items-center justify-center rounded-2xl text-white shadow-sm transition-transform hover:scale-105 active:scale-95"
+                style={bgStyle}
+              >
+                <i className={`${iconClass} ${s.icon} text-2xl`}></i>
+              </a>
+            )
+          })}
+        </div>
+      </section>
+    ) : null
+
+  const gallerySection =
+    gallery.length > 0 ? (
+      <section className="taply-section">
+        <h2 style={{ color: '#D4AF37' }}>
+          <i className="fa-regular fa-images" style={{ color: '#D4AF37' }}></i> Gallery
+        </h2>
+        <div className="-mx-5 mt-4 grid grid-cols-3 gap-1.5">
+          {gallery.map((item: any, i: number) => (
+            <button
+              key={i}
+              onClick={() => openLightbox(i)}
+              className="group relative aspect-square overflow-hidden rounded-xl border border-white/5"
+            >
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img
+                src={item.src}
+                alt={item.alt || `Gallery ${i + 1}`}
+                loading="lazy"
+                className="h-full w-full object-cover transition-transform duration-300 group-hover:scale-105"
+              />
+            </button>
+          ))}
+        </div>
+      </section>
+    ) : null
+
+  const contactSection =
+    visiblePhone || visibleEmail || visibleAddress ? (
+      <section className="taply-contact">
+        <h2 style={{ color: '#D4AF37' }}>
+          <i className="fa-solid fa-address-book" style={{ color: '#D4AF37' }}></i> Contact
+        </h2>
+        {visiblePhone && (
+          <div className="taply-contact-item">
+            <span className="taply-contact-icon">
+              <i className="fa-solid fa-mobile-screen-button"></i>
+            </span>
+            <div>
+              <small>Phone</small>
+              <a href={`tel:${visiblePhone}`}>{visiblePhone}</a>
+            </div>
+          </div>
+        )}
+        {visibleEmail && (
+          <div className="taply-contact-item">
+            <span className="taply-contact-icon">
+              <i className="fa-regular fa-envelope"></i>
+            </span>
+            <div>
+              <small>Email</small>
+              <a href={`mailto:${visibleEmail}`}>{visibleEmail}</a>
+            </div>
+          </div>
+        )}
+        {visibleAddress && (
+          <div className="taply-contact-item">
+            <span className="taply-contact-icon">
+              <i className="fa-solid fa-location-dot"></i>
+            </span>
+            <div>
+              <small>Address</small>
+              <p>{visibleAddress}</p>
+            </div>
+          </div>
+        )}
+      </section>
+    ) : null
+
+  const quickActionsSection = (
+    <section className="taply-section">
+      <h2 style={{ color: '#D4AF37' }}>
+        <i className="fa-solid fa-bolt" style={{ color: '#D4AF37' }}></i> Quick Actions
+      </h2>
+
+      <div className="taply-pills">
+        {profile.phone && (
+          <a className="taply-action-btn" href={`tel:${profile.phone}`}>
+            <span className="ico">
+              <i className="fa-solid fa-phone"></i>
+            </span>
+            <span className="lbl">Call Me</span>
+          </a>
+        )}
+        {profile.phone && (
+          <a className="taply-action-btn" href={`sms:${profile.phone}`}>
+            <span className="ico">
+              <i className="fa-solid fa-comment-sms"></i>
+            </span>
+            <span className="lbl">Text / SMS</span>
+          </a>
+        )}
+        {profile.email && (
+          <a className="taply-action-btn" href={`mailto:${profile.email}`}>
+            <span className="ico">
+              <i className="fa-solid fa-envelope"></i>
+            </span>
+            <span className="lbl">Send Email</span>
+          </a>
+        )}
+      </div>
+
+      <div className="taply-secondary-pills quick-actions-row">
+        {profile.address && mapsVisible && (
+          <a
+            className="taply-action-btn small google-maps"
+            href={
+              profile.mapsLink ||
+              `https://maps.google.com/?q=${encodeURIComponent(profile.address)}`
+            }
+            target="_blank"
+            rel="noreferrer"
+          >
+            <span className="ico">
+              <i className="fa-solid fa-location-dot" style={{ color: '#E53935' }}></i>
+            </span>
+            <span className="lbl">Google Maps</span>
+          </a>
+        )}
+        <button className="taply-action-btn small gold" onClick={saveContact}>
+          <span className="ico">
+            <i className="fa-solid fa-address-card"></i>
+          </span>
+          <span className="lbl">Save Contact</span>
+        </button>
+        {(gcashQR || mayaQR) && (
+          <button className="taply-action-btn small gold" onClick={() => setShowPaymentModal(true)}>
+            <span className="ico">
+              <i className="fa-solid fa-qrcode"></i>
+            </span>
+            <span className="lbl">Payment</span>
+          </button>
+        )}
+        <button className="taply-action-btn small gold" onClick={shareCard}>
+          <span className="ico">
+            <i className="fa-solid fa-share-nodes"></i>
+          </span>
+          <span className="lbl">Share My Card</span>
+        </button>
+      </div>
     </section>
-  ) : null
+  )
 
   const footerSection = (
-    <footer className="taply-footer" style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '8px' }}>
-      <p suppressHydrationWarning style={{ margin: 0 }}>© {new Date().getFullYear()} {profile.name}. All rights reserved.</p>
+    <footer
+      className="taply-footer"
+      style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '10px' }}
+    >
+      <p suppressHydrationWarning style={{ margin: 0 }}>
+        © {new Date().getFullYear()} {profile.name}. All rights reserved.
+      </p>
 
-      {isStudent ? (
-        <div style={{ display: 'inline-flex', alignItems: 'center', gap: '6px', fontSize: '10px', color: '#22c55e', opacity: 0.9 }}>
-          <i className="fa-solid fa-hand-pointer" />
-          <span>{getTapCount(profile)} {getTapCount(profile) === 1 ? 'tap' : 'taps'}</span>
-        </div>
-      ) : (
-        <div style={{ display: 'inline-flex', alignItems: 'center', gap: '6px', fontSize: '10px', color: '#D4AF37', opacity: 0.8 }}>
-          <i className="fa-regular fa-eye"></i>
-          <span suppressHydrationWarning>
-            {profile.views || 0} {profile.views === 1 ? 'view' : 'views'}
-          </span>
-        </div>
-      )}
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '10px' }}>
+        {isStudent ? (
+          <div
+            style={{
+              display: 'inline-flex',
+              alignItems: 'center',
+              gap: '6px',
+              fontSize: '10px',
+              color: accent,
+              opacity: 0.9,
+            }}
+          >
+            <i className="fa-solid fa-hand-pointer" />
+            <span>
+              {getTapCount(profile)} {getTapCount(profile) === 1 ? 'tap' : 'taps'}
+            </span>
+          </div>
+        ) : (
+          <div
+            style={{
+              display: 'inline-flex',
+              alignItems: 'center',
+              gap: '6px',
+              fontSize: '10px',
+              color: '#D4AF37',
+              opacity: 0.8,
+            }}
+          >
+            <i className="fa-regular fa-eye"></i>
+            <span suppressHydrationWarning>
+              {profile.views || 0} {profile.views === 1 ? 'view' : 'views'}
+            </span>
+          </div>
+        )}
+
+        {authReady && <span style={{ color: '#333', fontSize: '10px' }}>|</span>}
+
+        {authReady &&
+          (isOwner ? (
+            <Link
+              href={`/dashboard?edit=${encodeURIComponent(String(profile.username || ''))}`}
+              style={{
+                display: 'inline-flex',
+                alignItems: 'center',
+                gap: '4px',
+                fontSize: '10px',
+                fontWeight: 600,
+                letterSpacing: '0.05em',
+                textTransform: 'uppercase',
+                textDecoration: 'none',
+                color: isStudent ? '#22c55e' : '#D4AF37',
+              }}
+            >
+              <i className="fa-solid fa-pen-to-square" style={{ fontSize: '9px' }} />
+              Edit Profile
+            </Link>
+          ) : (
+            <button
+              onClick={() => setIsLoginModalOpen(true)}
+              style={{
+                fontSize: '10px',
+                letterSpacing: '0.05em',
+                textTransform: 'uppercase',
+                textDecoration: 'none',
+                background: 'transparent',
+                border: 'none',
+                color: 'var(--muted, #71717a)',
+                opacity: 0.85,
+                cursor: 'pointer',
+              }}
+            >
+              Sign in to edit
+            </button>
+          ))}
+      </div>
     </footer>
   )
 
@@ -285,11 +617,34 @@ END:VCARD`
     return (
       <div className="taply-gold-wrapper" style={{ background: '#050505' }}>
         <div className="phone-wrap">
-          <main className="taply-card" style={{ background: '#121214', border: '1px solid #242426', borderRadius: '36px', width: '390px' }}>
+          <main
+            className="taply-card"
+            style={{
+              background: '#121214',
+              border: '1px solid #242426',
+              borderRadius: '36px',
+              width: '390px',
+            }}
+          >
             <div style={{ height: '380px', background: '#1A1B1F' }} />
             <div style={{ padding: '24px', textAlign: 'center' }}>
-              <div style={{ height: '32px', background: '#27272a', borderRadius: '8px', marginBottom: '12px' }} />
-              <div style={{ height: '12px', background: '#27272a', borderRadius: '4px', width: '60%', margin: '0 auto' }} />
+              <div
+                style={{
+                  height: '32px',
+                  background: '#27272a',
+                  borderRadius: '8px',
+                  marginBottom: '12px',
+                }}
+              />
+              <div
+                style={{
+                  height: '12px',
+                  background: '#27272a',
+                  borderRadius: '4px',
+                  width: '60%',
+                  margin: '0 auto',
+                }}
+              />
             </div>
           </main>
         </div>
@@ -299,320 +654,390 @@ END:VCARD`
 
   return (
     <>
-    <div suppressHydrationWarning className={`taply-gold-wrapper ${!isDark ? 'light-mode' : ''}`} style={{ background: '#050505', ['--sg' as any]: accent } as any}>
-      <div className="phone-wrap">
-        <div className="glow-behind" style={{ background: accent }} />
-        <main suppressHydrationWarning className={`taply-card ${th.light || !isDark ? 'light-mode' : ''}`} style={{ background: '#121214', border: '1px solid #242426', borderRadius: '36px', width: '390px', boxShadow: `0 0 80px ${accent}45, 0 0 140px ${accent}22` } as any}>
-          <button className="taply-theme-toggle" onClick={toggleMode} aria-label="Toggle dark mode">
-            <i className={`fa-solid ${isDark ? 'fa-sun' : 'fa-moon'}`}></i>
-          </button>
+      <LoginModal isOpen={isLoginModalOpen} onClose={() => setIsLoginModalOpen(false)} />
 
-          <section suppressHydrationWarning className="taply-profile">
-            <div className="taply-hero"><img src={heroImg} alt="Profile" className="taply-profile-img" /></div>
-            <div suppressHydrationWarning className="taply-profile-body text-center">
-              <h1 
-                className="name-font-taply"
-                style={{
-                  fontFamily: "'Playfair Display', Georgia, serif",
-                  fontSize: 'clamp(30px, 7vw, 36px)',
-                  fontWeight: 700,
-                  lineHeight: '1.08',
-                  letterSpacing: '0.5px',
-                  color: '#FFF8E7',
-                  textAlign: 'center',
-                  marginBottom: '10px',
-                  textWrap: 'balance',
-                  textShadow: '0 2px 20px rgba(0,0,0,0.6), 0 2px 10px rgba(0,0,0,0.5)'
-                }}
-              >
-                {profile.name || 'Your Name'}
-              </h1>
-              <p 
-                className="subtitle-gold job-title"
-                style={{
-                  fontFamily: "'Montserrat', 'Inter', system-ui, sans-serif",
-                  fontSize: '8px',
-                  fontWeight: 500,
-                  lineHeight: '1.4',
-                  letterSpacing: '1px',
-                  textTransform: 'uppercase',
-                  color: isStudent ? '#22c55e' : '#D4AF37',
-                  textAlign: 'center',
-                  margin: '0 auto 18px',
-                  maxWidth: '420px'
-                }}
-              >
-                {profile.title || 'Your Title'}
-              </p>
+      <div
+        suppressHydrationWarning
+        className={`taply-gold-wrapper ${!isDark ? 'light-mode' : ''}`}
+        style={{ background: '#050505', ['--sg' as any]: accent } as any}
+      >
+        <div className="phone-wrap">
+          <div className="glow-behind" style={{ background: accent }} />
+          <main
+            suppressHydrationWarning
+            className={`taply-card ${th.light || !isDark ? 'light-mode' : ''}`}
+            style={{
+              background: '#121214',
+              border: '1px solid #242426',
+              borderRadius: '36px',
+              width: '390px',
+              boxShadow: `0 0 80px ${accent}45, 0 0 140px ${accent}22`,
+            } as any}
+          >
+            <button className="taply-theme-toggle" onClick={toggleMode} aria-label="Toggle dark mode">
+              <i className={`fa-solid ${isDark ? 'fa-sun' : 'fa-moon'}`}></i>
+            </button>
 
-              {/* Student-only: taps + streak sit directly under the title. */}
-              {isStudent && <StudentStats profile={profile} />}
+            {/* 1. HERO / PROFILE */}
+            <section suppressHydrationWarning className="taply-profile">
+              <div className="taply-hero">
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                <img src={heroImg} alt="Profile" className="taply-profile-img" />
+              </div>
+              <div suppressHydrationWarning className="taply-profile-body text-center">
+                <h1
+                  className="name-font-taply"
+                  style={{
+                    fontFamily: "'Playfair Display', Georgia, serif",
+                    fontSize: 'clamp(30px, 7vw, 36px)',
+                    fontWeight: 700,
+                    lineHeight: '1.08',
+                    letterSpacing: '0.5px',
+                    color: '#FFF8E7',
+                    textAlign: 'center',
+                    marginBottom: '10px',
+                    textWrap: 'balance',
+                    textShadow: '0 2px 20px rgba(0,0,0,0.6), 0 2px 10px rgba(0,0,0,0.5)',
+                  }}
+                >
+                  {profile.name || 'Your Name'}
+                </h1>
+                <p
+                  className="subtitle-gold job-title"
+                  style={{
+                    fontFamily: "'Montserrat', 'Inter', system-ui, sans-serif",
+                    fontSize: '8px',
+                    fontWeight: 500,
+                    lineHeight: '1.4',
+                    letterSpacing: '1px',
+                    textTransform: 'uppercase',
+                    color: accent,
+                    textAlign: 'center',
+                    margin: '0 auto 18px',
+                    maxWidth: '420px',
+                  }}
+                >
+                  {profile.title || 'Your Title'}
+                </p>
 
-              <div 
-                className="gold-line-divider"
-                style={{
-                  width: '60px',
-                  height: '1.5px',
-                  background: isStudent
-                    ? 'linear-gradient(90deg, transparent 0%, #22c55e 20%, #86efac 50%, #22c55e 80%, transparent 100%)'
-                    : 'linear-gradient(90deg, transparent 0%, #D4AF37 20%, #E8C766 50%, #D4AF37 80%, transparent 100%)',
-                  margin: '12px auto 0 auto',
-                  borderRadius: '2px',
-                  boxShadow: isStudent ? '0 0 8px rgba(34,197,94,0.45)' : '0 0 8px rgba(212,175,55,0.5)',
-                  opacity: 0.9
-                }}
-              />
-              <div className="taply-bio" style={{ marginTop: '24px' }}>{profile.bio || 'Bio'}</div>
-              {socialButtons.length > 0 && <a href="#socials" className="taply-primary-btn" style={{ marginTop: '16px', display: 'inline-flex' }}>Let's Connect ↓</a>}
-              {!isStudent && profile.spotify_url && (
-                <div style={{ marginTop: '18px' }}>
-                  <SpotifyPlayer spotifyUrl={profile.spotify_url} accentColor={accent} />
-                </div>
-              )}
-            </div>
-          </section>
+                <div
+                  className="gold-line-divider"
+                  style={{
+                    width: '60px',
+                    height: '1.5px',
+                    background: `linear-gradient(90deg, transparent 0%, ${accent} 20%, ${accent} 50%, ${accent} 80%, transparent 100%)`,
+                    margin: '12px auto 0 auto',
+                    borderRadius: '2px',
+                    boxShadow: `0 0 8px ${accent}80`,
+                    opacity: 0.9,
+                  }}
+                />
 
-          {isStudent ? (
-            <>
-              {(profile.school || profile.course || profile.year_level || profile.spotify_url) && (
-                <section className="taply-section student-section">
-                  <StudentEducation profile={profile} />
-                  {profile.spotify_url && <StudentSpotify spotifyUrl={profile.spotify_url} />}
-                </section>
-              )}
-
-              <section className="taply-section">
-                <h2><i className="fa-solid fa-bolt"></i> Quick Actions</h2>
-                <div className="student-quick-actions">
-                  <button className="taply-action-btn small" onClick={saveContact}>
-                    <span className="ico"><i className="fa-solid fa-address-card"></i></span>
-                    <span className="lbl">Save Contact</span>
-                  </button>
-                  <button className="taply-action-btn small" onClick={shareCard}>
-                    <span className="ico"><i className="fa-solid fa-share-nodes"></i></span>
-                    <span className="lbl">Share My Card</span>
-                  </button>
-                </div>
-              </section>
-
-              {socialsSection}
-            </>
-          ) : (
-            <>
-              {profile.about && (<section className="taply-section"><h2><i className="fa-regular fa-user"></i> About Me</h2><p>{profile.about}</p></section>)}
-
-              {gallery.length > 0 && (
-                <section className="taply-section">
-                  <h2><i className="fa-regular fa-images"></i> Gallery </h2>
-                  <div className="taply-carousel">
-                    <div className="taply-reel" ref={reelRef}>
-                      {gallery.map((item:any,i:number)=>(
-                        <figure key={i} onClick={() => openLightbox(i)}>
-                          <img src={item.src} alt={item.alt} loading="lazy" />
-                        </figure>
-                      ))}
-                    </div>
-                    <button className="taply-carousel-btn prev" onClick={()=>scroll(-1)}><i className="fa-solid fa-chevron-left"></i></button>
-                    <button className="taply-carousel-btn next" onClick={()=>scroll(1)}><i className="fa-solid fa-chevron-right"></i></button>
-                    <p className="taply-carousel-count">{current} / {gallery.length} </p>
+                {isStudent && (
+                  <div style={{ marginTop: '16px' }}>
+                    <StudentStats profile={profile} />
                   </div>
-                </section>
-              )}
+                )}
 
-              {socialsSection}
-
-              <section className="taply-section">
-                <h2><i className="fa-solid fa-bolt"></i> Quick Actions</h2>
-                <div className="taply-pills">
-                  {profile.phone && <a className="taply-action-btn" href={`tel:${profile.phone}`}><span className="ico"><i className="fa-solid fa-phone"></i></span><span className="lbl">Call Me</span></a>}
-                  {profile.phone && <a className="taply-action-btn" href={`sms:${profile.phone}`}><span className="ico"><i className="fa-solid fa-comment-sms"></i></span><span className="lbl">Text / SMS</span></a>}
-                  {profile.email && <a className="taply-action-btn" href={`mailto:${profile.email}`}><span className="ico"><i className="fa-solid fa-envelope"></i></span><span className="lbl">Send Email</span></a>}
+                <div className="taply-bio" style={{ marginTop: isStudent ? '20px' : '24px' }}>
+                  {profile.bio || 'Bio'}
                 </div>
-                <div className="taply-secondary-pills quick-actions-row">
-                  {profile.address && socialsVisible.google_maps !== false && (
-                    <a className="taply-action-btn small google-maps" href={profile.mapsLink || `https://maps.google.com/?q=${encodeURIComponent(profile.address)}`} target="_blank" rel="noreferrer">
-                      <span className="ico"><i className="fa-solid fa-location-dot" style={{ color: '#E53935' }}></i></span><span className="lbl">Google Maps</span>
-                    </a>
-                  )}
-                  <button className="taply-action-btn small gold" onClick={saveContact}><span className="ico"><i className="fa-solid fa-address-card"></i></span><span className="lbl">Save Contact</span></button>
-                  
-                  {(gcashQR || mayaQR) && (
-                    <button className="taply-action-btn small gold" onClick={() => setShowPaymentModal(true)}>
-                      <span className="ico"><i className="fa-solid fa-qrcode"></i></span><span className="lbl">Payment</span>
+
+                {socialButtons.length > 0 && (
+                  <a
+                    href="#socials"
+                    className="taply-primary-btn"
+                    style={{ marginTop: '16px', display: 'inline-flex' }}
+                  >
+                    Let&apos;s Connect ↓
+                  </a>
+                )}
+              </div>
+            </section>
+
+            {/* 2. ABOUT ME */}
+            {profile.about && (
+              <section className="taply-section">
+                <h2 style={{ color: '#D4AF37' }}>
+                  <i className="fa-regular fa-user" style={{ color: '#D4AF37' }}></i> About Me
+                </h2>
+                <p>{profile.about}</p>
+              </section>
+            )}
+
+            {/* 3 & 4. Student Education + Spotify */}
+            {isStudent && (
+              <>
+                {visibleEducation.hasAny && (
+                  <section className="taply-section student-section">
+                    <StudentEducation profile={profile} />
+                  </section>
+                )}
+                {profile.spotify_url && (
+                  <div className="taply-section">
+                    <StudentSpotify spotifyUrl={profile.spotify_url} />
+                  </div>
+                )}
+              </>
+            )}
+
+            {/* 5. Gallery */}
+            {gallerySection}
+            
+            {/* 6. Quick Actions */}
+            {quickActionsSection}
+            
+            {/* 7. Social Media */}
+            {socialsSection}
+            
+            {/* 8. Contact */}
+            {contactSection}
+            
+            {footerSection}
+          </main>
+        </div>
+      </div>
+
+      {showPaymentModal &&
+        (gcashQR || mayaQR) &&
+        createPortal(
+          <div
+            className="fixed inset-0 z-[9999] flex items-center justify-center bg-black/80 p-4 backdrop-blur-sm animate-in fade-in duration-200"
+            onClick={() => setShowPaymentModal(false)}
+          >
+            <div
+              className="relative w-full max-w-[340px] overflow-hidden rounded-3xl border border-[#2A2A2A] bg-[#121214] shadow-[0_0_80px_rgba(0,0,0,0.8)]"
+              onClick={(e) => e.stopPropagation()}
+            >
+              <div className="relative p-6 pb-2">
+                <h3 className="mb-1 text-xl font-bold tracking-wide text-white">Scan to Pay</h3>
+                <p className="text-[11px] text-[#A1A1A1]">Secure payment via e-wallet</p>
+                <button
+                  onClick={() => setShowPaymentModal(false)}
+                  className="absolute right-6 top-6 flex h-8 w-8 items-center justify-center rounded-full bg-[#1E1E20] text-gray-400 transition-colors hover:text-white"
+                >
+                  ✕
+                </button>
+              </div>
+              <div className="mb-4 px-6">
+                <div className="flex rounded-xl border border-[#1E1E1E] bg-[#050505] p-1">
+                  {gcashQR && (
+                    <button
+                      onClick={() => setActiveTab('gcash')}
+                      className={`flex-1 rounded-lg py-2 text-xs font-bold transition-all ${
+                        activeTab === 'gcash'
+                          ? 'bg-[#007DFE] text-white shadow-lg'
+                          : 'text-gray-400 hover:text-white'
+                      }`}
+                    >
+                      GCash
                     </button>
                   )}
-
-                  <button className="taply-action-btn small gold" onClick={shareCard}><span className="ico"><i className="fa-solid fa-share-nodes"></i></span><span className="lbl">Share My Card</span></button>
+                  {mayaQR && (
+                    <button
+                      onClick={() => setActiveTab('maya')}
+                      className={`flex-1 rounded-lg py-2 text-xs font-bold transition-all ${
+                        activeTab === 'maya'
+                          ? 'bg-[#00D632] text-black shadow-lg'
+                          : 'text-gray-400 hover:text-white'
+                      }`}
+                    >
+                      Maya
+                    </button>
+                  )}
                 </div>
-              </section>
-
-              <section className="taply-contact">
-                <h2><i className="fa-solid fa-address-book"></i> Contact</h2>
-                {profile.phone && <div className="taply-contact-item"><span className="taply-contact-icon"><i className="fa-solid fa-mobile-screen-button"></i></span><div><small>Phone</small><a href={`tel:${profile.phone}`}>{profile.phone}</a></div></div>}
-                {profile.email && <div className="taply-contact-item"><span className="taply-contact-icon"><i className="fa-regular fa-envelope"></i></span><div><small>Email</small><a href={`mailto:${profile.email}`}>{profile.email}</a></div></div>}
-                {profile.address && <div className="taply-contact-item"><span className="taply-contact-icon"><i className="fa-solid fa-location-dot"></i></span><div><small>Address</small><p>{profile.address}</p></div></div>}
-              </section>
-            </>
-          )}
-
-          {footerSection}
-        </main>
-      </div>
-    </div>
-
-    {/* PAYMENT MODAL (PORTAL) */}
-    {showPaymentModal && (gcashQR || mayaQR) && createPortal(
-      <div className="fixed inset-0 z-[9999] bg-black/80 backdrop-blur-sm flex items-center justify-center p-4 animate-in fade-in duration-200" onClick={() => setShowPaymentModal(false)}>
-        <div className="bg-[#121214] border border-[#2A2A2A] rounded-3xl w-full max-w-[340px] relative shadow-[0_0_80px_rgba(0,0,0,0.8)] overflow-hidden" onClick={e => e.stopPropagation()}>
-          
-          <div className="p-6 pb-2 relative">
-            <h3 className="text-white font-bold text-xl mb-1 tracking-wide">Scan to Pay</h3>
-            <p className="text-[11px] text-[#A1A1A1]">Secure payment via e-wallet</p>
-            <button onClick={() => setShowPaymentModal(false)} className="absolute top-6 right-6 w-8 h-8 rounded-full bg-[#1E1E20] text-gray-400 hover:text-white flex items-center justify-center transition-colors">✕</button>
-          </div>
-
-          {/* TABS */}
-          <div className="px-6 mb-4">
-            <div className="flex bg-[#050505] p-1 rounded-xl border border-[#1E1E1E]">
-              {gcashQR && (
-                <button 
-                  onClick={() => setActiveTab('gcash')} 
-                  className={`flex-1 py-2 text-xs font-bold rounded-lg transition-all ${activeTab === 'gcash' ? 'bg-[#007DFE] text-white shadow-lg' : 'text-gray-400 hover:text-white'}`}
-                >
-                  GCash
-                </button>
-              )}
-              {mayaQR && (
-                <button 
-                  onClick={() => setActiveTab('maya')} 
-                  className={`flex-1 py-2 text-xs font-bold rounded-lg transition-all ${activeTab === 'maya' ? 'bg-[#00D632] text-black shadow-lg' : 'text-gray-400 hover:text-white'}`}
-                >
-                  Maya
-                </button>
-              )}
+              </div>
+              <div className="px-6 pb-6">
+                <div className="mb-3 flex items-center justify-between">
+                  <p
+                    className={`text-[11px] font-bold uppercase tracking-wider ${
+                      activeTab === 'gcash' ? 'text-[#007DFE]' : 'text-[#00D632]'
+                    }`}
+                  >
+                    {activeTab === 'gcash' ? 'GCash QR' : 'Maya QR'}
+                  </p>
+                  <span className="flex items-center gap-1 text-[10px] font-semibold text-[#00D632]">
+                    <i className="fa-solid fa-circle-check"></i> Verified
+                  </span>
+                </div>
+                <div className="mb-4 flex justify-center rounded-2xl bg-white p-3">
+                  {/* eslint-disable-next-line @next/next/no-img-element */}
+                  <img
+                    src={activeTab === 'gcash' ? gcashQR : mayaQR}
+                    alt={`${activeTab} QR`}
+                    className="h-[200px] w-[200px] rounded-xl object-contain"
+                  />
+                </div>
+                <p className="mb-6 text-center text-[11px] leading-relaxed text-[#A1A1A1]">
+                  Open your {activeTab === 'gcash' ? 'GCash' : 'Maya'} app, scan this code,
+                  <br />
+                  and enter the amount to pay.
+                </p>
+                <div className="flex gap-3">
+                  <button
+                    onClick={() =>
+                      handleSaveQR(
+                        activeTab === 'gcash' ? gcashQR : mayaQR,
+                        activeTab === 'gcash' ? 'GCash' : 'Maya'
+                      )
+                    }
+                    className="flex flex-1 items-center justify-center gap-2 rounded-xl border border-[#2A2A2A] bg-[#1E1E20] py-3 text-xs font-bold text-white transition-colors hover:bg-[#2A2A2A]"
+                  >
+                    <i className="fa-solid fa-download"></i> Save
+                  </button>
+                  <button
+                    onClick={() =>
+                      handleShareQR(
+                        activeTab === 'gcash' ? gcashQR : mayaQR,
+                        activeTab === 'gcash' ? 'GCash' : 'Maya'
+                      )
+                    }
+                    className="flex flex-1 items-center justify-center gap-2 rounded-xl bg-[#E8C766] py-3 text-xs font-bold text-black transition-colors hover:bg-[#D4AF37]"
+                  >
+                    <i className="fa-solid fa-share-nodes"></i> Share
+                  </button>
+                </div>
+              </div>
             </div>
-          </div>
-
-          {/* CONTENT */}
-          <div className="px-6 pb-6">
-            <div className="flex items-center justify-between mb-3">
-              <p className={`text-[11px] font-bold uppercase tracking-wider ${activeTab === 'gcash' ? 'text-[#007DFE]' : 'text-[#00D632]'}`}>
-                {activeTab === 'gcash' ? 'GCash QR' : 'Maya QR'}
-              </p>
-              <span className="text-[10px] text-[#00D632] flex items-center gap-1 font-semibold">
-                <i className="fa-solid fa-circle-check"></i> Verified
-              </span>
-            </div>
-
-            <div className="bg-white p-3 rounded-2xl mb-4 flex justify-center">
-              <img 
-                src={activeTab === 'gcash' ? gcashQR : mayaQR} 
-                alt={`${activeTab} QR`} 
-                className="w-[200px] h-[200px] object-contain rounded-xl" 
-              />
-            </div>
-
-            <p className="text-[11px] text-[#A1A1A1] text-center leading-relaxed mb-6">
-              Open your {activeTab === 'gcash' ? 'GCash' : 'Maya'} app, scan this code,<br/>and enter the amount to pay.
-            </p>
-
-            {/* ACTIONS */}
-            <div className="flex gap-3">
-              <button 
-                onClick={() => handleSaveQR(activeTab === 'gcash' ? gcashQR : mayaQR, activeTab === 'gcash' ? 'GCash' : 'Maya')} 
-                className="flex-1 py-3 rounded-xl bg-[#1E1E20] text-white font-bold text-xs border border-[#2A2A2A] hover:bg-[#2A2A2A] transition-colors flex items-center justify-center gap-2"
-              >
-                <i className="fa-solid fa-download"></i> Save
-              </button>
-              <button 
-                onClick={() => handleShareQR(activeTab === 'gcash' ? gcashQR : mayaQR, activeTab === 'gcash' ? 'GCash' : 'Maya')} 
-                className="flex-1 py-3 rounded-xl bg-[#E8C766] text-black font-bold text-xs hover:bg-[#D4AF37] transition-colors flex items-center justify-center gap-2"
-              >
-                <i className="fa-solid fa-share-nodes"></i> Share
-              </button>
-            </div>
-          </div>
-        </div>
-      </div>,
-      document.body
-    )}
-
-    {/* LIGHTBOX (PORTAL) */}
-    {lightboxOpen && gallery[lightboxIndex] && createPortal(
-      <div 
-        style={{ position: 'fixed', inset: 0, zIndex: 99999, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center' }}
-        className="bg-[#050505]/95 backdrop-blur-[16px] p-4"
-        onClick={closeLightbox}
-      >
-        <button 
-          onClick={closeLightbox} 
-          style={{ position: 'fixed', top: '20px', right: '20px', zIndex: 100000 }}
-          className="w-10 h-10 rounded-full bg-[#121214] border border-[#2A2A2A] text-white hover:border-[#D4AF37] flex items-center justify-center cursor-pointer"
-        >
-          ×
-        </button>
-
-        <div
-          className="relative flex items-center justify-center"
-          style={{ width: '90vw', maxWidth: '900px', height: '70vh', margin: '0 auto' }}
-          onClick={(e) => e.stopPropagation()}
-        >
-          <div
-            className="relative w-full h-full flex items-center justify-center rounded-xl border border-[#1E1E1E] bg-[#121214] overflow-hidden"
-            style={{ boxShadow: '0 0 80px rgba(212,175,55,0.15)' }}
-            onMouseDown={handleMouseDown}
-            onMouseMove={handleMouseMove}
-            onMouseUp={handleMouseUp}
-            onMouseLeave={handleMouseUp}
-            onTouchStart={handleTouchStart}
-            onTouchMove={handleTouchMove}
-            onTouchEnd={handleMouseUp}
-            onDoubleClick={() => zoom === 1 ? handleZoomIn() : handleReset()}
-          >
-            <img 
-              src={gallery[lightboxIndex].src} 
-              alt={gallery[lightboxIndex].alt}
-              style={{ 
-                maxWidth: '100%', 
-                maxHeight: '100%', 
-                objectFit: 'contain',
-                transform: `scale(${zoom}) translate(${pan.x / zoom}px, ${pan.y / zoom}px)`,
-                transition: isDragging ? 'none' : 'transform 0.2s ease'
-              }}
-              draggable={false}
-            />
-          </div>
-
-          {gallery.length > 1 && (
-            <>
-              <button onClick={(e) => { e.stopPropagation(); prevImage() }} className="absolute left-0 md:-left-12 top-1/2 -translate-y-1/2 w-10 h-10 rounded-full bg-[#121214] border border-[#2A2A2A] text-white hover:border-[#D4AF37] flex items-center justify-center cursor-pointer">‹</button>
-              <button onClick={(e) => { e.stopPropagation(); nextImage() }} className="absolute right-0 md:-right-12 top-1/2 -translate-y-1/2 w-10 h-10 rounded-full bg-[#121214] border border-[#2A2A2A] text-white hover:border-[#D4AF37] flex items-center justify-center cursor-pointer">›</button>
-            </>
-          )}
-        </div>
-
-        <div className="flex items-center gap-2 px-4 py-2 rounded-full bg-[#121214] border border-[#1E1E1E] mt-6" style={{ boxShadow: '0 8px 32px rgba(0,0,0,0.6)' }} onClick={(e) => e.stopPropagation()}>
-          <span className="text-xs text-[#A1A1A1]">{lightboxIndex + 1} / {gallery.length}</span>
-          <div className="w-px h-4 bg-[#2A2A2A]" />
-          <span className="text-xs text-white/50">{Math.round(zoom * 100)}%</span>
-          <button onClick={handleZoomOut} disabled={zoom <= 1} className="w-8 h-8 rounded-full bg-[#1E1E1E] text-white disabled:opacity-30 flex items-center justify-center">−</button>
-          <button onClick={handleZoomIn} disabled={zoom >= 4} className="w-8 h-8 rounded-full bg-[#1E1E1E] text-white disabled:opacity-30 flex items-center justify-center">+</button>
-          <button onClick={handleReset} className="w-8 h-8 rounded-full bg-[#1E1E1E] text-white flex items-center justify-center">⛶</button>
-          <button onClick={closeLightbox} className="w-8 h-8 rounded-full bg-red-500/20 text-red-400 border border-red-500/30 flex items-center justify-center">×</button>
-        </div>
-
-        <p className="text-[11px] text-white/30 mt-3">Tap + to zoom • Arrows to navigate • Esc to close</p>
-
-        {gallery.length > 1 && (
-          <div className="flex gap-2 mt-4 max-w-[90vw] overflow-x-auto justify-center">
-            {gallery.map((img: any, i: number) => (
-              <img key={i} src={img.src} onClick={() => setLightboxIndex(i)} className={`w-14 h-14 rounded-lg object-cover border-2 cursor-pointer flex-shrink-0 ${i === lightboxIndex ? 'border-[#D4AF37]' : 'border-transparent opacity-60'}`} />
-            ))}
-          </div>
+          </div>,
+          document.body
         )}
-      </div>,
-      document.body
-    )}
+
+      {lightboxOpen &&
+        gallery[lightboxIndex] &&
+        createPortal(
+          <div
+            style={{
+              position: 'fixed',
+              inset: 0,
+              zIndex: 99999,
+              display: 'flex',
+              flexDirection: 'column',
+              alignItems: 'center',
+              justifyContent: 'center',
+            }}
+            className="bg-[#050505]/95 p-4 backdrop-blur-[16px]"
+            onClick={closeLightbox}
+          >
+            <button
+              onClick={closeLightbox}
+              style={{ position: 'fixed', top: '20px', right: '20px', zIndex: 100000 }}
+              className="flex h-10 w-10 cursor-pointer items-center justify-center rounded-full border border-[#2A2A2A] bg-[#121214] text-white hover:border-[#D4AF37]"
+            >
+              ×
+            </button>
+            <div
+              className="relative flex items-center justify-center"
+              style={{ width: '90vw', maxWidth: '900px', height: '70vh', margin: '0 auto' }}
+              onClick={(e) => e.stopPropagation()}
+            >
+              <div
+                className="relative flex h-full w-full items-center justify-center overflow-hidden rounded-xl border border-[#1E1E1E] bg-[#121214]"
+                style={{ boxShadow: '0 0 80px rgba(212,175,55,0.15)' }}
+                onMouseDown={handleMouseDown}
+                onMouseMove={handleMouseMove}
+                onMouseUp={handleMouseUp}
+                onMouseLeave={handleMouseUp}
+                onTouchStart={handleTouchStart}
+                onTouchMove={handleTouchMove}
+                onTouchEnd={handleMouseUp}
+                onDoubleClick={() => (zoom === 1 ? handleZoomIn() : handleReset())}
+              >
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                <img
+                  src={gallery[lightboxIndex].src}
+                  alt={gallery[lightboxIndex].alt}
+                  style={{
+                    maxWidth: '100%',
+                    maxHeight: '100%',
+                    objectFit: 'contain',
+                    transform: `scale(${zoom}) translate(${pan.x / zoom}px, ${pan.y / zoom}px)`,
+                    transition: isDragging ? 'none' : 'transform 0.2s ease',
+                  }}
+                  draggable={false}
+                />
+              </div>
+              {gallery.length > 1 && (
+                <>
+                  <button
+                    onClick={(e) => {
+                      e.stopPropagation()
+                      prevImage()
+                    }}
+                    className="absolute left-0 top-1/2 flex h-10 w-10 -translate-y-1/2 cursor-pointer items-center justify-center rounded-full border border-[#2A2A2A] bg-[#121214] text-white hover:border-[#D4AF37] md:-left-12"
+                  >
+                    ‹
+                  </button>
+                  <button
+                    onClick={(e) => {
+                      e.stopPropagation()
+                      nextImage()
+                    }}
+                    className="absolute right-0 top-1/2 flex h-10 w-10 -translate-y-1/2 cursor-pointer items-center justify-center rounded-full border border-[#2A2A2A] bg-[#121214] text-white hover:border-[#D4AF37] md:-right-12"
+                  >
+                    ›
+                  </button>
+                </>
+              )}
+            </div>
+            <div
+              className="mt-6 flex items-center gap-2 rounded-full border border-[#1E1E1E] bg-[#121214] px-4 py-2"
+              style={{ boxShadow: '0 8px 32px rgba(0,0,0,0.6)' }}
+              onClick={(e) => e.stopPropagation()}
+            >
+              <span className="text-xs text-[#A1A1A1]">
+                {lightboxIndex + 1} / {gallery.length}
+              </span>
+              <div className="h-4 w-px bg-[#2A2A2A]" />
+              <span className="text-xs text-white/50">{Math.round(zoom * 100)}%</span>
+              <button
+                onClick={handleZoomOut}
+                disabled={zoom <= 1}
+                className="flex h-8 w-8 items-center justify-center rounded-full bg-[#1E1E1E] text-white disabled:opacity-30"
+              >
+                −
+              </button>
+              <button
+                onClick={handleZoomIn}
+                disabled={zoom >= 4}
+                className="flex h-8 w-8 items-center justify-center rounded-full bg-[#1E1E1E] text-white disabled:opacity-30"
+              >
+                +
+              </button>
+              <button
+                onClick={handleReset}
+                className="flex h-8 w-8 items-center justify-center rounded-full bg-[#1E1E1E] text-white"
+              >
+                ⛶
+              </button>
+              <button
+                onClick={closeLightbox}
+                className="flex h-8 w-8 items-center justify-center rounded-full border border-red-500/30 bg-red-500/20 text-red-400"
+              >
+                ×
+              </button>
+            </div>
+            <p className="mt-3 text-[11px] text-white/30">
+              Tap + to zoom • Arrows to navigate • Esc to close
+            </p>
+            {gallery.length > 1 && (
+              <div className="mt-4 flex max-w-[90vw] justify-center gap-2 overflow-x-auto">
+                {gallery.map((img: any, i: number) => (
+                  // eslint-disable-next-line @next/next/no-img-element
+                  <img
+                    key={i}
+                    src={img.src}
+                    onClick={() => setLightboxIndex(i)}
+                    className={`h-14 w-14 flex-shrink-0 cursor-pointer rounded-lg border-2 object-cover ${
+                      i === lightboxIndex ? 'border-[#D4AF37]' : 'border-transparent opacity-60'
+                    }`}
+                  />
+                ))}
+              </div>
+            )}
+          </div>,
+          document.body
+        )}
     </>
   )
 }

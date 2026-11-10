@@ -5,19 +5,10 @@ import { createServerClient } from '@supabase/ssr'
 const AUTH_ENFORCED = process.env.ENFORCE_DASHBOARD_AUTH === 'true'
 
 export async function middleware(request: NextRequest) {
-  // Phase 1: allow everything through. Dashboard stays open without login.
-  if (!AUTH_ENFORCED) {
-    return NextResponse.next()
-  }
-
-  // Only the dashboard is protected. /auth/callback must stay reachable so the
-  // code exchange can complete and write the session cookies.
-  if (!request.nextUrl.pathname.startsWith('/dashboard')) {
-    return NextResponse.next()
-  }
-
   let response = NextResponse.next({ request })
 
+  // 1. ALWAYS initialize Supabase to refresh sessions and sync cookies.
+  // This is what allows the popup login to communicate with the main page.
   const supabase = createServerClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
     process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
@@ -40,19 +31,27 @@ export async function middleware(request: NextRequest) {
     }
   )
 
+  // 2. Refresh the session (this triggers the client-side onAuthStateChange)
   const { data, error } = await supabase.auth.getUser()
 
-  if (error || !data.user) {
-    const redirectUrl = request.nextUrl.clone()
-    redirectUrl.pathname = '/'
-    redirectUrl.search = ''
-    redirectUrl.searchParams.set('auth_required', '1')
-    return NextResponse.redirect(redirectUrl)
+  // 3. Only apply the dashboard protection IF the env variable is true
+  // AND the user is trying to access the dashboard.
+  if (AUTH_ENFORCED && request.nextUrl.pathname.startsWith('/dashboard')) {
+    if (error || !data.user) {
+      const redirectUrl = request.nextUrl.clone()
+      redirectUrl.pathname = '/'
+      redirectUrl.search = ''
+      redirectUrl.searchParams.set('auth_required', '1')
+      return NextResponse.redirect(redirectUrl)
+    }
   }
 
   return response
 }
 
 export const config = {
-  matcher: ['/dashboard', '/auth/callback'],
+  // Run on all routes except static assets and images
+  matcher: [
+    '/((?!_next/static|_next/image|favicon.ico|.*\\.(?:svg|png|jpg|jpeg|gif|webp)$).*)',
+  ],
 }

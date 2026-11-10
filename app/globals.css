@@ -356,16 +356,16 @@ body {
   gap: 6px;
   padding: 6px 11px;
   border-radius: 999px;
-  border: 1px solid rgba(34, 197, 94, 0.28);
-  background: rgba(34, 197, 94, 0.10);
-  color: #86efac;
+  border: 1px solid color-mix(in srgb, var(--sg, #22c55e) 30%, transparent);
+  background: color-mix(in srgb, var(--sg, #22c55e) 12%, transparent);
+  color: var(--sg-text, #86efac);
   font-size: 10px;
   font-weight: 700;
   letter-spacing: 0.02em;
   line-height: 1;
   white-space: nowrap;
 }
-.student-stat-pill i { font-size: 10px; color: #22c55e; }
+.student-stat-pill i { font-size: 10px; color: var(--sg, #22c55e); }
 .student-stat-pill-fire {
   border-color: rgba(249, 115, 22, 0.30);
   background: rgba(249, 115, 22, 0.10);
@@ -381,8 +381,8 @@ body {
 
 .student-education-card {
   border-radius: 18px;
-  border: 1px solid rgba(34, 197, 94, 0.18);
-  background: linear-gradient(135deg, rgba(34, 197, 94, 0.10), rgba(24, 24, 27, 0.70));
+  border: 1px solid color-mix(in srgb, var(--sg, #22c55e) 20%, transparent);
+  background: linear-gradient(135deg, color-mix(in srgb, var(--sg, #22c55e) 12%, transparent), rgba(24, 24, 27, 0.70));
   padding: 16px;
 }
 .student-education-head { display: flex; align-items: center; gap: 12px; }
@@ -392,11 +392,11 @@ body {
   width: 38px;
   height: 38px;
   border-radius: 12px;
-  background: #22c55e;
-  color: #04130a;
+  background: var(--sg, #22c55e);
+  color: var(--sg-ink, #04130a);
   font-size: 14px;
   flex-shrink: 0;
-  box-shadow: 0 8px 20px rgba(34, 197, 94, 0.22);
+  box-shadow: 0 8px 20px color-mix(in srgb, var(--sg, #22c55e) 24%, transparent);
 }
 .student-education-eyebrow {
   margin: 0;
@@ -404,7 +404,7 @@ body {
   font-weight: 700;
   letter-spacing: 0.20em;
   text-transform: uppercase;
-  color: #4ade80;
+  color: var(--sg-text, #4ade80);
 }
 .student-education-school {
   margin: 2px 0 0;
@@ -419,7 +419,7 @@ body {
   gap: 8px;
   margin-top: 14px;
   padding-top: 12px;
-  border-top: 1px solid rgba(34, 197, 94, 0.12);
+  border-top: 1px solid color-mix(in srgb, var(--sg, #22c55e) 14%, transparent);
 }
 .student-education-item { min-width: 0; }
 .student-education-item span {
@@ -449,16 +449,17 @@ body {
   width: 100%;
   min-height: 48px;
   border-radius: 999px;
-  background: #22c55e !important;
-  color: #04130a !important;
+  background: var(--sg, #22c55e) !important;
+  color: var(--sg-ink, #04130a) !important;
   font-weight: 700;
   font-size: 11px;
   flex-direction: row;
   gap: 7px;
   padding: 12px 14px;
-  box-shadow: 0 8px 22px rgba(34, 197, 94, 0.18);
+  box-shadow: 0 8px 22px color-mix(in srgb, var(--sg, #22c55e) 20%, transparent);
 }
-.student-quick-actions .taply-action-btn.small .ico { font-size: 12px; color: #04130a; }
+.student-quick-actions .taply-action-btn.small .ico { font-size: 12px; color: var(--sg-ink, #04130a); }
+.student-quick-actions .student-payment-btn { grid-column: 1 / -1; }
 
 .student-spotify-card {
   background: linear-gradient(135deg, #0b2a4a 0%, #0d3b5c 55%, #0e7490 100%) !important;
@@ -468,9 +469,9 @@ body {
 .student-spotify-card .student-spotify-subtitle { color: rgba(224, 242, 254, 0.65) !important; }
 
 .taply-gold-wrapper.light-mode .student-stat-pill {
-  border-color: rgba(22, 163, 74, 0.25);
-  background: rgba(22, 163, 74, 0.08);
-  color: #15803d;
+  border-color: color-mix(in srgb, var(--sg, #22c55e) 30%, transparent);
+  background: color-mix(in srgb, var(--sg, #22c55e) 10%, transparent);
+  color: var(--sg-text, #15803d);
 }
 .taply-gold-wrapper.light-mode .student-stat-pill-fire {
   border-color: rgba(234, 88, 12, 0.25);
@@ -478,10 +479,10 @@ body {
   color: #c2410c;
 }
 .taply-gold-wrapper.light-mode .student-education-card {
-  background: linear-gradient(135deg, rgba(34, 197, 94, 0.08), rgba(255, 255, 255, 0.90));
-  border-color: rgba(22, 163, 74, 0.18);
+  background: linear-gradient(135deg, color-mix(in srgb, var(--sg, #22c55e) 10%, transparent), rgba(255, 255, 255, 0.90));
+  border-color: color-mix(in srgb, var(--sg, #22c55e) 20%, transparent);
 }
-.taply-gold-wrapper.light-mode .student-education-eyebrow { color: #15803d; }
+.taply-gold-wrapper.light-mode .student-education-eyebrow { color: var(--sg-text, #15803d); }
 .taply-gold-wrapper.light-mode .student-spotify-card {
   background: linear-gradient(135deg, #dbeafe 0%, #e0f2fe 55%, #cffafe 100%) !important;
   border-color: rgba(14, 116, 144, 0.25) !important;

@@ -45,6 +45,25 @@ export function getStreakCount(profile: any): number {
 }
 
 /**
+ * Education values that are allowed to appear on the public card. A missing or
+ * null flag means visible, so existing rows keep rendering until they are
+ * explicitly hidden.
+ */
+export function getVisibleEducation(profile: any) {
+  const school = profile?.show_school === false ? '' : String(profile?.school || '')
+  const course = profile?.show_course === false ? '' : String(profile?.course || '')
+  const yearLevel =
+    profile?.show_year_level === false ? '' : String(profile?.year_level || '')
+
+  return {
+    school,
+    course,
+    yearLevel,
+    hasAny: Boolean(school || course || yearLevel),
+  }
+}
+
+/**
  * Fill gaps in a profiles row with the legacy student_profiles row. Values on
  * profiles always win, so this is safe to run after the SQL migration too.
  */
@@ -54,6 +73,14 @@ export function mergeStudentProfileData(profile: any, studentData: any) {
 
   for (const key of ['school', 'course', 'year_level', 'spotify_url', 'bio']) {
     if (merged[key] === null || merged[key] === undefined || merged[key] === '') {
+      merged[key] = studentData[key] ?? merged[key]
+    }
+  }
+
+  // Visibility flags are booleans, so the `''` check above does not apply.
+  // Only fall back to the legacy row when profiles has no value at all.
+  for (const key of ['show_school', 'show_year_level', 'show_course']) {
+    if (merged[key] === null || merged[key] === undefined) {
       merged[key] = studentData[key] ?? merged[key]
     }
   }

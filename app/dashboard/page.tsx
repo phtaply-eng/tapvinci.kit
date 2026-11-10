@@ -1,301 +1,158 @@
 'use client'
+
 import { useState, useEffect, useRef } from 'react'
 import TaplyTemplate from '../../components/TaplyTemplate'
-import StudentEditForm from '../../components/dashboard/StudentEditForm'
+import UnifiedEditForm from '../../components/dashboard/UnifiedEditForm'
 import { supabase } from '../../lib/supabase'
-import HamburgerMenu from "@/components/HamburgerMenu"
+import HamburgerMenu from '@/components/HamburgerMenu'
 import PaymentModal, { type PaymentSubmission } from '../../components/PaymentModal'
-import {
-  DEFAULT_SOCIALS,
-  DEFAULT_VISIBLE,
-  SOCIALS_CONFIG,
-  THEMES,
-  isValidSpotifyUrl,
-} from '../../lib/profile-config'
-import { mergeStudentProfileData, resolveProfileRole, type ProfileRole } from '../../lib/profile-role'
+import { DEFAULT_SOCIALS, DEFAULT_VISIBLE } from '../../lib/profile-config'
+import { mergeStudentProfileData, resolveProfileRole } from '../../lib/profile-role'
 
-const BUCKET = 'profile-images'
 const RECEIPT_BUCKET = 'payment-proofs'
-const MAX_INPUT_BYTES = 20 * 1024 * 1024
 
-type UploadKind = 'hero' | 'gallery' | 'gcash' | 'maya'
-const UPLOAD_OPTS: Record<UploadKind, { maxWidth: number; quality: number }> = {
-  hero: { maxWidth: 1000, quality: 0.8 },
-  gallery: { maxWidth: 800, quality: 0.7 },
-  gcash: { maxWidth: 1000, quality: 0.92 },
-  maya: { maxWidth: 1000, quality: 0.92 },
-}
-
-function compressImage(file: File, maxWidth: number, quality: number): Promise<File> {
-  return new Promise((resolve, reject) => {
-    const objectUrl = URL.createObjectURL(file)
-    const img = new Image()
-    img.onload = () => {
-      URL.revokeObjectURL(objectUrl)
-      let width = img.naturalWidth
-      let height = img.naturalHeight
-      if (width > maxWidth) {
-        height = Math.round((maxWidth / width) * height)
-        width = maxWidth
-      }
-      const canvas = document.createElement('canvas')
-      canvas.width = width
-      canvas.height = height
-      const ctx = canvas.getContext('2d')
-      if (!ctx) return reject(new Error('Canvas not supported in this browser'))
-      ctx.drawImage(img, 0, 0, width, height)
-      canvas.toBlob((blob) => {
-        if (!blob) return reject(new Error('Could not compress the image'))
-        resolve(new File([blob], file.name.replace(/\.[^/.]+$/, '') + '.webp', { type: 'image/webp' }))
-      }, 'image/webp', quality)
-    }
-    img.onerror = () => {
-      URL.revokeObjectURL(objectUrl)
-      reject(new Error('Could not read this image. Try a JPG or PNG.'))
-    }
-    img.src = objectUrl
-  })
+const DEFAULT_PROFILE_DATA = {
+  username: 'TapVinci',
+  name: 'TapVinci',
+  title: 'A NEW STANDARD OF INTRODUCTION • MADE TO CONNECT • PHILIPPINES 2026 ',
+  bio: 'A simple tap. A smarter introduction. TapVinci turns calling cards into digital profiles where your contact details and links are easy to access and share.',
+  about:
+    'TapVinci helps professionals and local businesses get noticed - through NFC digital business cards that share contacts and links instantly. TapVinci goal is simple: make it personal, modern, and easy to share.',
+  hero_image: 'hero.png',
+  avatar_url: '',
+  photoFocus: 'center 30%',
+  phone: '+63 908 327 4971',
+  email: 'tapvinci@yahoo.com',
+  address: 'Quezon City, Philippines',
+  mapsLink: 'https://maps.app.goo.gl/Rz2wrV8uDwbg4qox7',
+  accent_color: '#D4AF37',
+  theme: 'gold',
+  galleryTitle: 'Gallery',
+  gallerySubtitle: '',
+  gallery: [],
+  socials: { ...DEFAULT_SOCIALS },
+  socials_visible: { ...DEFAULT_VISIBLE },
+  spotify_url: '',
+  school: '',
+  course: '',
+  year_level: '',
+  is_admin: false,
+  gcash_qr_url: '',
+  maya_qr_url: '',
+  gcash_name: '',
+  maya_name: '',
+  gcash_number: '',
+  maya_number: '',
+  show_phone: true,
+  show_email: true,
+  show_address: true,
+  show_school: true,
+  show_year_level: true,
+  show_course: true,
 }
 
 export default function Dashboard() {
-  const [profile, setProfile] = useState<any>({
-    username: 'TapVinci',
-    name: 'TapVinci',
-    title: 'A NEW STANDARD OF INTRODUCTION • MADE TO CONNECT • PHILIPPINES 2026 ',
-    bio: 'A simple tap. A smarter introduction. TapVinci turns calling cards into digital profiles where your contact details and links are easy to access and share.',
-    about: "TapVinci Help professionals and local businesses get noticed - through NFC digital business cards that share contacts and links instantly. TapVinci goal is simple: make it personal, modern, and easy to share.",
-    hero_image: 'hero.png',
-    avatar_url: '',
-    photoFocus: 'center 30%',
-    phone: '+63 908 327 4971',
-    email: 'tapvinci@yahoo.com',
-    address: 'Quezon City, Philippines',
-    mapsLink: 'https://maps.app.goo.gl/Rz2wrV8uDwbg4qox7',
-    accent_color: '#D4AF37',
-    theme: 'gold',
-    galleryTitle: 'Gallery',
-    gallerySubtitle: '',
-    gallery: [],
-    socials: { ...DEFAULT_SOCIALS },
-    socials_visible: { ...DEFAULT_VISIBLE },
-    spotify_url: '',
-    is_admin: false,
-    gcash_qr_url: '',
-    maya_qr_url: '',
-    gcash_name: '',
-    maya_name: '',
-    gcash_number: '',
-    maya_number: '',
-  })
-  // Role routing. `role` is the new source of truth; `tier` keeps existing
-  // student cards working until the SQL migration has been applied.
-  const actualRole = resolveProfileRole(profile)
-  const [viewMode, setViewMode] = useState<ProfileRole | null>(null)
+  const [profile, setProfile] = useState<any>({ ...DEFAULT_PROFILE_DATA })
 
-  // Only the profile row flagged in Supabase can skip checkout. Do not use the
-  // editable `email` field for this check: any user could type the admin email.
-  const isAdmin =
-    profile.is_admin === true ||
-    String(profile.role || '').toLowerCase() === 'admin'
+  const [adminSession, setAdminSession] = useState(false)
+  const [forceAdminPreview, setForceAdminPreview] = useState(false)
 
-  // Admins can preview either experience without leaving the dashboard.
-  // Everyone else is locked to their real role.
-  const effectiveRole: ProfileRole = isAdmin ? (viewMode ?? actualRole) : actualRole
-  const showStudentForm = effectiveRole === 'student'
+  const isAdminAccount =
+    profile.is_admin === true || String(profile.role || '').toLowerCase() === 'admin'
 
-  const reloadProfileAfterStudentSave = async () => {
-    // StudentEditForm already saved to Supabase. Re-fetch so dashboard state stays in sync,
-    // including a username change.
-    const id = (profile as any)?.id
-    const query = id
-      ? supabase.from('profiles').select('*').eq('id', id).single()
-      : supabase.from('profiles').select('*').eq('username', (profile.username || '').toLowerCase()).single()
-    const { data } = await query
-    if (data) {
-      const mergedSocials = { ...DEFAULT_SOCIALS, ...((data as any).socials || {}) }
-      const mergedVisible = { ...DEFAULT_VISIBLE, ...((data as any).socials_visible || {}) }
-      setProfile((p: any) => ({ ...p, ...data, socials: mergedSocials, socials_visible: mergedVisible }))
-    }
-  }
+  const isStudent = resolveProfileRole(profile) === 'student'
+
   const [saving, setSaving] = useState(false)
-  const [heroUploading, setHeroUploading] = useState(false)
-  const [galleryUploading, setGalleryUploading] = useState(false)
-  const [gcashUploading, setGcashUploading] = useState(false)
-  const [mayaUploading, setMayaUploading] = useState(false)
-  const heroInputRef = useRef<HTMLInputElement>(null)
-  const galleryInputRef = useRef<HTMLInputElement>(null)
-  const gcashInputRef = useRef<HTMLInputElement>(null)
-  const mayaInputRef = useRef<HTMLInputElement>(null)
-  const [dragOverHero, setDragOverHero] = useState(false)
-  const [dragOverGallery, setDragOverGallery] = useState(false)
-  const [dragOverGcash, setDragOverGcash] = useState(false)
-  const [dragOverMaya, setDragOverMaya] = useState(false)
   const [showLive, setShowLive] = useState(false)
   const sliderWrapperRef = useRef<HTMLDivElement>(null)
   const editPanelRef = useRef<HTMLDivElement>(null)
-  
+  const livePreviewRef = useRef<HTMLDivElement>(null)
+
   const [isPaymentModalOpen, setIsPaymentModalOpen] = useState(false)
-  
-  // Demo Code State
+
   const [demoCode, setDemoCode] = useState('')
   const [showDemoCode, setShowDemoCode] = useState(false)
 
   const [toast, setToast] = useState('')
   const toastTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
-  const livePreviewRef = useRef<HTMLDivElement>(null)
-  const editTopRef = useRef<HTMLDivElement>(null)
 
-  useEffect(() => {
-    // Check if we should show the hidden demo code field
-    const params = new URLSearchParams(window.location.search)
-    if (params.get('admin') === 'true') setShowDemoCode(true)
-
-    const wrapper = sliderWrapperRef.current
-    const activeEl = showLive ? livePreviewRef.current : editPanelRef.current
-    if (!wrapper || !activeEl) return
-    const updateHeight = () => { wrapper.style.height = activeEl.scrollHeight + 'px' }
-    updateHeight()
-    window.addEventListener('resize', updateHeight)
-    const t = setTimeout(updateHeight, 300)
-    let ro: ResizeObserver | undefined
-    if (typeof ResizeObserver !== 'undefined') {
-      ro = new ResizeObserver(updateHeight)
-      ro.observe(activeEl)
-      if (activeEl.firstElementChild) ro.observe(activeEl.firstElementChild)
-    }
-    return () => {
-      window.removeEventListener('resize', updateHeight)
-      clearTimeout(t)
-      ro?.disconnect()
-    }
-  }, [showLive, profile, effectiveRole])
-
-  const showToast = (msg: string) => {
-    setToast(msg)
+  const showToast = (message: string) => {
+    setToast(message)
     if (toastTimer.current) clearTimeout(toastTimer.current)
     toastTimer.current = setTimeout(() => setToast(''), 3000)
   }
 
   useEffect(() => {
+    const params = new URLSearchParams(window.location.search)
+    if (params.get('admin') === 'true') {
+      setShowDemoCode(true)
+      setForceAdminPreview(true)
+    }
+
+    try {
+      if (sessionStorage.getItem('tapvinci_admin_ok') === '1') setAdminSession(true)
+    } catch {}
+  }, [])
+
+  useEffect(() => {
+    const wrapper = sliderWrapperRef.current
+    const activeEl = showLive ? livePreviewRef.current : editPanelRef.current
+    if (!wrapper || !activeEl) return
+    const updateHeight = () => {
+      wrapper.style.height = activeEl.scrollHeight + 'px'
+    }
+    updateHeight()
+    window.addEventListener('resize', updateHeight)
+    const timer = setTimeout(updateHeight, 300)
+    let observer: ResizeObserver | undefined
+    if (typeof ResizeObserver !== 'undefined') {
+      observer = new ResizeObserver(updateHeight)
+      observer.observe(activeEl)
+      if (activeEl.firstElementChild) observer.observe(activeEl.firstElementChild)
+    }
+    return () => {
+      window.removeEventListener('resize', updateHeight)
+      clearTimeout(timer)
+      observer?.disconnect()
+    }
+  }, [showLive, profile])
+
+  useEffect(() => {
     const load = async () => {
-      const editParam = (new URLSearchParams(window.location.search).get('edit') || '').trim().toLowerCase()
-      const DEFAULT_USERNAME = (editParam || process.env.NEXT_PUBLIC_DEFAULT_USERNAME || 'TapVinci').toLowerCase()
-      const { data } = await supabase.from('profiles').select('*').eq('username', DEFAULT_USERNAME).single()
-      if (data) {
-        let mergedData: any = data
+      const editParam = (
+        new URLSearchParams(window.location.search).get('edit') || ''
+      )
+        .trim()
+        .toLowerCase()
+      const username = (
+        editParam ||
+        process.env.NEXT_PUBLIC_DEFAULT_USERNAME ||
+        'TapVinci'
+      ).toLowerCase()
 
-        // Existing student cards keep school/course/counts in student_profiles.
-        // Fill those gaps until the SQL migration has been run.
-        if (resolveProfileRole(data) === 'student' && (data as any).id) {
-          const { data: studentData } = await supabase
-            .from('student_profiles')
-            .select('*')
-            .eq('id', (data as any).id)
-            .maybeSingle()
-          mergedData = mergeStudentProfileData(data, studentData)
-        }
+      const { data } = await supabase.from('profiles').select('*').eq('username', username).single()
+      if (!data) return
 
-        const mergedSocials = { ...DEFAULT_SOCIALS, ...(mergedData.socials || {}) }
-        const mergedVisible = { ...DEFAULT_VISIBLE, ...(mergedData.socials_visible || {}) }
-        setProfile((p:any) => ({ ...p, ...mergedData, socials: mergedSocials, socials_visible: mergedVisible }))
+      let mergedData: any = data
+
+      if (resolveProfileRole(data) === 'student' && (data as any).id) {
+        const { data: legacy } = await supabase
+          .from('student_profiles')
+          .select('*')
+          .eq('id', (data as any).id)
+          .maybeSingle()
+        mergedData = mergeStudentProfileData(data, legacy)
       }
+
+      setProfile((previous: any) => ({
+        ...previous,
+        ...mergedData,
+        socials: { ...DEFAULT_SOCIALS, ...(mergedData.socials || {}) },
+        socials_visible: { ...DEFAULT_VISIBLE, ...(mergedData.socials_visible || {}) },
+      }))
     }
     load()
   }, [])
-
-  const uploadToSupabase = async (file: File, kind: UploadKind): Promise<string | null> => {
-    const username = (profile.username || '').toLowerCase().replace(/[^a-z0-9_-]/g, '')
-    if (!username) {
-      alert('Type a username first - photos are stored under it.')
-      return null
-    }
-    if (file.size > MAX_INPUT_BYTES) {
-      alert(`${file.name} is too large (max ${MAX_INPUT_BYTES / 1024 / 1024} MB).`)
-      return null
-    }
-    try {
-      const { maxWidth, quality } = UPLOAD_OPTS[kind]
-      const compressed = await compressImage(file, maxWidth, quality)
-      const safeName = file.name.replace(/\.[^/.]+$/, '').replace(/[^a-zA-Z0-9-]/g, '').slice(0, 40) || 'photo'
-      const stamp = Date.now()
-      const isQR = kind === 'gcash' || kind === 'maya'
-      const path =
-        kind === 'hero' ? `${username}/avatar/${stamp}-avatar.webp`
-        : kind === 'gallery' ? `${username}/gallery/${stamp}-${safeName}.webp`
-        : `${username}/payment/${kind}-qr.webp`
-      const { error } = await supabase.storage.from(BUCKET).upload(path, compressed, {
-        cacheControl: '3600',
-        upsert: isQR,
-        contentType: 'image/webp'
-      })
-      if (error) throw error
-      const url = supabase.storage.from(BUCKET).getPublicUrl(path).data.publicUrl
-      return isQR ? `${url}?v=${stamp}` : url
-    } catch (err) {
-      alert('Upload failed: ' + ((err as Error)?.message || 'unknown error') + '\nMake sure you ran the profile-images SQL in Supabase.')
-      return null
-    }
-  }
-
-  const handleHeroFiles = async (files: FileList | null) => {
-    if (!files || files.length === 0) return
-    const file = files[0]
-    if (!file.type.startsWith('image/')) return
-    setHeroUploading(true)
-    const url = await uploadToSupabase(file, 'hero')
-    setHeroUploading(false)
-    if (url) setProfile((p:any) => ({ ...p, hero_image: url }))
-  }
-
-  const handleGalleryFiles = async (files: FileList | null) => {
-    if (!files || files.length === 0) return
-    const newItems: any[] = []
-    setGalleryUploading(true)
-    for (let i = 0; i < files.length; i++) {
-      const file = files[i]
-      if (!file.type.startsWith('image/')) continue
-      const url = await uploadToSupabase(file, 'gallery')
-      if (url) newItems.push({ src: url, alt: 'Gallery photo' })
-    }
-    setGalleryUploading(false)
-    if (newItems.length > 0) {
-      setProfile((p:any) => ({ ...p, gallery: [...(p.gallery || []), ...newItems] }))
-    }
-  }
-
-  const handleGcashFiles = async (files: FileList | null) => {
-    if (!files || files.length === 0) return
-    const file = files[0]
-    if (!file.type.startsWith('image/')) return
-    setGcashUploading(true)
-    const url = await uploadToSupabase(file, 'gcash')
-    setGcashUploading(false)
-    if (url) setProfile((p:any) => ({ ...p, gcash_qr_url: url }))
-  }
-
-  const handleMayaFiles = async (files: FileList | null) => {
-    if (!files || files.length === 0) return
-    const file = files[0]
-    if (!file.type.startsWith('image/')) return
-    setMayaUploading(true)
-    const url = await uploadToSupabase(file, 'maya')
-    setMayaUploading(false)
-    if (url) setProfile((p:any) => ({ ...p, maya_qr_url: url }))
-  }
-
-  const removeGalleryItem = (idx: number) => {
-    setProfile((p:any) => ({ ...p, gallery: p.gallery.filter((_:any, i:number) => i !== idx) }))
-  }
-
-  const toggleVisibility = (key: string) => {
-    setProfile((p:any) => ({ ...p, socials_visible: { ...p.socials_visible, [key]: !p.socials_visible[key] } }))
-  }
-
-  const clearSocial = (key: string) => {
-    setProfile((p:any) => ({ ...p, socials: { ...p.socials, [key]: '' } }))
-  }
-
-  const SITE_URL = (process.env.NEXT_PUBLIC_SITE_URL || 'https://tapvinci.vercel.app').replace(/\/+$/, '')
 
   const validateProfile = () => {
     const username = (profile.username || '').trim().toLowerCase()
@@ -312,26 +169,66 @@ export default function Dashboard() {
     return true
   }
 
+  const syncStudentMirror = async (profileId: string | undefined, payload: any) => {
+    if (!isStudent || !profileId) return
+    try {
+      const { error } = await supabase.from('student_profiles').upsert(
+        {
+          id: profileId,
+          school: payload.school || null,
+          course: payload.course || null,
+          year_level: payload.year_level || null,
+          show_school: payload.show_school !== false,
+          show_year_level: payload.show_year_level !== false,
+          show_course: payload.show_course !== false,
+          spotify_url: payload.spotify_url || null,
+        },
+        { onConflict: 'id' }
+      )
+      if (error) {
+        console.warn('[Dashboard] student_profiles mirror skipped:', error.message)
+      }
+    } catch (error) {
+      console.warn('[Dashboard] student_profiles mirror failed:', error)
+    }
+  }
+
+  const isDuplicateUsername = (error: unknown) => {
+    const candidate = error as { code?: string; message?: string } | null
+    return (
+      candidate?.code === '23505' ||
+      /duplicate key|already exists|unique constraint/i.test(candidate?.message || '')
+    )
+  }
+
   const handleSaveProfile = async () => {
     if (!validateProfile()) return
 
-    // Regular users keep the existing checkout/verification flow.
-    if (!isAdmin) {
+    if (!isAdminAccount) {
       setIsPaymentModalOpen(true)
       return
     }
 
-    // Admin/creator: save directly, keep the profile active, skip payment.
     setSaving(true)
-    const fixedUsername = profile.username.trim().toLowerCase()
+    const fixedUsername = String(profile.username || '').trim().toLowerCase()
 
-    // Do not overwrite server-managed/order fields with stale dashboard state.
     const rest: Record<string, any> = { ...profile }
     for (const key of [
-      'id', 'created_at', 'views', 'receipt_url',
-      'payment_status', 'is_active', 'is_admin', 'paid_at',
-      'fulfillment', 'fulfilled_at', 'deactivated_at',
-      'package', 'plan_tier', 'plan_amount', 'payment_method',
+      'id',
+      'created_at',
+      'views',
+      'receipt_url',
+      'payment_status',
+      'is_active',
+      'is_admin',
+      'paid_at',
+      'fulfillment',
+      'fulfilled_at',
+      'deactivated_at',
+      'package',
+      'plan_tier',
+      'plan_amount',
+      'payment_method',
     ]) {
       delete rest[key]
     }
@@ -349,36 +246,49 @@ export default function Dashboard() {
       const { data, error } = await supabase
         .from('profiles')
         .upsert(fixed, { onConflict: 'username' })
-        .select('username, is_admin, is_active, payment_status')
+        .select('*')
         .single()
 
       if (error) throw error
       if (!data) throw new Error('The database did not return the saved profile.')
 
-      setProfile((p: any) => ({
-        ...p,
+      setProfile((previous: any) => ({
+        ...previous,
         ...data,
+        socials: { ...DEFAULT_SOCIALS, ...(data.socials || {}) },
+        socials_visible: { ...DEFAULT_VISIBLE, ...(data.socials_visible || {}) },
         is_admin: true,
         is_active: true,
         payment_status: 'paid',
       }))
+
+      await syncStudentMirror((data as any).id, fixed)
+
       showToast('Profile updated successfully')
-    } catch (err) {
-      console.error('[Admin save] Profile save failed:', err)
-      showToast('Could not save profile. Please try again.')
+    } catch (error) {
+      console.error('[Admin save] Profile save failed:', error)
+      showToast(
+        isDuplicateUsername(error)
+          ? 'That username is already taken. Please choose another one.'
+          : 'Could not save profile. Please try again.'
+      )
     } finally {
       setSaving(false)
     }
   }
 
-
-  const handleConfirmPayment = async ({ receiptFile, planTier, planAmount, paymentMethod }: PaymentSubmission) => {
+  const handleConfirmPayment = async ({
+    receiptFile,
+    planTier,
+    planAmount,
+    paymentMethod,
+  }: PaymentSubmission) => {
     setSaving(true)
-    const fixedUsername = profile.username.trim().toLowerCase()
-    const { id, created_at, ...rest } = profile
+    const fixedUsername = String(profile.username || '').trim().toLowerCase()
+
+    const { id: _id, created_at: _createdAt, ...rest } = profile
 
     try {
-      // 1. Upload the receipt to Supabase Storage
       const rawExt = receiptFile.name.split('.').pop()?.toLowerCase() || ''
       const fileExt = /^(jpe?g|png|pdf)$/.test(rawExt)
         ? rawExt
@@ -387,20 +297,16 @@ export default function Dashboard() {
           : receiptFile.type === 'image/png'
             ? 'png'
             : 'jpg'
+
       const path = `${fixedUsername}/receipts/receipt-${Date.now()}.${fileExt}`
-      const { error: uploadError } = await supabase.storage.from(RECEIPT_BUCKET).upload(path, receiptFile)
-      if (uploadError) {
-        console.error('[Checkout] Receipt upload failed:', uploadError)
-        throw new Error('Receipt upload failed. Please try again.')
-      }
+      const { error: uploadError } = await supabase.storage
+        .from(RECEIPT_BUCKET)
+        .upload(path, receiptFile)
+      if (uploadError) throw new Error('Receipt upload failed. Please try again.')
 
       const receiptUrl = supabase.storage.from(RECEIPT_BUCKET).getPublicUrl(path).data.publicUrl
-
-      // Check if the secret code matches
       const isDemoAccount = demoCode.trim() === process.env.NEXT_PUBLIC_DEMO_SECRET_CODE
 
-      // 2. Build the row written to profiles. All of these columns are created
-      //    by supabase-plan-tier.sql.
       const fixed = {
         ...rest,
         username: fixedUsername,
@@ -414,391 +320,145 @@ export default function Dashboard() {
         payment_method: paymentMethod,
       }
 
-      // 3. Decide whether this is a new order (only used for the admin email).
-      const { data: existing, error: existingError } = await supabase
+      const { data: existing } = await supabase
         .from('profiles')
         .select('username')
         .eq('username', fixed.username)
         .maybeSingle()
-      if (existingError) {
-        console.warn('[Checkout] Could not check for an existing profile:', existingError)
-      }
       const isNewProfile = !existing
 
-      // 4. Upsert handles both cases: username is the primary key, so an
-      //    existing profile is updated and a brand-new one is inserted.
       const { data: saved, error: dbError } = await supabase
         .from('profiles')
         .upsert(fixed, { onConflict: 'username' })
-        .select('username, payment_status')
+        .select('*')
         .single()
 
       if (dbError) {
-        console.error('[Checkout] Database save failed:', dbError)
-        throw new Error('Database save failed. Please try again.')
+        throw new Error(
+          isDuplicateUsername(dbError)
+            ? 'That username is already taken. Please choose another one.'
+            : 'Database save failed. Please try again.'
+        )
       }
-      if (!saved) {
-        console.error('[Checkout] Database save returned no row:', { username: fixed.username })
-        throw new Error('Database save failed. Please try again.')
-      }
+      if (!saved) throw new Error('Database save failed. Please try again.')
 
-      // 5. Success - PaymentModal shows the pending-activation confirmation.
+      await syncStudentMirror((saved as any).id, fixed)
 
-      // 6. Notify admin (email). Notification failures must not block checkout.
+      setProfile((previous: any) => ({
+        ...previous,
+        ...saved,
+        socials: { ...DEFAULT_SOCIALS, ...(saved.socials || {}) },
+        socials_visible: { ...DEFAULT_VISIBLE, ...(saved.socials_visible || {}) },
+      }))
+
       try {
         fetch('/api/send-notification', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ username: fixed.username, type: isNewProfile ? 'created' : 'updated' }),
+          body: JSON.stringify({
+            username: fixed.username,
+            type: isNewProfile ? 'created' : 'updated',
+          }),
           keepalive: true,
         }).catch(() => {})
       } catch {}
-
-    } catch (err) {
-      console.error('[Checkout] Payment submission failed:', err)
-      throw err instanceof Error ? err : new Error('Payment submission failed.')
+    } catch (error) {
+      console.error('[Checkout] Payment submission failed:', error)
+      throw error instanceof Error ? error : new Error('Payment submission failed.')
     } finally {
       setSaving(false)
     }
   }
 
-  const inputCls = "w-full mt-1 p-2.5 rounded-lg bg-zinc-800 border border-zinc-700 focus:border-[#D4AF37] outline-none text-sm"
-  const activeSocialCount = SOCIALS_CONFIG.filter(s => profile.socials_visible[s.key] && profile.socials[s.key]?.trim()).length
+  void adminSession
+  void forceAdminPreview
+
   return (
     <>
       <HamburgerMenu />
-      
-      <PaymentModal 
+
+      <PaymentModal
         isOpen={isPaymentModalOpen}
         onClose={() => setIsPaymentModalOpen(false)}
         onConfirm={handleConfirmPayment}
       />
 
       <style jsx global>{`
-        .dashboard-slider-wrapper { overflow:hidden !important; display:block !important; }
-        .dashboard-slider { height:auto !important; min-height:auto !important; align-items:flex-start !important; }
-        .edit-panel { height:auto !important; min-height:auto !important; padding-bottom:24px !important; margin-bottom:0 !important; }
-        .live-panel { height:auto !important; min-height:auto !important; padding-bottom:0 !important; margin-bottom:0 !important; }
+        .dashboard-slider-wrapper { overflow: hidden !important; display: block !important; }
+        .dashboard-slider { height: auto !important; min-height: auto !important; align-items: flex-start !important; }
+        .edit-panel { height: auto !important; min-height: auto !important; padding-bottom: 24px !important; margin-bottom: 0 !important; }
+        .live-panel { height: auto !important; min-height: auto !important; padding-bottom: 0 !important; margin-bottom: 0 !important; }
         .floating-toggle-btn { transition: opacity .3s ease, transform .3s ease; }
-        body:has(.menu-panel.open) .floating-toggle-btn { opacity:0 !important; transform:translateY(16px) !important; pointer-events:none !important; }
-        .live-panel .taply-gold-wrapper { min-height:auto !important; height:auto !important; min-height:0 !important; padding-bottom:0 !important; }
+        body:has(.menu-panel.open) .floating-toggle-btn { opacity: 0 !important; transform: translateY(16px) !important; pointer-events: none !important; }
+        .live-panel .taply-gold-wrapper { min-height: auto !important; height: auto !important; min-height: 0 !important; padding-bottom: 0 !important; }
       `}</style>
+
       {!showLive && (
-        <button onClick={() => setShowLive(true)} className="floating-toggle-btn fixed bottom-6 right-6 md:bottom-8 md:right-8 z-[30] rounded-full px-6 py-3.5 text-[12px] font-extrabold tracking-[0.15em] uppercase shadow-[0_8px_32px_rgba(212,175,55,0.4)] transition-all duration-200 hover:scale-[1.02] active:scale-[0.98] border border-black/10" style={{ background: '#D4AF37', color: '#050505' }}>LIVE PREVIEW ↓</button>
+        <button
+          onClick={() => setShowLive(true)}
+          className="floating-toggle-btn fixed bottom-6 right-6 z-[30] rounded-full border border-black/10 px-6 py-3.5 text-[12px] font-extrabold uppercase tracking-[0.15em] shadow-[0_8px_32px_rgba(212,175,55,0.4)] transition-all duration-200 hover:scale-[1.02] active:scale-[0.98] md:bottom-8 md:right-8"
+          style={{ background: '#D4AF37', color: '#050505' }}
+        >
+          LIVE PREVIEW ↓
+        </button>
       )}
       {showLive && (
-        <button onClick={() => setShowLive(false)} className="floating-toggle-btn fixed bottom-6 right-6 md:bottom-8 md:right-8 z-[30] rounded-full px-6 py-3.5 text-[12px] font-extrabold tracking-[0.15em] uppercase shadow-[0_8px_32px_rgba(212,175,55,0.4)] transition-all duration-200 hover:scale-[1.02] active:scale-[0.98] border border-black/10" style={{ background: '#D4AF37', color: '#050505' }}>↑ BACK TO EDIT</button>
+        <button
+          onClick={() => setShowLive(false)}
+          className="floating-toggle-btn fixed bottom-6 right-6 z-[30] rounded-full border border-black/10 px-6 py-3.5 text-[12px] font-extrabold uppercase tracking-[0.15em] shadow-[0_8px_32px_rgba(212,175,55,0.4)] transition-all duration-200 hover:scale-[1.02] active:scale-[0.98] md:bottom-8 md:right-8"
+          style={{ background: '#D4AF37', color: '#050505' }}
+        >
+          ↑ BACK TO EDIT
+        </button>
       )}
 
-      <div className="bg-[#050505] text-white p-4 h-auto min-h-0 pb-6" style={{ height: 'auto', minHeight: 0 }}>
-        <div className="dashboard-slider-wrapper overflow-hidden w-full h-auto min-h-0" ref={sliderWrapperRef} style={{ transition: 'height 0.3s ease' }}>
-          <div className="dashboard-slider flex w-[200%] items-start will-change-transform" style={{ transform: showLive ? 'translateX(-50%) translate3d(0,0,0)' : 'translateX(0) translate3d(0,0,0)', transition: 'transform 0.5s cubic-bezier(0.4,0,0.2,1)' }}>
-            <div ref={editPanelRef} className="w-[50%] flex-shrink-0 px-1 lg:px-3 h-auto min-h-0" style={{ height: 'auto', minHeight: 0 }}>
-              <div className="max-w-7xl mx-auto h-auto min-h-0" style={{ height: 'auto', minHeight: 0 }}>
-<div ref={editTopRef} className="edit-panel space-y-4 bg-zinc-900 p-6 rounded-2xl h-auto min-h-0 pb-6" style={{ height: 'auto', minHeight: 0 }}>
-          <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-            <div>
-              <p className="text-[10px] font-bold uppercase tracking-[0.22em] text-zinc-500">
-                {showStudentForm ? 'Student experience' : 'Professional experience'}
-              </p>
-              <h1 className="mt-0.5 text-xl font-bold">
-                {showStudentForm ? 'Edit Student Profile' : 'Edit Profile'}
-              </h1>
-            </div>
-            {isAdmin && (
-              <button
-                type="button"
-                onClick={() => setViewMode(showStudentForm ? 'professional' : 'student')}
-                title="Preview the other edit experience without leaving this page"
-                className="inline-flex items-center justify-center gap-2 rounded-full border border-emerald-500/30 bg-emerald-500/10 px-4 py-2 text-[10px] font-bold uppercase tracking-widest text-emerald-300 transition hover:border-emerald-400/50 hover:bg-emerald-500/20"
-              >
-                <i className={`fa-solid ${showStudentForm ? 'fa-briefcase' : 'fa-graduation-cap'}`} />
-                {showStudentForm ? 'Switch to Professional View' : 'Switch to Student View'}
-              </button>
-            )}
-          </div>
-
-          {showStudentForm ? (
-            <StudentEditForm profile={profile} onSaved={reloadProfileAfterStudentSave} />
-          ) : (
-            <>
-          <label className="block text-[11px] tracking-widest text-zinc-400 uppercase">Username<input value={profile.username} onChange={e => setProfile({...profile, username: e.target.value.toLowerCase()})} className={inputCls} /></label>
-          <label className="block text-[11px] tracking-widest text-zinc-400 uppercase">Name<input value={profile.name} onChange={e => setProfile({...profile, name: e.target.value})} className={inputCls} /></label>
-          
-          {/* 3. PROFILE PHOTO */}
-          <div className="space-y-2">
-            <p className="text-[11px] tracking-widest text-zinc-400 uppercase">Profile Photo</p>
+      <div className="h-auto min-h-0 bg-[#050505] p-4 pb-6 text-white" style={{ height: 'auto', minHeight: 0 }}>
+        <div
+          className="dashboard-slider-wrapper h-auto min-h-0 w-full overflow-hidden"
+          ref={sliderWrapperRef}
+          style={{ transition: 'height 0.3s ease' }}
+        >
+          <div
+            className="dashboard-slider flex w-[200%] items-start will-change-transform"
+            style={{
+              transform: showLive ? 'translateX(-50%) translate3d(0,0,0)' : 'translateX(0) translate3d(0,0,0)',
+              transition: 'transform 0.5s cubic-bezier(0.4,0,0.2,1)',
+            }}
+          >
             <div
-              onDragOver={(e) => { e.preventDefault(); setDragOverHero(true) }}
-              onDragLeave={() => setDragOverHero(false)}
-              onDrop={(e) => { e.preventDefault(); setDragOverHero(false); handleHeroFiles(e.dataTransfer.files) }}
-              onClick={() => heroInputRef.current?.click()}
-              className={`relative w-full rounded-xl border-2 border-dashed p-4 cursor-pointer transition-all ${dragOverHero ? 'border-[#D4AF37] bg-[#D4AF37]/10' : 'border-zinc-700 bg-zinc-800/50 hover:border-zinc-600'}`}
+              ref={editPanelRef}
+              className="h-auto min-h-0 w-[50%] flex-shrink-0 px-1 lg:px-3"
+              style={{ height: 'auto', minHeight: 0 }}
             >
-              <input ref={heroInputRef} type="file" accept="image/*" className="hidden" onChange={(e) => handleHeroFiles(e.target.files)} />
-              {profile.hero_image ? (
-                <div className="flex items-center gap-3">
-                  <img src={profile.hero_image} alt="Hero preview" className="w-16 h-16 rounded-lg object-cover" />
-                  <div className="flex-1 min-w-0">
-                    <p className="text-xs text-white truncate">{heroUploading ? 'Uploading...' : 'Hero image set'}</p>
-                    <p className="text-[11px] text-[#D4AF37] mt-1">Click or drag new image to replace</p>
-                  </div>
-                </div>
-              ) : (
-                <div className="text-center py-2">
-                  <div className="text-2xl mb-1">📸</div>
-                  <p className="text-xs text-white font-semibold">{heroUploading ? 'Uploading...' : 'Drop profile photo here'}</p>
-                  <p className="text-[11px] text-zinc-400">Logo will stay as hero banner</p>
-                </div>
-              )}
-              {heroUploading && <div className="absolute inset-0 bg-black/50 rounded-xl flex items-center justify-center"><div className="text-[#D4AF37] text-xs">Uploading...</div></div>}
-            </div>
-            <p className="text-[9px] text-zinc-500">/hero.png (Upload your profile)</p>
-          </div>
-
-          {/* 3.5 THEME */}
-          <div className="space-y-3 border-t border-zinc-800 pt-4">
-            <p className="text-[11px] uppercase tracking-widest text-[#D4AF37] font-bold">Themes</p>
-            <div className="grid grid-cols-2 gap-2">
-              {THEMES.map(t => (
-                <button key={t.id} onClick={() => setProfile({...profile, accent_color: t.hex, theme: t.id})} className={`p-3 rounded-xl border-2 text-left ${profile.theme === t.id ? 'border-white scale-[1.02]' : 'border-zinc-700 hover:border-zinc-500'}`}>
-                  <div className="flex items-center gap-2"><div className="w-5 h-5 rounded-full border border-white/20" style={{background: t.hex}}></div><span className="text-xs font-bold">{t.name}</span></div>
-                  <p className="text-[10px] text-zinc-500 mt-1">{t.desc} • {t.hex}</p>
-                </button>
-              ))}
-            </div>
-          </div>
-
-          {/* 4. HERO CONTENT */}
-          <div className="space-y-3 border-t border-zinc-800 pt-4">
-            <p className="text-[11px] uppercase tracking-widest text-[#D4AF37] font-bold">Hero</p>
-            <label className="block text-[11px] tracking-widest text-zinc-400 uppercase">Title<input value={profile.title} onChange={e => setProfile({...profile, title: e.target.value})} className={inputCls} placeholder="WEB DEVELOPER | TAPVINCI FOUNDER..." /></label>
-            <label className="block text-[11px] tracking-widest text-zinc-400 uppercase">Bio<textarea value={profile.bio} onChange={e => setProfile({...profile, bio: e.target.value})} rows={3} className={inputCls} placeholder="A simple tap. A smarter introduction..." /></label>
-            <label className="block text-[11px] tracking-widest text-zinc-400 uppercase">About Me<textarea value={profile.about} onChange={e => setProfile({...profile, about: e.target.value})} rows={4} className={inputCls} placeholder="Hi, I'm Shua, owner of TapVinci..." /></label>
-          </div>
-
-          {/* 5. GALLERY */}
-          <div className="space-y-2 border-t border-zinc-800 pt-4">
-            <p className="text-[11px] uppercase tracking-widest text-[#D4AF37] font-bold">Gallery</p>
-            <div
-              onDragOver={(e) => { e.preventDefault(); setDragOverGallery(true) }}
-              onDragLeave={() => setDragOverGallery(false)}
-              onDrop={(e) => { e.preventDefault(); setDragOverGallery(false); handleGalleryFiles(e.dataTransfer.files) }}
-              onClick={() => galleryInputRef.current?.click()}
-              className={`w-full rounded-xl border-2 border-dashed p-6 cursor-pointer text-center transition-all ${dragOverGallery ? 'border-[#D4AF37] bg-[#D4AF37]/10' : 'border-zinc-700 bg-zinc-800/50 hover:border-zinc-600'}`}
-            >
-              <input ref={galleryInputRef} type="file" accept="image/*" multiple className="hidden" onChange={(e) => handleGalleryFiles(e.target.files)} />
-              <div className="text-2xl mb-1">🖼</div>
-              <p className="text-xs text-white font-semibold">{galleryUploading ? 'Uploading...' : 'Drop images here'}</p>
-              <p className="text-[11px] text-zinc-400">or click to pick from computer — multiple allowed</p>
-            </div>
-            {profile.gallery && profile.gallery.length > 0 && (
-              <div className="space-y-1 mt-2">
-                <p className="text-[11px] text-[#D4AF37]">✓ {profile.gallery.length} image(s) saved - Visible in Live Preview</p>
-                {profile.gallery.map((item:any, idx:number) => (
-                  <div key={idx} className="flex items-center justify-between bg-[#1A1A1C] rounded-[8px] px-3 py-2 border border-dashed border-[#3a3a3c]">
-                    <span className="text-[11px] text-zinc-400">/gallery-{idx+1}.webp</span>
-                    <button onClick={() => removeGalleryItem(idx)} className="text-[11px] text-zinc-500 hover:text-red-400">Remove</button>
-                  </div>
-                ))}
-              </div>
-            )}
-          </div>
-
-          {/* 6. SOCIALS */}
-          <div className="space-y-3 border-t border-zinc-800 pt-4">
-            <div className="flex items-center justify-between">
-              <p className="text-[11px] uppercase tracking-widest text-[#D4AF37] font-bold">Social Links</p>
-              <span className="text-[10px] bg-zinc-800 px-2 py-1 rounded-full">{activeSocialCount} visible</span>
-            </div>
-            <p className="text-[11px] text-zinc-500">👁 Show = visible, 🙈 Hide = hidden but saved. Order matches Live Preview.</p>
-            
-            {SOCIALS_CONFIG.map(s => {
-              const hasUrl = !!profile.socials[s.key]?.trim()
-              const isVisible = profile.socials_visible[s.key]
-              const willShow = hasUrl && isVisible
-              return (
-                <div key={s.key} className={`p-3 rounded-xl border transition-all ${willShow ? 'bg-zinc-800 border-zinc-700' : 'bg-zinc-800/50 border-zinc-800/50 opacity-75'}`}>
-                  <div className="flex items-center justify-between mb-2">
-                    <label className={`text-xs font-bold ${s.color} flex items-center gap-2`}>
-                      {s.label}
-                      {!hasUrl && <span className="text-[9px] bg-zinc-700 px-1.5 py-0.5 rounded text-zinc-400">EMPTY</span>}
-                      {hasUrl && !isVisible && <span className="text-[9px] bg-red-500/20 px-1.5 py-0.5 rounded text-red-300">HIDDEN</span>}
-                      {willShow && <span className="text-[9px] bg-green-500/20 px-1.5 py-0.5 rounded text-green-300">VISIBLE</span>}
-                    </label>
-                    <div className="flex gap-1.5">
-                      <button
-                        onClick={() => toggleVisibility(s.key)}
-                        className={`px-3 py-1.5 rounded-full text-[11px] font-bold flex items-center gap-1.5 transition-all ${isVisible ? 'bg-green-500/20 text-green-300 border border-green-500/30 hover:bg-green-500/30' : 'bg-red-500/20 text-red-300 border border-red-500/30 hover:bg-red-500/30'}`}
-                      >
-                        <i className={`fa-solid ${isVisible ? 'fa-eye' : 'fa-eye-slash'}`}></i>
-                        {isVisible ? 'Show' : 'Hide'}
-                      </button>
-                      {hasUrl && (
-                        <button onClick={() => clearSocial(s.key)} className="px-2 py-1.5 rounded-full bg-zinc-700 text-[11px] text-zinc-300 hover:bg-zinc-600">×</button>
-                      )}
-                    </div>
-                  </div>
-                  <input 
-                    value={profile.socials[s.key] || ''} 
-                    onChange={e => setProfile({...profile, socials:{...profile.socials, [s.key]: e.target.value}})} 
-                    className={inputCls + " mt-0"} 
-                    placeholder={s.placeholder}
+              <div className="mx-auto h-auto min-h-0 max-w-7xl" style={{ height: 'auto', minHeight: 0 }}>
+                <div
+                  className="edit-panel h-auto min-h-0 space-y-4 rounded-2xl bg-zinc-900 p-6 pb-6"
+                  style={{ height: 'auto', minHeight: 0 }}
+                >
+                  <UnifiedEditForm
+                    profile={profile}
+                    setProfile={setProfile}
+                    onSave={handleSaveProfile}
+                    saving={saving}
+                    isStudent={isStudent}
+                    isAdminAccount={isAdminAccount}
+                    showDemoCode={showDemoCode}
+                    demoCode={demoCode}
+                    setDemoCode={setDemoCode}
+                    showToast={showToast}
                   />
                 </div>
-              )
-            })}
-
-            {/* 6.5 SPOTIFY PLAYER */}
-            <div className="mt-4 rounded-xl border border-zinc-800 bg-zinc-800/50 p-3">
-              <div className="flex items-center justify-between mb-2">
-                <label className="text-xs font-bold text-[#1DB954] flex items-center gap-2">
-                  <i className="fa-brands fa-spotify"></i>
-                  Spotify
-                  {profile.spotify_url && isValidSpotifyUrl(profile.spotify_url) && (
-                    <span className="text-[9px] bg-[#1DB954]/20 px-1.5 py-0.5 rounded text-[#1ED760]">LIVE</span>
-                  )}
-                </label>
-              </div>
-              <input
-                value={profile.spotify_url || ''}
-                onChange={e => setProfile({ ...profile, spotify_url: e.target.value })}
-                className={inputCls + ' mt-0'}
-                placeholder="https://open.spotify.com/track/..."
-                aria-label="Spotify track or playlist link"
-              />
-              <p className="text-[10px] text-zinc-500 mt-1.5">
-                Paste a track, album, or playlist link. It appears under &ldquo;Let&apos;s Connect&rdquo; on your profile.
-              </p>
-              {!isValidSpotifyUrl(profile.spotify_url || '') && (
-                <p className="text-[10px] text-red-400 mt-1">
-                  That doesn&apos;t look like a Spotify link yet.
-                </p>
-              )}
-            </div>
-          </div>
-
-          {/* 7. QUICK ACTIONS & CONTACT */}
-          <div className="space-y-3 border-t border-zinc-800 pt-4">
-            <p className="text-[11px] uppercase tracking-widest text-[#D4AF37] font-bold">Quick Actions & Contact Info</p>
-            <p className="text-[11px] text-zinc-500">Controls Quick Actions row + Contact section. Matches Live Preview order.</p>
-            <div className="grid grid-cols-1 gap-3">
-              <label className="block text-[11px] tracking-widest text-zinc-400 uppercase">Phone<input value={profile.phone} onChange={e => setProfile({...profile, phone: e.target.value})} className={inputCls} /></label>
-              <label className="block text-[11px] tracking-widest text-zinc-400 uppercase">Email<input value={profile.email} onChange={e => setProfile({...profile, email: e.target.value})} className={inputCls} /></label>
-              <label className="block text-[11px] tracking-widest text-zinc-400 uppercase">Address<input value={profile.address} onChange={e => setProfile({...profile, address: e.target.value})} className={inputCls} /></label>
-              <div className="space-y-2">
-                <div className="flex items-center justify-between">
-                  <label className="text-[11px] tracking-widest text-zinc-400 uppercase">Google Maps Link</label>
-                  <button
-                    onClick={() => toggleVisibility('google_maps')}
-                    className={`px-3 py-1.5 rounded-full text-[11px] font-bold flex items-center gap-1.5 transition-all ${profile.socials_visible.google_maps !== false ? 'bg-green-500/20 text-green-300 border border-green-500/30' : 'bg-red-500/20 text-red-300 border border-red-500/30'}`}
-                  >
-                    <i className={`fa-solid ${profile.socials_visible.google_maps !== false ? 'fa-eye' : 'fa-eye-slash'}`}></i>
-                    {profile.socials_visible.google_maps !== false ? 'Show' : 'Hide'}
-                  </button>
-                </div>
-                <input value={profile.mapsLink} onChange={e => setProfile({...profile, mapsLink: e.target.value})} className={inputCls} placeholder="https://maps.app.goo.gl/..." />
-                <p className="text-[10px] text-zinc-500">{profile.socials_visible.google_maps !== false ? '✅ Google Maps button visible on profile' : '🙈 Google Maps hidden — address still saved but button hidden'}</p>
               </div>
             </div>
-          </div>
 
-          {/* 8. PAYMENT QR CODES */}
-          <div className="space-y-4 border-t border-zinc-800 pt-6">
-            <div>
-              <div className="flex items-center justify-between">
-                <p className="text-[10px] uppercase tracking-[1px] text-[#9CA3AF] font-bold flex items-center gap-2">
-                  <i className="fa-solid fa-qrcode text-[#D4AF37]"></i> Payment QR Codes (For YOUR Customers)
-                </p>
-              </div>
-              <p className="text-[11px] text-zinc-500 mt-1">Upload YOUR GCash/Maya QR so your customers can pay you.</p>
-            </div>
-
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              {/* GCASH */}
-              <div className="space-y-2">
-                <div className="flex items-center justify-between">
-                  <p className="text-[11px] uppercase tracking-widest text-zinc-400 font-bold">GCash QR</p>
-                </div>
+            <div className="h-auto min-h-0 w-[50%] flex-shrink-0 px-1 lg:px-3">
+              <div className="mx-auto h-auto min-h-0 max-w-7xl">
                 <div
-                  onDragOver={(e) => { e.preventDefault(); setDragOverGcash(true) }}
-                  onDragLeave={() => setDragOverGcash(false)}
-                  onDrop={(e) => { e.preventDefault(); setDragOverGcash(false); handleGcashFiles(e.dataTransfer.files) }}
-                  onClick={() => gcashInputRef.current?.click()}
-                  className={`group w-full rounded-[12px] border border-dashed p-6 cursor-pointer text-center transition-all ${dragOverGcash ? 'border-[#D4AF37] bg-[#D4AF37]/10' : 'border-[#3a3a3c] bg-[#1A1A1C] hover:border-[#555]'}`}
+                  ref={livePreviewRef}
+                  id="live-preview-section"
+                  className="live-panel h-auto min-h-0 scroll-mt-24 pb-6"
                 >
-                  <input ref={gcashInputRef} type="file" accept="image/png,image/jpeg,image/jpg,image/webp" className="hidden" onChange={(e) => handleGcashFiles(e.target.files)} />
-                  <div className="flex flex-col items-center">
-                    {profile.gcash_qr_url ? (
-                      <div className="relative">
-                        <img src={profile.gcash_qr_url} alt="GCash" className="w-12 h-12 rounded-[8px] object-contain bg-white p-1" />
-                        <div className="absolute inset-0 bg-black/60 rounded-[8px] opacity-0 group-hover:opacity-100 flex items-center justify-center transition-all"><span className="text-[10px] text-white font-bold">Change</span></div>
-                      </div>
-                    ) : (
-                      <div className="w-8 h-8 rounded-full bg-[#2A2A2A] flex items-center justify-center mb-2"><i className="fa-solid fa-qrcode text-zinc-400 text-[12px]"></i></div>
-                    )}
-                    <p className="text-[13px] font-semibold text-white mt-2">{gcashUploading ? 'Uploading...' : 'Drop GCash QR here'}</p>
-                  </div>
-                </div>
-              </div>
-
-              {/* MAYA */}
-              <div className="space-y-2">
-                <div className="flex items-center justify-between">
-                  <p className="text-[11px] uppercase tracking-widest text-zinc-400 font-bold">Maya QR</p>
-                </div>
-                <div
-                  onDragOver={(e) => { e.preventDefault(); setDragOverMaya(true) }}
-                  onDragLeave={() => setDragOverMaya(false)}
-                  onDrop={(e) => { e.preventDefault(); setDragOverMaya(false); handleMayaFiles(e.dataTransfer.files) }}
-                  onClick={() => mayaInputRef.current?.click()}
-                  className={`group w-full rounded-[12px] border border-dashed p-6 cursor-pointer text-center transition-all ${dragOverMaya ? 'border-[#D4AF37] bg-[#D4AF37]/10' : 'border-[#3a3a3c] bg-[#1A1A1C] hover:border-[#555]'}`}
-                >
-                  <input ref={mayaInputRef} type="file" accept="image/png,image/jpeg,image/jpg,image/webp" className="hidden" onChange={(e) => handleMayaFiles(e.target.files)} />
-                  <div className="flex flex-col items-center">
-                    {profile.maya_qr_url ? (
-                      <div className="relative">
-                        <img src={profile.maya_qr_url} alt="Maya" className="w-12 h-12 rounded-[8px] object-contain bg-white p-1" />
-                        <div className="absolute inset-0 bg-black/60 rounded-[8px] opacity-0 group-hover:opacity-100 flex items-center justify-center transition-all"><span className="text-[10px] text-white font-bold">Change</span></div>
-                      </div>
-                    ) : (
-                      <div className="w-8 h-8 rounded-full bg-[#2A2A2A] flex items-center justify-center mb-2"><i className="fa-solid fa-qrcode text-zinc-400 text-[12px]"></i></div>
-                    )}
-                    <p className="text-[13px] font-semibold text-white mt-2">{mayaUploading ? 'Uploading...' : 'Drop Maya QR here'}</p>
-                  </div>
-                </div>
-              </div>
-            </div>
-          </div>
-
-          {/* HIDDEN DEMO SECRET CODE */}
-          {showDemoCode && (
-            <div className="border-t border-zinc-800 pt-4 mt-4 animate-in fade-in">
-              <label className="block text-[10px] tracking-widest text-[#D4AF37] uppercase">
-                🔒 Admin Only: Demo Secret Code
-                <input 
-                  value={demoCode} 
-                  onChange={e => setDemoCode(e.target.value)} 
-                  className={inputCls} 
-                  placeholder="Type secret code here to create a demo" 
-                />
-              </label>
-              <p className="text-[9px] text-zinc-500 mt-1">This field is hidden from public users.</p>
-            </div>
-          )}
-          
-          <button onClick={handleSaveProfile} disabled={saving || heroUploading || galleryUploading || gcashUploading || mayaUploading} className="w-full py-3 rounded-xl font-bold hover:brightness-110 disabled:opacity-50" style={{background: profile.accent_color, color: 'black'}}>
-            {saving ? 'Saving...' : isAdmin ? 'Save Profile (Admin)' : 'Save Profile'}
-          </button>
-            </>
-          )}
-        </div>
-              </div>
-            </div>
-            <div className="w-[50%] flex-shrink-0 px-1 lg:px-3 h-auto min-h-0">
-              <div className="max-w-7xl mx-auto h-auto min-h-0">
-                <div ref={livePreviewRef} id="live-preview-section" className="live-panel scroll-mt-24 h-auto min-h-0 pb-6">
-                  <TaplyTemplate profile={profile} viewAs={effectiveRole} />
+                  <TaplyTemplate profile={profile} />
                 </div>
               </div>
             </div>
@@ -806,7 +466,11 @@ export default function Dashboard() {
         </div>
       </div>
 
-      {toast && <div className="success-toast" role="status">{toast}</div>}
+      {toast && (
+        <div className="success-toast" role="status">
+          {toast}
+        </div>
+      )}
     </>
   )
 }

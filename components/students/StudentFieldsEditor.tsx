@@ -2,32 +2,31 @@
 
 import { useState } from 'react'
 import { createClient } from '../../lib/supabase-browser'
-import { parseSpotifyUrl } from '../../lib/students/spotify'
-import type { StudentProfile } from '../../lib/students/student'
+import { isValidSpotifyUrl } from '../../lib/profile-config'
 
 export default function StudentFieldsEditor({
   profile,
   onSaved,
 }: {
-  profile: StudentProfile
+  profile: any
   onSaved?: () => void
 }) {
   const [username, setUsername] = useState(profile.username ?? '')
   const [school, setSchool] = useState(profile.school ?? '')
   const [course, setCourse] = useState(profile.course ?? '')
   const [yearLevel, setYearLevel] = useState(profile.year_level ?? '')
+  
   const [spotifyUrl, setSpotifyUrl] = useState(profile.spotify_url ?? '')
+  
   const [saving, setSaving] = useState(false)
   const [message, setMessage] = useState('')
 
   async function handleSave() {
     setMessage('')
-    if (spotifyUrl.trim()) {
-      const parsed = parseSpotifyUrl(spotifyUrl)
-      if (!parsed.embedUrl) {
-        setMessage('That Spotify link does not look valid. Use a link like https://open.spotify.com/track/...')
-        return
-      }
+    
+    if (spotifyUrl.trim() && !isValidSpotifyUrl(spotifyUrl)) {
+      setMessage('That Spotify link does not look valid.')
+      return
     }
 
     setSaving(true)
@@ -44,10 +43,6 @@ export default function StudentFieldsEditor({
       }
     }
 
-    // FIX: school / course / year_level / spotify_url live in student_profiles, not profiles.
-    // profiles only has username, name, tier, etc. Saving them to profiles caused:
-    // "Could not find the 'course' column of 'profiles' in the schema cache"
-    // Use upsert so it works even if the student_profiles row does not exist yet.
     const { error } = await supabase
       .from('student_profiles')
       .upsert(
@@ -71,55 +66,55 @@ export default function StudentFieldsEditor({
   }
 
   return (
-    <div className="rounded-2xl border p-4 space-y-4">
-      <h2 className="font-bold text-lg">Student profile</h2>
+    <div className="rounded-2xl border border-zinc-800 bg-zinc-900 p-4 space-y-4">
+      <h2 className="font-bold text-lg text-white">Student profile</h2>
 
       <label className="block">
-        <span className="text-sm opacity-70">Username</span>
+        <span className="text-sm text-zinc-400">Username</span>
         <input
           value={username}
           onChange={(e) => setUsername(e.target.value)}
-          className="mt-1 w-full rounded-lg border px-3 py-2 bg-transparent"
+          className="mt-1 w-full rounded-lg border border-zinc-700 bg-zinc-950 px-3 py-2 text-white"
           placeholder="your-name"
         />
       </label>
 
       <label className="block">
-        <span className="text-sm opacity-70">School</span>
+        <span className="text-sm text-zinc-400">School</span>
         <input
           value={school}
           onChange={(e) => setSchool(e.target.value)}
-          className="mt-1 w-full rounded-lg border px-3 py-2 bg-transparent"
+          className="mt-1 w-full rounded-lg border border-zinc-700 bg-zinc-950 px-3 py-2 text-white"
           placeholder="Your school"
         />
       </label>
 
       <label className="block">
-        <span className="text-sm opacity-70">Course</span>
+        <span className="text-sm text-zinc-400">Course</span>
         <input
           value={course}
           onChange={(e) => setCourse(e.target.value)}
-          className="mt-1 w-full rounded-lg border px-3 py-2 bg-transparent"
+          className="mt-1 w-full rounded-lg border border-zinc-700 bg-zinc-950 px-3 py-2 text-white"
           placeholder="e.g. BS Computer Science"
         />
       </label>
 
       <label className="block">
-        <span className="text-sm opacity-70">Year level</span>
+        <span className="text-sm text-zinc-400">Year level</span>
         <input
           value={yearLevel}
           onChange={(e) => setYearLevel(e.target.value)}
-          className="mt-1 w-full rounded-lg border px-3 py-2 bg-transparent"
+          className="mt-1 w-full rounded-lg border border-zinc-700 bg-zinc-950 px-3 py-2 text-white"
           placeholder="e.g. 2nd Year"
         />
       </label>
 
       <label className="block">
-        <span className="text-sm opacity-70">Spotify link</span>
+        <span className="text-sm text-zinc-400">Spotify Link</span>
         <input
           value={spotifyUrl}
           onChange={(e) => setSpotifyUrl(e.target.value)}
-          className="mt-1 w-full rounded-lg border px-3 py-2 bg-transparent"
+          className="mt-1 w-full rounded-lg border border-zinc-700 bg-zinc-950 px-3 py-2 text-white"
           placeholder="https://open.spotify.com/track/..."
         />
       </label>
@@ -127,12 +122,12 @@ export default function StudentFieldsEditor({
       <button
         onClick={handleSave}
         disabled={saving}
-        className="rounded-lg bg-black px-4 py-2 text-white disabled:opacity-50"
+        className="rounded-lg bg-emerald-500 px-4 py-2 text-black font-bold disabled:opacity-50"
       >
         {saving ? 'Saving...' : 'Save student profile'}
       </button>
 
-      {message && <p className="text-sm">{message}</p>}
+      {message && <p className={`text-sm ${message === 'Saved!' ? 'text-emerald-400' : 'text-red-400'}`}>{message}</p>}
     </div>
   )
 }

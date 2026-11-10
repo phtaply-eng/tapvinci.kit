@@ -1,9 +1,16 @@
 /**
  * Student-only education card. Rendered between the bio and the compact
  * Spotify player on the public profile.
+ *
+ * Each field honors its dashboard visibility toggle: `show_school`,
+ * `show_year_level`, `show_course`. Missing/null means visible.
  */
+import { getVisibleEducation } from '../../lib/profile-role'
+
 export default function StudentEducation({ profile }: { profile: any }) {
-  if (!profile.school && !profile.course && !profile.year_level) return null
+  const { school, course, yearLevel, hasAny } = getVisibleEducation(profile)
+
+  if (!hasAny) return null
 
   return (
     <div className="student-education-card">
@@ -13,22 +20,22 @@ export default function StudentEducation({ profile }: { profile: any }) {
         </span>
         <div className="min-w-0">
           <p className="student-education-eyebrow">Education</p>
-          <p className="student-education-school">{profile.school || 'Student'}</p>
+          <p className="student-education-school">{school || 'Student'}</p>
         </div>
       </div>
 
-      {(profile.course || profile.year_level) && (
+      {(course || yearLevel) && (
         <div className="student-education-grid">
-          {profile.course && (
+          {course && (
             <div className="student-education-item">
               <span>Course</span>
-              <strong>{profile.course}</strong>
+              <strong>{course}</strong>
             </div>
           )}
-          {profile.year_level && (
+          {yearLevel && (
             <div className="student-education-item">
               <span>Year Level</span>
-              <strong>{profile.year_level}</strong>
+              <strong>{yearLevel}</strong>
             </div>
           )}
         </div>

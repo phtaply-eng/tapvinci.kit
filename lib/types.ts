@@ -28,6 +28,13 @@ export type Profile = {
   school?: string | null
   course?: string | null
   year_level?: string | null
+  /** Public-profile visibility flags. Missing/null means visible. */
+  show_phone?: boolean
+  show_email?: boolean
+  show_address?: boolean
+  show_school?: boolean
+  show_year_level?: boolean
+  show_course?: boolean
   taps?: number | null
   streak?: number | null
   tap_count?: number | null
