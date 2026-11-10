@@ -6,17 +6,22 @@ export default function PopupDone() {
   const [stuck, setStuck] = useState(false)
 
   useEffect(() => {
+    // 1. Tell the main page that auth is done
     try {
       const channel = new BroadcastChannel('tapvinci-auth')
       channel.postMessage('signed-in')
       channel.close()
     } catch {}
 
+    // 2. Fallback: Tell the main page using window.postMessage
     try {
       window.opener?.postMessage('tapvinci-signed-in', window.location.origin)
     } catch {}
 
+    // 3. Try to close the window
     const closeTimer = setTimeout(() => window.close(), 250)
+    
+    // 4. If it can't close (common on mobile browsers), show a message
     const stuckTimer = setTimeout(() => setStuck(true), 1200)
 
     return () => {
