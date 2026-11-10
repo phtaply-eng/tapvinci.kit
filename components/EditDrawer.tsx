@@ -102,12 +102,20 @@ export default function EditDrawer({
   }, [isOpen, requestClose])
 
   const handleSave = async () => {
-    const result = await editor.save()
-    if (!result.ok) return
-    onSaved?.()
-    // A renamed student profile lives at a new URL: go there and reopen the editor
-    if (result.newUsername) {
-      window.location.assign(`/${encodeURIComponent(result.newUsername)}?edit_profile=1`)
+    // ADDED LOGGING HERE SO YOU CAN SEE THE EXACT ERROR IN CONSOLE
+    try {
+      const result = await editor.save()
+      if (!result.ok) {
+        console.error("Save failed inside editor.save(). Check the previous console errors for Supabase details.")
+        return
+      }
+      onSaved?.()
+      // A renamed student profile lives at a new URL: go there and reopen the editor
+      if (result.newUsername) {
+        window.location.assign(`/${encodeURIComponent(result.newUsername)}?edit_profile=1`)
+      }
+    } catch (err) {
+      console.error("Unhandled error during save:", err)
     }
   }
 

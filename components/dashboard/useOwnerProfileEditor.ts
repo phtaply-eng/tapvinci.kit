@@ -5,43 +5,18 @@ import { createClient } from '@/lib/supabase-browser'
 import { DEFAULT_VISIBLE } from '@/lib/profile-config'
 import { mergeStudentProfileData, resolveProfileRole } from '@/lib/profile-role'
 
-/**
- * Load + save for a SIGNED-IN OWNER editing their own profile.
- *
- * This is deliberately different from the dashboard's save: the dashboard asks
- * for a payment (or uses the admin upsert). An owner of an already-live profile
- * just updates their own row, and can never touch payment, role, ownership or
- * the tap/streak counters from here.
- */
-
-// Never written from the owner editor
 const PROTECTED_KEYS = [
-  'id',
-  'created_at',
-  'updated_at',
-  'views',
-  'receipt_url',
-  'payment_status',
-  'is_active',
-  'is_admin',
-  'is_demo',
-  'paid_at',
-  'fulfillment',
-  'fulfilled_at',
-  'deactivated_at',
-  'package',
-  'plan_tier',
-  'plan_amount',
-  'payment_method',
-  'owner_id',
-  'claimed_by',
-  'role',
-  'tier',
-  'taps',
-  'streak',
-  'tap_count',
-  'streak_count',
-  'last_tap_date',
+  'id', 'created_at', 'updated_at', 'views', 'receipt_url', 'payment_status', 
+  'is_active', 'is_admin', 'is_demo', 'paid_at', 'fulfillment', 'fulfilled_at', 
+  'deactivated_at', 'package', 'plan_tier', 'plan_amount', 'payment_method', 
+  'owner_id', 'claimed_by', 'role', 'tier', 'taps', 'streak', 'tap_count', 
+  'streak_count', 'last_tap_date',
+]
+
+// These fields exist in student_profiles, NOT in the main profiles table
+const STUDENT_ONLY_KEYS = [
+  'school', 'course', 'year_level', 'spotify_url', 'youtube_url', 'audio_url',
+  'show_school', 'show_year_level', 'show_course'
 ]
 
 const USERNAME_MESSAGES: Record<string, string> = {
@@ -127,9 +102,6 @@ export function useOwnerProfileEditor({
   }, [enabled, profileId, reloadKey])
 
   const isStudent = useMemo(() => resolveProfileRole(profile) === 'student', [profile])
-
-  // Professional cards are programmed with /username, so renaming would break the printed card.
-  // Student cards open /c/CODE, which redirects to the current username, so renaming is safe.
   const usernameLocked = !isStudent
 
   const dirty = useMemo(
@@ -168,7 +140,6 @@ export function useOwnerProfileEditor({
     try {
       const supabase = createClient()
 
-      // Student renames go through the checked function (3-24 chars, no reserved names, unique)
       if (usernameChanged) {
         const { data: result, error: renameError } = await supabase.rpc('set_my_username', {
           p_username: username,
@@ -184,11 +155,20 @@ export function useOwnerProfileEditor({
 
       const payload: Record<string, any> = { ...profile }
       for (const key of PROTECTED_KEYS) delete payload[key]
-      delete payload.username // the username is only changed through the function above
+      delete payload.username
 
+      // 1. Separate the data for the two tables
+      const profilePayload = { ...payload }
+      if (isStudent) {
+        for (const key of STUDENT_ONLY_KEYS) {
+          delete profilePayload[key]
+        }
+      }
+
+      // 2. Update the main 'profiles' table (only safe columns)
       const { data: saved, error: saveError } = await supabase
         .from('profiles')
-        .update(payload)
+        .update(profilePayload)
         .eq('id', profile.id)
         .select('*')
         .maybeSingle()
@@ -196,7 +176,7 @@ export function useOwnerProfileEditor({
       if (saveError) throw saveError
       if (!saved) throw new Error('No row was updated. Are you signed in as the owner?')
 
-      // Keep the legacy student_profiles row in sync, like the dashboard does
+      // 3. Update the student_profiles mirror if applicable
       if (isStudent) {
         const { error: mirrorError } = await supabase.from('student_profiles').upsert(
           {
@@ -208,6 +188,7 @@ export function useOwnerProfileEditor({
             show_year_level: payload.show_year_level !== false,
             show_course: payload.show_course !== false,
             spotify_url: payload.spotify_url || null,
+            // audio_url/youtube_url can be added here if you keep them
           },
           { onConflict: 'id' }
         )
@@ -216,7 +197,10 @@ export function useOwnerProfileEditor({
         }
       }
 
-      const next = normalize(saved)
+      // 4. Merge the local state so the drawer doesn't lose the student fields
+      const mergedSaved = isStudent ? { ...saved, ...payload } : saved
+      const next = normalize(mergedSaved)
+      
       baselineRef.current = JSON.stringify(next)
       setProfile(next)
       showToast('Profile updated successfully')
