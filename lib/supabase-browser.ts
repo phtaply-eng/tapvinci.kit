@@ -1,12 +1,17 @@
 import { createBrowserClient } from '@supabase/ssr'
 
-/**
- * Supabase client for Client Components. Safe to call on every render -
- * createBrowserClient already returns a singleton in the browser.
- */
+// Create a module-level variable to hold the single instance
+let client: ReturnType<typeof createBrowserClient> | undefined
+
 export function createClient() {
-  return createBrowserClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
-  )
+  // If the client doesn't exist yet, create it
+  if (!client) {
+    client = createBrowserClient(
+      process.env.NEXT_PUBLIC_SUPABASE_URL!,
+      process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
+    )
+  }
+  
+  // Always return the exact same instance
+  return client
 }
