@@ -11,6 +11,7 @@ import { createClient } from '../lib/supabase-browser'
 import dynamic from 'next/dynamic'
 import { useRouter } from 'next/navigation'
 import ToastView from '@/components/ToastView'
+import { type AuthChangeEvent } from '@supabase/supabase-js' // <-- ADDED IMPORT
 
 const EditDrawer = dynamic(() => import('@/components/EditDrawer'), { ssr: false })
 
@@ -94,6 +95,7 @@ export default function TaplyTemplate({
   const authResultRef = useRef(handleAuthResult)
   authResultRef.current = handleAuthResult
 
+  // 1. Initial session check (handles returning from mobile redirect with ?edit_profile=1)
   useEffect(() => {
     let alive = true
     const params = new URLSearchParams(window.location.search)
@@ -112,6 +114,7 @@ export default function TaplyTemplate({
         setIsCardOwner(owner)
 
         if (wantsEdit) {
+          // Clean up the URL so the query param disappears
           params.delete('edit_profile')
           const qs = params.toString()
           window.history.replaceState(
@@ -119,6 +122,7 @@ export default function TaplyTemplate({
             '',
             window.location.pathname + (qs ? `?${qs}` : '') + window.location.hash
           )
+          
           if (!user) {
             awaitingSignIn.current = true
             setIsLoginModalOpen(true)
@@ -140,12 +144,13 @@ export default function TaplyTemplate({
     }
   }, [profile.id])
 
+  // 2. Auth state listener
   useEffect(() => {
     const supabase = createClient()
 
     const {
       data: { subscription },
-    } = supabase.auth.onAuthStateChange((event) => {
+    } = supabase.auth.onAuthStateChange((event: AuthChangeEvent) => { // <-- ADDED TYPE HERE
       if (event === 'SIGNED_OUT') {
         setCurrentUserId(null)
         setIsCardOwner(false)

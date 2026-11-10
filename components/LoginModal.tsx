@@ -99,12 +99,36 @@ export default function LoginModal({
     doneRef.current = false
 
     const supabase = createClient()
-
-    // 1. Set a cookie to tell the callback route to redirect to popup-done
-    document.cookie = "auth_next=/auth/popup-done; path=/; max-age=600; SameSite=Lax"
-
-    // 2. Clean redirect URL (no query params to confuse Supabase)
     const origin = window.location.origin
+
+    // 1. Detect Mobile Device
+    const isMobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(
+      navigator.userAgent
+    ) || window.innerWidth < 768
+
+    if (isMobile) {
+      // MOBILE FLOW: Full page redirect
+      const currentPath = window.location.pathname
+      const nextUrl = `${currentPath}?edit_profile=1`
+      const redirectTo = `${origin}/auth/callback?next=${encodeURIComponent(nextUrl)}`
+
+      const { error } = await supabase.auth.signInWithOAuth({
+        provider: 'google',
+        options: {
+          redirectTo,
+          queryParams: { prompt: 'select_account' },
+        },
+      })
+
+      if (error) {
+        setError(error.message)
+        setLoading(false)
+      }
+      return // Exit early, the browser is now redirecting to Google
+    }
+
+    // DESKTOP FLOW: Popup window
+    document.cookie = 'auth_next=/auth/popup-done; path=/; max-age=600; SameSite=Lax'
     const popupRedirect = `${origin}/auth/callback`
 
     let startUserId: string | null = null
@@ -137,12 +161,12 @@ export default function LoginModal({
     )
 
     if (!popup) {
-      // Fallback if popup is blocked
+      // Fallback if popup is blocked on desktop
       const backTo = `${window.location.pathname}?edit_profile=1`
       const { error: fallbackError } = await supabase.auth.signInWithOAuth({
         provider: 'google',
         options: {
-          redirectTo: `${origin}/auth/callback`,
+          redirectTo: `${origin}/auth/callback?next=${encodeURIComponent(backTo)}`,
           queryParams: { prompt: 'select_account' },
         },
       })
