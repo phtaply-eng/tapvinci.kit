@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect, useRef } from 'react'
+import { useState, useEffect, useRef, useCallback } from 'react'
 import { createPortal } from 'react-dom'
 import LoginModal from '@/components/LoginModal'
 import SpotifyPlayer from '@/components/SpotifyPlayer'
@@ -14,9 +14,18 @@ import { type AuthChangeEvent } from '@supabase/supabase-js'
 const EditDrawer = dynamic(() => import('@/components/EditDrawer'), { ssr: false })
 
 export default function TaplyTemplate({ profile }: { profile: any }) {
+  // Local state for real-time live preview
+  const [localProfile, setLocalProfile] = useState(profile)
+  
+  // Sync with server props ONLY when the server sends new data
+  useEffect(() => {
+    setLocalProfile(profile)
+  }, [profile])
+
   const [isDark, setIsDark] = useState(true)
   const [lightboxOpen, setLightboxOpen] = useState(false)
   const [lightboxIndex, setLightboxIndex] = useState(0)
+  const [currentGalleryIndex, setCurrentGalleryIndex] = useState(0) // State for 1-5 image slider
   const [zoom, setZoom] = useState(1)
   const [pan, setPan] = useState({ x: 0, y: 0 })
   const [isDragging, setIsDragging] = useState(false)
@@ -49,15 +58,23 @@ export default function TaplyTemplate({ profile }: { profile: any }) {
     setIsEditDrawerOpen(true)
   }
 
+  const handleCloseDrawer = useCallback(() => {
+    setIsEditDrawerOpen(false)
+  }, [])
+
+  const handlePreviewChange = useCallback((draftProfile: any) => {
+    setLocalProfile(draftProfile)
+  }, [])
+
   const checkOwnership = async (userId: string): Promise<boolean> => {
-    if (userId === profile.owner_id || userId === profile.claimed_by) return true
-    if (!profile.id) return false
+    if (userId === localProfile.owner_id || userId === localProfile.claimed_by) return true
+    if (!localProfile.id) return false
     const supabase = createClient()
     const { data } = await supabase
       .from('cards')
       .select('profile_id')
       .eq('claimed_by', userId)
-      .eq('profile_id', profile.id)
+      .eq('profile_id', localProfile.id)
       .maybeSingle()
     return !!data?.profile_id
   }
@@ -88,8 +105,6 @@ export default function TaplyTemplate({ profile }: { profile: any }) {
   const authResultRef = useRef(handleAuthResult)
   authResultRef.current = handleAuthResult
 
-  // 1. Initial session check (handles returning from the OAuth redirect with
-  // ?edit_profile=1 or the legacy ?edit=1 param)
   useEffect(() => {
     let alive = true
     const params = new URLSearchParams(window.location.search)
@@ -109,7 +124,6 @@ export default function TaplyTemplate({ profile }: { profile: any }) {
         setIsCardOwner(owner)
 
         if (wantsEdit) {
-          // Clean up the URL so the query param disappears
           params.delete('edit_profile')
           params.delete('edit')
           const qs = params.toString()
@@ -138,15 +152,15 @@ export default function TaplyTemplate({ profile }: { profile: any }) {
     return () => {
       alive = false
     }
-  }, [profile.id])
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [localProfile.id])
 
-  // 2. Auth state listener
   useEffect(() => {
     const supabase = createClient()
 
     const {
       data: { subscription },
-    } = supabase.auth.onAuthStateChange((event: AuthChangeEvent) => { // <-- ADDED TYPE HERE
+    } = supabase.auth.onAuthStateChange((event: AuthChangeEvent) => {
       if (event === 'SIGNED_OUT') {
         setCurrentUserId(null)
         setIsCardOwner(false)
@@ -161,31 +175,32 @@ export default function TaplyTemplate({ profile }: { profile: any }) {
     return () => {
       subscription.unsubscribe()
     }
-  }, [profile.id])
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [localProfile.id])
 
   const isOwner =
     !!currentUserId &&
-    (currentUserId === profile.owner_id ||
-      currentUserId === profile.claimed_by ||
+    (currentUserId === localProfile.owner_id ||
+      currentUserId === localProfile.claimed_by ||
       isCardOwner)
 
-  const accent = profile.accent_color || '#D4AF37'
+  const accent = localProfile.accent_color || '#D4AF37'
 
-  const visiblePhone = profile.show_phone !== false && profile.phone ? String(profile.phone) : ''
-  const visibleEmail = profile.show_email !== false && profile.email ? String(profile.email) : ''
+  const visiblePhone = localProfile.show_phone !== false && localProfile.phone ? String(localProfile.phone) : ''
+  const visibleEmail = localProfile.show_email !== false && localProfile.email ? String(localProfile.email) : ''
   const visibleAddress =
-    profile.show_address !== false && profile.address ? String(profile.address) : ''
-  const visibleEducation = getVisibleEducation(profile)
-  const taps = getTapCount(profile)
-  const streak = getStreakCount(profile)
-  const showStats = profile.show_stats !== false
-  const showBio = profile.show_bio !== false && Boolean(String(profile.bio || '').trim())
-  const showAbout = Boolean(String(profile.about || '').trim()) && profile.show_about !== false
-  const showEducation = Boolean(String(profile.school || '').trim()) && visibleEducation.hasAny
-  const showSpotify = Boolean(profile.spotify_url) && profile.show_spotify !== false
+    localProfile.show_address !== false && localProfile.address ? String(localProfile.address) : ''
+  const visibleEducation = getVisibleEducation(localProfile)
+  const taps = getTapCount(localProfile)
+  const streak = getStreakCount(localProfile)
+  const showStats = localProfile.show_stats !== false
+  const showBio = localProfile.show_bio !== false && Boolean(String(localProfile.bio || '').trim())
+  const showAbout = Boolean(String(localProfile.about || '').trim()) && localProfile.show_about !== false
+  const showEducation = Boolean(String(localProfile.school || '').trim()) && visibleEducation.hasAny
+  const showSpotify = Boolean(localProfile.spotify_url) && localProfile.show_spotify !== false
   
   const mapsVisible =
-    profile.socials_visible?.google_maps !== false && profile.show_google_maps !== false
+    localProfile.socials_visible?.google_maps !== false && localProfile.show_google_maps !== false
 
   useEffect(() => {
     setMounted(true)
@@ -199,16 +214,16 @@ export default function TaplyTemplate({ profile }: { profile: any }) {
     localStorage.setItem('tapvinci-theme-mode', newMode ? 'dark' : 'light')
   }
 
-  const gallery = (profile.gallery || [])
+  const gallery = (localProfile.gallery || [])
     .map((item: any) => {
       if (typeof item === 'string') return { src: item, alt: 'Gallery' }
       return { src: item.src, alt: item.alt || 'Gallery' }
     })
     .filter((g: any) => g.src)
 
-  const heroImg = profile.hero_image || profile.avatar_url || ''
-  const socials = profile.socials || {}
-  const socialsVisible = profile.socials_visible || {}
+  const heroImg = localProfile.hero_image || localProfile.avatar_url || ''
+  const socials = localProfile.socials || {}
+  const socialsVisible = localProfile.socials_visible || {}
 
   const isVisible = (key: string) => {
     if (socialsVisible[key] === false) return false
@@ -226,8 +241,8 @@ export default function TaplyTemplate({ profile }: { profile: any }) {
   if (isVisible('website')) socialButtons.push({ id: 'website', href: socials.website, icon: 'fa-globe', label: 'Website' })
   if (isVisible('twitter') || isVisible('x')) socialButtons.push({ id: 'twitter', href: socials.twitter || socials.x, icon: 'fa-x-twitter', label: 'X / Twitter' })
 
-  const gcashQR = (profile as any).gcash_qr_url || (profile as any).gcash_qr
-  const mayaQR = (profile as any).maya_qr_url || (profile as any).maya_qr
+  const gcashQR = (localProfile as any).gcash_qr_url || (localProfile as any).gcash_qr
+  const mayaQR = (localProfile as any).maya_qr_url || (localProfile as any).maya_qr
 
   useEffect(() => {
     if (!gcashQR && mayaQR) setActiveTab('maya')
@@ -241,7 +256,7 @@ export default function TaplyTemplate({ profile }: { profile: any }) {
       const objectUrl = URL.createObjectURL(blob)
       const a = document.createElement('a')
       a.href = objectUrl
-      a.download = `${type}-QR-${profile.name || 'TapVinci'}.png`
+      a.download = `${type}-QR-${localProfile.name || 'TapVinci'}.png`
       document.body.appendChild(a)
       a.click()
       a.remove()
@@ -255,7 +270,7 @@ export default function TaplyTemplate({ profile }: { profile: any }) {
     if (navigator.share) {
       try {
         await navigator.share({
-          title: `${type} QR - ${profile.name}`,
+          title: `${type} QR - ${localProfile.name}`,
           text: `Scan my ${type} QR to pay`,
           url,
         })
@@ -266,7 +281,7 @@ export default function TaplyTemplate({ profile }: { profile: any }) {
   }
 
   const getTheme = () => {
-    const t = profile.theme || 'gold'
+    const t = localProfile.theme || 'gold'
     if (!isDark) {
       return {
         bg: '#f1f5f9',
@@ -361,8 +376,8 @@ export default function TaplyTemplate({ profile }: { profile: any }) {
     const lines = [
       'BEGIN:VCARD',
       'VERSION:3.0',
-      `FN:${profile.name}`,
-      `ORG:${profile.title || ''}`,
+      `FN:${localProfile.name}`,
+      `ORG:${localProfile.title || ''}`,
       visiblePhone ? `TEL:${visiblePhone}` : '',
       visibleEmail ? `EMAIL:${visibleEmail}` : '',
       visibleAddress ? `ADR:${visibleAddress}` : '',
@@ -374,7 +389,7 @@ export default function TaplyTemplate({ profile }: { profile: any }) {
     const url = URL.createObjectURL(blob)
     const a = document.createElement('a')
     a.href = url
-    a.download = `${profile.name.replace(/\s+/g, '_')}.vcf`
+    a.download = `${localProfile.name.replace(/\s+/g, '_')}.vcf`
     a.click()
     URL.revokeObjectURL(url)
   }
@@ -383,8 +398,8 @@ export default function TaplyTemplate({ profile }: { profile: any }) {
     if (typeof window === 'undefined') return
     const url = window.location.href
     const shareData = {
-      title: profile.name || 'My TapVinci card',
-      text: profile.title || 'Tap my TapVinci card',
+      title: localProfile.name || 'My TapVinci card',
+      text: localProfile.title || 'Tap my TapVinci card',
       url,
     }
     if (navigator.share) {
@@ -447,29 +462,90 @@ export default function TaplyTemplate({ profile }: { profile: any }) {
       </section>
     ) : null
 
+  // UPDATED: Dynamic Gallery Layout
   const gallerySection =
     gallery.length > 0 ? (
       <section className="taply-section">
         <h2 style={{ color: '#D4AF37' }}>
           <i className="fa-regular fa-images" style={{ color: '#D4AF37' }}></i> Gallery
         </h2>
-        <div className="-mx-5 mt-4 grid grid-cols-3 gap-1.5">
-          {gallery.map((item: any, i: number) => (
-            <button
-              key={i}
-              onClick={() => openLightbox(i)}
-              className="group relative aspect-square overflow-hidden rounded-xl border border-white/5"
-            >
+        
+        {gallery.length <= 5 ? (
+          // CONDITION 1: 1 to 5 Images (Downsized Slider with Outside Arrows)
+          <div className="flex items-center justify-between gap-3 mt-4 w-full">
+            {/* Left Arrow */}
+            {gallery.length > 1 ? (
+              <button
+                onClick={() => setCurrentGalleryIndex((prev) => (prev - 1 + gallery.length) % gallery.length)}
+                className="flex-shrink-0 w-10 h-10 rounded-full bg-[#1E1E20] text-white flex items-center justify-center border border-white/10 hover:bg-[#D4AF37] hover:text-black hover:border-[#D4AF37] transition-all shadow-md active:scale-95"
+                aria-label="Previous image"
+              >
+                <i className="fa-solid fa-chevron-left text-sm" />
+              </button>
+            ) : (
+              <div className="w-10 h-10 flex-shrink-0" /> // Spacer if only 1 image
+            )}
+
+            {/* Image Container */}
+            <div className="relative flex-1 h-[250px] sm:h-[280px] rounded-2xl overflow-hidden group border border-white/5">
               {/* eslint-disable-next-line @next/next/no-img-element */}
               <img
-                src={item.src}
-                alt={item.alt || `Gallery ${i + 1}`}
-                loading="lazy"
-                className="h-full w-full object-cover transition-transform duration-300 group-hover:scale-105"
+                src={gallery[currentGalleryIndex].src}
+                alt={gallery[currentGalleryIndex].alt || 'Gallery Image'}
+                className="w-full h-full object-cover cursor-pointer transition-transform duration-500 hover:scale-105"
+                onClick={() => openLightbox(currentGalleryIndex)}
               />
-            </button>
-          ))}
-        </div>
+              
+              {/* Dots Indicator - FIXED TYPES HERE */}
+              {gallery.length > 1 && (
+                <div className="absolute bottom-3 left-0 right-0 flex justify-center gap-1.5 pointer-events-none z-10">
+                  {gallery.map((_: any, i: number) => (
+                    <div
+                      key={i}
+                      className={`h-1.5 rounded-full transition-all duration-300 ${
+                        i === currentGalleryIndex ? 'bg-[#D4AF37] w-4' : 'bg-white/40 w-1.5'
+                      }`}
+                    />
+                  ))}
+                </div>
+              )}
+            </div>
+
+            {/* Right Arrow */}
+            {gallery.length > 1 ? (
+              <button
+                onClick={() => setCurrentGalleryIndex((prev) => (prev + 1) % gallery.length)}
+                className="flex-shrink-0 w-10 h-10 rounded-full bg-[#1E1E20] text-white flex items-center justify-center border border-white/10 hover:bg-[#D4AF37] hover:text-black hover:border-[#D4AF37] transition-all shadow-md active:scale-95"
+                aria-label="Next image"
+              >
+                <i className="fa-solid fa-chevron-right text-sm" />
+              </button>
+            ) : (
+              <div className="w-10 h-10 flex-shrink-0" /> // Spacer if only 1 image
+            )}
+          </div>
+        ) : (
+          // CONDITION 2: 6 or More Images (2x2 Horizontal Scroll)
+          <div className="mt-4 w-full overflow-x-auto snap-x snap-mandatory [&::-webkit-scrollbar]:hidden [-ms-overflow-style:none] [scrollbar-width:none]">
+            <div className="grid grid-rows-2 grid-flow-col gap-2 auto-cols-[calc(50%-0.25rem)] pb-2">
+              {gallery.map((item: any, i: number) => (
+                <button
+                  key={i}
+                  onClick={() => openLightbox(i)}
+                  className="group relative w-full aspect-square snap-start overflow-hidden rounded-xl border border-white/5"
+                >
+                  {/* eslint-disable-next-line @next/next/no-img-element */}
+                  <img
+                    src={item.src}
+                    alt={item.alt || `Gallery ${i + 1}`}
+                    loading="lazy"
+                    className="h-full w-full object-cover transition-transform duration-300 group-hover:scale-105"
+                  />
+                </button>
+              ))}
+            </div>
+          </div>
+        )}
       </section>
     ) : null
 
@@ -521,69 +597,113 @@ export default function TaplyTemplate({ profile }: { profile: any }) {
         <i className="fa-solid fa-bolt" style={{ color: '#D4AF37' }}></i> Quick Actions
       </h2>
 
-      <div className="taply-pills">
-        {profile.phone && (
-          <a className="taply-action-btn" href={`tel:${profile.phone}`}>
-            <span className="ico">
-              <i className="fa-solid fa-phone"></i>
-            </span>
-            <span className="lbl">Call Me</span>
-          </a>
+      {/* ──────────────────────────────────────────────── */}
+      {/* ROW 1 — Call / Text / Email · downsized squircle */}
+      {/* ──────────────────────────────────────────────── */}
+      <div className="mt-4 grid grid-cols-3 gap-3">
+        {localProfile.phone && (
+          <>
+            <a
+              href={`tel:${String(localProfile.phone).replace(/[^\d+]/g, '')}`}
+              aria-label="Call"
+              className="group flex flex-col items-center justify-center gap-1.5 rounded-2xl border border-white/10 bg-[#1A1A1D] px-2 py-4 shadow-lg shadow-black/50 transition-all duration-200 hover:border-[#D4AF37]/50 hover:bg-[#222225] active:scale-[0.97]"
+            >
+              <i
+                className="fa-solid fa-phone text-xl text-[#D4AF37] transition-transform duration-200 group-hover:scale-110"
+                aria-hidden="true"
+              />
+              <span className="text-[11px] font-semibold tracking-wide text-gray-300">
+                Call
+              </span>
+            </a>
+
+            <a
+              href={`sms:${String(localProfile.phone).replace(/[^\d+]/g, '')}`}
+              aria-label="Text"
+              className="group flex flex-col items-center justify-center gap-1.5 rounded-2xl border border-white/10 bg-[#1A1A1D] px-2 py-4 shadow-lg shadow-black/50 transition-all duration-200 hover:border-[#D4AF37]/50 hover:bg-[#222225] active:scale-[0.97]"
+            >
+              <i
+                className="fa-solid fa-comment-sms text-xl text-[#D4AF37] transition-transform duration-200 group-hover:scale-110"
+                aria-hidden="true"
+              />
+              <span className="text-[11px] font-semibold tracking-wide text-gray-300">
+                Text
+              </span>
+            </a>
+          </>
         )}
-        {profile.phone && (
-          <a className="taply-action-btn" href={`sms:${profile.phone}`}>
-            <span className="ico">
-              <i className="fa-solid fa-comment-sms"></i>
+
+        {localProfile.email && (
+          <a
+            href={`mailto:${localProfile.email}`}
+            aria-label="Email"
+            className="group flex flex-col items-center justify-center gap-1.5 rounded-2xl border border-white/10 bg-[#1A1A1D] px-2 py-4 shadow-lg shadow-black/50 transition-all duration-200 hover:border-[#D4AF37]/50 hover:bg-[#222225] active:scale-[0.97]"
+          >
+            <i
+              className="fa-solid fa-envelope text-xl text-[#D4AF37] transition-transform duration-200 group-hover:scale-110"
+              aria-hidden="true"
+            />
+            <span className="text-[11px] font-semibold tracking-wide text-gray-300">
+              Email
             </span>
-            <span className="lbl">Text / SMS</span>
-          </a>
-        )}
-        {profile.email && (
-          <a className="taply-action-btn" href={`mailto:${profile.email}`}>
-            <span className="ico">
-              <i className="fa-solid fa-envelope"></i>
-            </span>
-            <span className="lbl">Send Email</span>
           </a>
         )}
       </div>
 
-      <div className="taply-secondary-pills quick-actions-row">
-        {profile.address && mapsVisible && (
+      {/* ──────────────────────────────────────────────── */}
+      {/* ROW 2 — Maps / Save / Pay / Share · scrollable   */}
+      {/* ──────────────────────────────────────────────── */}
+      <div className="mt-3 flex w-full flex-nowrap items-center gap-2 overflow-x-auto pb-1 [&::-webkit-scrollbar]:hidden [-ms-overflow-style:none] [scrollbar-width:none]">
+        {localProfile.address && mapsVisible && (
           <a
-            className="taply-action-btn small google-maps"
             href={
-              profile.mapsLink ||
-              `https://maps.google.com/?q=${encodeURIComponent(profile.address)}`
+              localProfile.mapsLink ||
+              `https://maps.google.com/?q=${encodeURIComponent(localProfile.address)}`
             }
             target="_blank"
             rel="noreferrer"
+            aria-label="Open in Google Maps"
+            className="flex flex-shrink-0 flex-row items-center justify-center gap-1.5 rounded-full border-2 border-[#D4AF37] bg-white py-2 px-4 text-black shadow-sm transition-transform duration-150 active:scale-95"
           >
-            <span className="ico">
-              <i className="fa-solid fa-location-dot" style={{ color: '#E53935' }}></i>
-            </span>
-            <span className="lbl">Google Maps</span>
+            <i
+              className="fa-solid fa-location-dot text-sm shrink-0"
+              style={{ color: '#E53935' }}
+              aria-hidden="true"
+            />
+            <span className="whitespace-nowrap text-[11px] font-semibold leading-none">Google Maps</span>
           </a>
         )}
-        <button className="taply-action-btn small gold" onClick={saveContact}>
-          <span className="ico">
-            <i className="fa-solid fa-address-card"></i>
-          </span>
-          <span className="lbl">Save Contact</span>
+
+        <button
+          type="button"
+          onClick={saveContact}
+          className="flex flex-shrink-0 flex-row items-center justify-center gap-1.5 rounded-full border-2 py-2 px-4 text-black shadow-sm transition-transform duration-150 active:scale-95"
+          style={{ backgroundColor: accent, borderColor: accent }}
+        >
+          <i className="fa-solid fa-address-card text-sm shrink-0" aria-hidden="true" />
+          <span className="whitespace-nowrap text-[11px] font-semibold leading-none">Save Contact</span>
         </button>
+
         {(gcashQR || mayaQR) && (
-          <button className="taply-action-btn small gold" onClick={() => setShowPaymentModal(true)}>
-            <span className="ico">
-              <i className="fa-solid fa-qrcode"></i>
-            </span>
-            <span className="lbl">Payment</span>
+          <button
+            type="button"
+            onClick={() => setShowPaymentModal(true)}
+            className="flex flex-shrink-0 flex-row items-center justify-center gap-1.5 rounded-full border-2 py-2 px-4 text-black shadow-sm transition-transform duration-150 active:scale-95"
+            style={{ backgroundColor: accent, borderColor: accent }}
+          >
+            <i className="fa-solid fa-qrcode text-sm shrink-0" aria-hidden="true" />
+            <span className="whitespace-nowrap text-[11px] font-semibold leading-none">Pay</span>
           </button>
         )}
-        <button className="taply-action-btn small gold" onClick={shareCard}>
-          <span className="ico">
-            <i className="fa-solid fa-share-nodes"></i>
-          </span>
-          <span className="lbl">Share My Card</span>
+
+        <button
+          type="button"
+          onClick={shareCard}
+          className="flex flex-shrink-0 flex-row items-center justify-center gap-1.5 rounded-full border-2 py-2 px-4 text-black shadow-sm transition-transform duration-150 active:scale-95"
+          style={{ backgroundColor: accent, borderColor: accent }}
+        >
+          <i className="fa-solid fa-share-nodes text-sm shrink-0" aria-hidden="true" />
+          <span className="whitespace-nowrap text-[11px] font-semibold leading-none">Share</span>
         </button>
       </div>
     </section>
@@ -595,7 +715,7 @@ export default function TaplyTemplate({ profile }: { profile: any }) {
       style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '10px' }}
     >
       <p suppressHydrationWarning style={{ margin: 0 }}>
-        © {new Date().getFullYear()} {profile.name}. All rights reserved.
+        © {new Date().getFullYear()} {localProfile.name}. All rights reserved.
       </p>
 
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '10px' }}>
@@ -611,7 +731,7 @@ export default function TaplyTemplate({ profile }: { profile: any }) {
         >
           <i className="fa-regular fa-eye"></i>
           <span suppressHydrationWarning>
-            {profile.views || 0} {profile.views === 1 ? 'view' : 'views'}
+            {localProfile.views || 0} {localProfile.views === 1 ? 'view' : 'views'}
           </span>
         </div>
 
@@ -718,9 +838,13 @@ export default function TaplyTemplate({ profile }: { profile: any }) {
       {drawerMounted && (
         <EditDrawer
           isOpen={isEditDrawerOpen}
-          onClose={() => setIsEditDrawerOpen(false)}
+          onClose={handleCloseDrawer}
           profile={profile}
-          onSaved={() => router.refresh()}
+          onPreviewChange={handlePreviewChange}
+          onSaved={(newData) => {
+            setLocalProfile(newData)
+            router.refresh()
+          }}
         />
       )}
 
@@ -769,7 +893,7 @@ export default function TaplyTemplate({ profile }: { profile: any }) {
                     textShadow: '0 2px 20px rgba(0,0,0,0.6), 0 2px 10px rgba(0,0,0,0.5)',
                   }}
                 >
-                  {profile.name || 'Your Name'}
+                  {localProfile.name || 'Your Name'}
                 </h1>
                 <p
                   className="subtitle-gold job-title"
@@ -780,13 +904,13 @@ export default function TaplyTemplate({ profile }: { profile: any }) {
                     lineHeight: '1.4',
                     letterSpacing: '1px',
                     textTransform: 'uppercase',
-                    color: accent,
+                    color: '#D4AF37', // STATIC GOLD
                     textAlign: 'center',
                     margin: '0 auto 18px',
                     maxWidth: '420px',
                   }}
                 >
-                  {profile.title || 'Your Title'}
+                  {localProfile.title || 'Your Title'}
                 </p>
 
                 <div
@@ -794,16 +918,16 @@ export default function TaplyTemplate({ profile }: { profile: any }) {
                   style={{
                     width: '60px',
                     height: '1.5px',
-                    background: `linear-gradient(90deg, transparent 0%, ${accent} 20%, ${accent} 50%, ${accent} 80%, transparent 100%)`,
+                    background: `linear-gradient(90deg, transparent 0%, #D4AF37 20%, #D4AF37 50%, #D4AF37 80%, transparent 100%)`, // STATIC GOLD
                     margin: '12px auto 0 auto',
                     borderRadius: '2px',
-                    boxShadow: `0 0 8px ${accent}80`,
+                    boxShadow: `0 0 8px #D4AF3780`, // STATIC GOLD
                     opacity: 0.9,
                   }}
                 />
 
                 {showStats && (
-                  <div className="taply-stat-pills" aria-label="Card activity">
+                  <div className="taply-stat-pills" aria-label="Card activity" style={{ '--sg': '#D4AF37' } as any}>
                     <span className="taply-stat-pill">
                       <i className="fa-solid fa-hand-pointer" aria-hidden="true" />
                       {taps} {taps === 1 ? 'tap' : 'taps'}
@@ -817,7 +941,7 @@ export default function TaplyTemplate({ profile }: { profile: any }) {
 
                 {showBio && (
                   <div className="taply-bio" style={{ marginTop: showStats ? '20px' : '24px' }}>
-                    {profile.bio}
+                    {localProfile.bio}
                   </div>
                 )}
 
@@ -825,7 +949,7 @@ export default function TaplyTemplate({ profile }: { profile: any }) {
                   <a
                     href="#socials"
                     className="taply-primary-btn"
-                    style={{ marginTop: '16px', display: 'inline-flex' }}
+                    style={{ backgroundColor: accent, color: '#0a0a0a', marginTop: '16px', display: 'inline-flex' }}
                   >
                     Let&apos;s Connect ↓
                   </a>
@@ -838,7 +962,7 @@ export default function TaplyTemplate({ profile }: { profile: any }) {
                 <h2 style={{ color: '#D4AF37' }}>
                   <i className="fa-regular fa-user" style={{ color: '#D4AF37' }}></i> About Me
                 </h2>
-                <p>{profile.about}</p>
+                <p>{localProfile.about}</p>
               </section>
             )}
 
@@ -886,7 +1010,7 @@ export default function TaplyTemplate({ profile }: { profile: any }) {
                 <h2 style={{ color: '#D4AF37' }}>
                   <i className="fa-brands fa-spotify" style={{ color: '#D4AF37' }}></i> Now Playing
                 </h2>
-                <SpotifyPlayer spotifyUrl={profile.spotify_url} accentColor={accent} compact />
+                <SpotifyPlayer spotifyUrl={localProfile.spotify_url} accentColor="#D4AF37" compact />
               </section>
             )}
 

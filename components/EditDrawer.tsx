@@ -20,7 +20,6 @@ function FormSkeleton() {
   )
 }
 
-// The form is only downloaded when the drawer opens, so visitors tapping a card never pay for it
 const UnifiedEditForm = dynamic(() => import('@/components/dashboard/UnifiedEditForm'), {
   ssr: false,
   loading: () => <FormSkeleton />,
@@ -33,13 +32,13 @@ export default function EditDrawer({
   onClose,
   profile,
   onSaved,
+  onPreviewChange,
 }: {
   isOpen: boolean
   onClose: () => void
-  /** The public profile object (only its id is used; the editor loads a fresh copy). */
   profile: any
-  /** Called after a successful save so the public page behind the drawer can refresh. */
-  onSaved?: () => void
+  onSaved?: (updatedProfile: any) => void
+  onPreviewChange?: (draftProfile: any) => void
 }) {
   const [mounted, setMounted] = useState(false)
   const [isDesktop, setIsDesktop] = useState(true)
@@ -67,7 +66,6 @@ export default function EditDrawer({
     }
   }, [])
 
-  // Desktop = slide in from the right, mobile = bottom sheet
   useEffect(() => {
     const query = window.matchMedia('(min-width: 768px)')
     const update = () => setIsDesktop(query.matches)
@@ -76,22 +74,33 @@ export default function EditDrawer({
     return () => query.removeEventListener('change', update)
   }, [])
 
+  // Send real-time updates to the parent page
+  useEffect(() => {
+    if (isOpen && editor.profile) {
+      onPreviewChange?.(editor.profile)
+    }
+  }, [editor.profile, isOpen, onPreviewChange])
+
   const requestClose = useCallback(() => {
     if (editor.saving) return
-    if (editor.dirty && !window.confirm('You have unsaved changes. Close without saving?')) return
     onClose()
-  }, [editor.saving, editor.dirty, onClose])
+  }, [editor.saving, onClose])
 
-  // Lock page scroll, close on Escape, focus the close button
+  // Use a ref so the effect below doesn't depend on requestClose
+  const requestCloseRef = useRef(requestClose)
+  requestCloseRef.current = requestClose
+
   useEffect(() => {
     if (!isOpen) return
     const previousOverflow = document.body.style.overflow
     document.body.style.overflow = 'hidden'
 
     const onKeyDown = (event: KeyboardEvent) => {
-      if (event.key === 'Escape') requestClose()
+      if (event.key === 'Escape') requestCloseRef.current()
     }
     window.addEventListener('keydown', onKeyDown)
+    
+    // Focus close button ONLY when the drawer opens
     const focusTimer = setTimeout(() => closeButtonRef.current?.focus(), 350)
 
     return () => {
@@ -99,18 +108,22 @@ export default function EditDrawer({
       window.removeEventListener('keydown', onKeyDown)
       clearTimeout(focusTimer)
     }
-  }, [isOpen, requestClose])
+  }, [isOpen]) // Only run when isOpen changes
 
   const handleSave = async () => {
-    // ADDED LOGGING HERE SO YOU CAN SEE THE EXACT ERROR IN CONSOLE
     try {
       const result = await editor.save()
       if (!result.ok) {
-        console.error("Save failed inside editor.save(). Check the previous console errors for Supabase details.")
+        console.error("Save failed inside editor.save().")
         return
       }
-      onSaved?.()
-      // A renamed profile lives at a new URL: go there and reopen the editor
+      
+      if (editor.profile) {
+        onSaved?.(editor.profile) 
+      }
+      
+      onClose()
+
       if (result.newUsername) {
         window.location.assign(`/${encodeURIComponent(result.newUsername)}?edit_profile=1`)
       }
@@ -159,7 +172,6 @@ export default function EditDrawer({
                 if (info.offset.y > 120 || info.velocity.y > 600) requestClose()
               }}
             >
-              {/* Header (on mobile, drag this area down to close) */}
               <div
                 className="shrink-0 border-b border-white/10 px-5 pb-3 pt-3"
                 onPointerDown={(event) => {
@@ -190,7 +202,6 @@ export default function EditDrawer({
                 </div>
               </div>
 
-              {/* Body */}
               <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain px-4 pb-[max(24px,env(safe-area-inset-bottom))] pt-4">
                 <div className="rounded-2xl bg-zinc-900 p-5">
                   {editor.loading || (!editor.profile && !editor.error) ? (
