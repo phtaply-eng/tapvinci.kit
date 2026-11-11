@@ -828,7 +828,7 @@ export default function UnifiedEditForm({
         className="w-full rounded-xl py-3 font-bold transition hover:brightness-110 disabled:opacity-50"
         style={{ background: accent, color: 'black' }}
       >
-        {saving ? 'Saving...' : isAdminAccount ? 'Save Profile (Admin)' : 'Save Profile'}
+        {saving ? 'Saving...' : isAdminAccount ? 'Save Profile' : 'Save Profile'}
       </button>
     </div>
   )

@@ -1,7 +1,9 @@
 import type { CSSProperties, ReactNode } from 'react'
 import Image from 'next/image'
 import Link from 'next/link'
+import { redirect } from 'next/navigation'
 import { createClient } from '@/lib/supabase-server'
+import { createSupabaseAdmin } from '@/lib/supabase-admin'
 import ClaimScreen, { ClaimCardButton } from './ClaimScreen'
 import { signOutAction } from './actions'
 
@@ -233,40 +235,43 @@ function NotFoundPanel() {
   )
 }
 
-function ClaimedPanel({ code, claimedOn }: { code: string; claimedOn: string | null }) {
-  return (
-    <div style={panelStyle}>
-      <CodeChip code={code} />
-      <div
-        style={{
-          width: '58px',
-          height: '58px',
-          margin: '0 auto 22px',
-          borderRadius: '50%',
-          display: 'grid',
-          placeItems: 'center',
-          border: '1px solid rgba(212,175,55,0.26)',
-          background: 'rgba(212,175,55,0.08)',
-          color: GOLD,
-          fontSize: '20px',
-        }}
-      >
-        <i className="fa-solid fa-circle-check" />
-      </div>
-      <h1 style={titleStyle}>Card already claimed</h1>
-      <p style={copyStyle}>
-        This TapVinci card is already linked to an account. If you believe this is a mistake, please contact TapVinci support.
-      </p>
-      {claimedOn && (
-        <p style={{ ...copyStyle, marginTop: '10px', color: '#635e55', fontSize: '11px' }}>
-          Claimed on {claimedOn}
-        </p>
-      )}
-      <Link href="/dashboard" style={{ ...goldButton, marginTop: '26px' }}>
-        Go to dashboard
-      </Link>
-    </div>
-  )
+async function getClaimedProfileUsername(code: string, statusUsername: string | null) {
+  if (statusUsername && statusUsername.trim()) {
+    return statusUsername.trim()
+  }
+
+  try {
+    const admin = createSupabaseAdmin()
+
+    const { data: card, error: cardError } = await admin
+      .from('cards')
+      .select('profile_id')
+      .eq('card_code', code)
+      .maybeSingle()
+
+    if (cardError) {
+      console.error('[Card page] claimed card lookup failed:', cardError.message)
+      return null
+    }
+    if (!card?.profile_id) return null
+
+    const { data: profile, error: profileError } = await admin
+      .from('profiles')
+      .select('username')
+      .eq('id', card.profile_id)
+      .maybeSingle()
+
+    if (profileError) {
+      console.error('[Card page] claimed profile lookup failed:', profileError.message)
+      return null
+    }
+
+    const profileUsername = typeof profile?.username === 'string' ? profile.username.trim() : ''
+    return profileUsername || null
+  } catch (error) {
+    console.error('[Card page] claimed card profile lookup failed:', error)
+    return null
+  }
 }
 
 function NotActivatedPanel() {
@@ -302,11 +307,13 @@ function NotActivatedPanel() {
 function ClaimPanel({
   code,
   email,
+  username,
   message,
   wantsClaim,
 }: {
   code: string
   email?: string | null
+  username: string | null
   message?: string
   wantsClaim: boolean
 }) {
@@ -340,7 +347,7 @@ function ClaimPanel({
       </p>
       <div style={{ marginTop: '22px' }}>
         <MessageBanner message={message} />
-        <ClaimCardButton code={code} />
+        <ClaimCardButton code={code} username={username} />
       </div>
       <form action={signOutAction.bind(null, code)} style={{ marginTop: '12px' }}>
         <button type="submit" style={ghostButton}>
@@ -382,11 +389,10 @@ export default async function CardPage({ params, searchParams }: CardPageProps) 
   }
 
   if (status.claimed) {
-    return (
-      <Shell>
-        <ClaimedPanel code={code} claimedOn={null} />
-      </Shell>
-    )
+    // Public visitors should always land on the claimed card's profile. Never
+    // render an "already claimed" screen for a normal card tap.
+    const profileUsername = await getClaimedProfileUsername(code, status.username)
+    redirect(profileUsername ? `/${encodeURIComponent(profileUsername)}` : '/')
   }
 
   if (!status.activated) {
@@ -411,7 +417,13 @@ export default async function CardPage({ params, searchParams }: CardPageProps) 
 
   return (
     <Shell>
-      <ClaimPanel code={code} email={user.email} message={message} wantsClaim={wantsClaim} />
+      <ClaimPanel
+        code={code}
+        email={user.email}
+        username={status.username}
+        message={message}
+        wantsClaim={wantsClaim}
+      />
     </Shell>
   )
 }
