@@ -114,7 +114,7 @@ export default function LoginPage() {
             )}
             {!myUsername && (
               <p style={{ fontSize: 13, color: "#a3a3a3", lineHeight: 1.5, marginBottom: 20 }}>
-                To edit the student card, you must be signed in as the Google account that claimed it.
+                To edit your card, you must be signed in as the Google account that claimed it.
               </p>
             )}
             <button
@@ -136,7 +136,7 @@ export default function LoginPage() {
             <p style={{ fontSize: 14, color: "#d4d4d4", lineHeight: 1.5, marginBottom: 20 }}>
               Use the same Google account that claimed your card.
               <br />
-              For the student card, that is the account you used when you first tapped / claimed it.
+              For your TapVinci card, that is the account you used when you first tapped / claimed it.
             </p>
             <button
               onClick={handleSignIn}

@@ -110,7 +110,7 @@ export default function EditDrawer({
         return
       }
       onSaved?.()
-      // A renamed student profile lives at a new URL: go there and reopen the editor
+      // A renamed profile lives at a new URL: go there and reopen the editor
       if (result.newUsername) {
         window.location.assign(`/${encodeURIComponent(result.newUsername)}?edit_profile=1`)
       }
@@ -173,7 +173,7 @@ export default function EditDrawer({
                 <div className="flex items-center justify-between gap-3">
                   <div className="min-w-0">
                     <p className="text-[10px] font-bold uppercase tracking-[0.22em] text-zinc-500">
-                      {editor.profile ? (editor.isStudent ? 'Student' : 'Professional') : 'Your profile'}
+                      {editor.profile ? 'Professional' : 'Your profile'}
                     </p>
                     <h2 className="truncate text-lg font-bold">Edit profile</h2>
                   </div>
@@ -212,7 +212,6 @@ export default function EditDrawer({
                       setProfile={editor.setProfile}
                       onSave={handleSave}
                       saving={editor.saving}
-                      isStudent={editor.isStudent}
                       isAdminAccount={false}
                       showDemoCode={false}
                       demoCode=""

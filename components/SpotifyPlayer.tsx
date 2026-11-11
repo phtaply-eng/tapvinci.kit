@@ -65,10 +65,8 @@ type SpotifyPlayerProps = {
   /** Matches the profile theme. Defaults to TapVinci gold. */
   accentColor?: string
   className?: string
-  /** Smaller album art / padding, used by the student profile. */
+  /** Smaller album art / padding, used inside compact card sections. */
   compact?: boolean
-  /** `student` adds the blue Spotify skin shown on student cards. */
-  variant?: 'default' | 'student'
 }
 
 export default function SpotifyPlayer({
@@ -76,7 +74,6 @@ export default function SpotifyPlayer({
   accentColor = '#D4AF37',
   className,
   compact = false,
-  variant = 'default',
 }: SpotifyPlayerProps) {
   const parsed = useMemo(() => parseSpotifyUrl(spotifyUrl), [spotifyUrl])
 
@@ -90,7 +87,6 @@ export default function SpotifyPlayer({
         accentColor={accentColor || '#D4AF37'}
         className={className}
         compact={compact}
-        variant={variant}
       />
     </SpotifyBoundary>
   )
@@ -101,13 +97,11 @@ function SpotifyPlayerCard({
   accentColor,
   className,
   compact,
-  variant,
 }: {
   parsed: ParsedSpotify
   accentColor: string
   className?: string
   compact: boolean
-  variant: 'default' | 'student'
 }) {
   const [meta, setMeta] = useState<SpotifyOEmbed | null>(null)
   const [loading, setLoading] = useState(true)
@@ -185,20 +179,18 @@ function SpotifyPlayerCard({
   const thumbnail = asSafeString(meta?.thumbnail_url)
   const showArt = !!thumbnail && !artFailed
   const embedHeight = parsed.type === 'track' || parsed.type === 'episode' ? 80 : 152
-  const isStudentSkin = variant === 'student'
 
   const shellClass = [
-    'relative w-full overflow-hidden border text-left backdrop-blur-xl',
+    'relative w-full overflow-hidden border border-white/10 text-left backdrop-blur-xl',
     compact
       ? 'rounded-xl border-white/10 bg-[#121214]/80 p-2.5 shadow-[0_6px_22px_rgba(0,0,0,0.35)]'
       : 'rounded-2xl border-white/10 bg-[#121214]/80 p-3 shadow-[0_8px_30px_rgba(0,0,0,0.45)]',
-    isStudentSkin ? 'student-spotify-card' : 'border-white/10',
     className || '',
   ]
     .filter(Boolean)
     .join(' ')
 
-  const shellStyle = isStudentSkin ? undefined : { borderColor: `${accentColor}33` }
+  const shellStyle = { borderColor: `${accentColor}33` }
   const artClass = compact ? 'h-10 w-10 rounded-lg' : 'h-14 w-14 rounded-xl'
   const playClass = compact ? 'h-9 w-9' : 'h-11 w-11'
 
@@ -261,7 +253,7 @@ function SpotifyPlayerCard({
         {/* Track info */}
         <div className="min-w-0 flex-1">
           <p
-            className={`student-spotify-label mb-0.5 flex items-center gap-1.5 font-bold uppercase tracking-[0.18em] ${
+            className={`spotify-label mb-0.5 flex items-center gap-1.5 font-bold uppercase tracking-[0.18em] ${
               compact ? 'text-[8px]' : 'text-[9px]'
             }`}
             style={{ color: accentColor }}
@@ -270,7 +262,7 @@ function SpotifyPlayerCard({
             {expanded ? 'Now Playing' : 'Spotify'}
           </p>
           <p
-            className={`student-spotify-title truncate font-bold leading-tight text-white ${
+            className={`spotify-title truncate font-bold leading-tight text-white ${
               compact ? 'text-[12px]' : 'text-[13px]'
             }`}
             title={displayTitle}
@@ -278,7 +270,7 @@ function SpotifyPlayerCard({
             {displayTitle}
           </p>
           <p
-            className={`student-spotify-subtitle mt-0.5 truncate font-medium text-zinc-400 ${
+            className={`spotify-subtitle mt-0.5 truncate font-medium text-zinc-400 ${
               compact ? 'text-[9.5px]' : 'text-[10px]'
             }`}
             title={subtitle}

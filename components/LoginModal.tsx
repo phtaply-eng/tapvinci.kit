@@ -101,6 +101,12 @@ export default function LoginModal({
     const supabase = createClient()
     const origin = window.location.origin
 
+    // Send the user back to the profile they started from, with a flag that
+    // tells the public page to open the edit drawer automatically.
+    const currentUrl = `${origin}${window.location.pathname}`
+    const redirectUrl = `${currentUrl}?edit_profile=1`
+    const profileCallbackUrl = `${origin}/auth/callback?next=${encodeURIComponent(redirectUrl)}`
+
     // 1. Detect Mobile Device
     const isMobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(
       navigator.userAgent
@@ -108,14 +114,10 @@ export default function LoginModal({
 
     if (isMobile) {
       // MOBILE FLOW: Full page redirect
-      const currentPath = window.location.pathname
-      const nextUrl = `${currentPath}?edit_profile=1`
-      const redirectTo = `${origin}/auth/callback?next=${encodeURIComponent(nextUrl)}`
-
       const { error } = await supabase.auth.signInWithOAuth({
         provider: 'google',
         options: {
-          redirectTo,
+          redirectTo: profileCallbackUrl,
           queryParams: { prompt: 'select_account' },
         },
       })
@@ -128,8 +130,8 @@ export default function LoginModal({
     }
 
     // DESKTOP FLOW: Popup window
-    document.cookie = 'auth_next=/auth/popup-done; path=/; max-age=600; SameSite=Lax'
-    const popupRedirect = `${origin}/auth/callback`
+    // The popup only needs to complete auth and hand control back to this tab.
+    const popupCallbackUrl = `${origin}/auth/callback?next=${encodeURIComponent('/auth/popup-done')}`
 
     let startUserId: string | null = null
     try {
@@ -142,7 +144,7 @@ export default function LoginModal({
     const { data, error } = await supabase.auth.signInWithOAuth({
       provider: 'google',
       options: {
-        redirectTo: popupRedirect,
+        redirectTo: popupCallbackUrl,
         skipBrowserRedirect: true,
         queryParams: { prompt: 'select_account' },
       },
@@ -161,12 +163,12 @@ export default function LoginModal({
     )
 
     if (!popup) {
-      // Fallback if popup is blocked on desktop
-      const backTo = `${window.location.pathname}?edit_profile=1`
+      // Fallback if popup is blocked on desktop: do a full-page redirect that
+      // returns to this profile and opens the editor.
       const { error: fallbackError } = await supabase.auth.signInWithOAuth({
         provider: 'google',
         options: {
-          redirectTo: `${origin}/auth/callback?next=${encodeURIComponent(backTo)}`,
+          redirectTo: profileCallbackUrl,
           queryParams: { prompt: 'select_account' },
         },
       })

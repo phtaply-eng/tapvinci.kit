@@ -4,7 +4,7 @@ import { createSupabaseAdmin } from '@/lib/supabase-admin'
 export const runtime = 'nodejs'
 export const dynamic = 'force-dynamic'
 
-const ALLOWED_SKUS = ['student_card'] // professional products still use the dashboard checkout
+const ALLOWED_SKUS = ['digital_only', 'card_digital']
 const BUCKET = 'payment-proofs'
 const MAX_BYTES = 4 * 1024 * 1024 // Vercel rejects bodies over ~4.5 MB
 
@@ -36,6 +36,7 @@ export async function POST(req: Request) {
 
   const sku = clean(form.get('sku'), 40)
   if (!ALLOWED_SKUS.includes(sku)) return fail('This product is not available for online checkout.')
+  const needsShipping = sku === 'card_digital'
 
   const buyer_name = clean(form.get('buyer_name'), 80)
   const buyer_email = clean(form.get('buyer_email'), 120).toLowerCase()
@@ -52,10 +53,12 @@ export async function POST(req: Request) {
   if (buyer_name.length < 2) return fail('Enter your full name.')
   if (!/^\S+@\S+\.\S+$/.test(buyer_email)) return fail('Enter a valid email address.')
   if (!/^(\+?63|0)9\d{9}$/.test(phoneRaw)) return fail('Enter a valid PH mobile number (09XX XXX XXXX).')
-  if (ship_address.length < 8) return fail('Enter your complete delivery address.')
-  if (ship_city.length < 2) return fail('Enter your city.')
-  if (ship_province.length < 2) return fail('Enter your province.')
-  if (!/^\d{4}$/.test(ship_zip)) return fail('Enter a 4-digit ZIP code.')
+  if (needsShipping) {
+    if (ship_address.length < 8) return fail('Enter your complete delivery address.')
+    if (ship_city.length < 2) return fail('Enter your city.')
+    if (ship_province.length < 2) return fail('Enter your province.')
+    if (!/^\d{4}$/.test(ship_zip)) return fail('Enter a 4-digit ZIP code.')
+  }
   if (!['gcash', 'maya'].includes(method)) return fail('Choose GCash or Maya.')
   if (!/^[A-Za-z0-9 -]{6,40}$/.test(payment_ref)) return fail('Enter the reference number from your payment receipt.')
   if (!receipt || typeof receipt === 'string') return fail('Upload your payment receipt.')
@@ -76,8 +79,11 @@ export async function POST(req: Request) {
       .select('sku, price_php, includes_card, active')
       .eq('sku', sku)
       .maybeSingle()
-    if (!product || !product.active || !product.includes_card) {
+    if (!product || !product.active) {
       return fail('This product is not available right now.')
+    }
+    if (needsShipping && !product.includes_card) {
+      return fail('This product does not include a physical card.')
     }
 
     // Light abuse guard: max 3 orders per email per hour
@@ -116,7 +122,7 @@ export async function POST(req: Request) {
       return fail('Could not save your order. Please try again.', 500)
     }
 
-    const path = `students/${order.id}/receipt-${Date.now()}.${kind}`
+    const path = `orders/${order.id}/receipt-${Date.now()}.${kind}`
     const { error: upErr } = await db.storage
       .from(BUCKET)
       .upload(path, bytes, { contentType: CONTENT_TYPE[kind], upsert: false })

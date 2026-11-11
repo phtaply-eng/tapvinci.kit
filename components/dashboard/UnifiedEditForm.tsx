@@ -59,7 +59,6 @@ export type UnifiedEditFormProps = {
   setProfile: Dispatch<SetStateAction<any>>
   onSave: () => void | Promise<void>
   saving: boolean
-  isStudent: boolean
   isAdminAccount: boolean
   showDemoCode: boolean
   demoCode: string
@@ -67,7 +66,7 @@ export type UnifiedEditFormProps = {
   showToast: (message: string) => void
   /** Hide the form's own "Edit Profile" header (used inside the edit drawer). */
   embedded?: boolean
-  /** Make the username read-only (professional cards are printed with it). */
+  /** Make the username read-only (printed cards keep their link). */
   lockUsername?: boolean
 }
 
@@ -76,7 +75,6 @@ export default function UnifiedEditForm({
   setProfile,
   onSave,
   saving,
-  isStudent,
   isAdminAccount,
   showDemoCode,
   demoCode,
@@ -229,33 +227,25 @@ export default function UnifiedEditForm({
   }
 
   const gallery = profile.gallery || []
-  const accent = profile.accent_color || (isStudent ? '#22c55e' : '#D4AF37')
+  const accent = profile.accent_color || '#D4AF37'
   const mapsVisible = socialsVisible.google_maps !== false
 
   return (
     <div className="space-y-4">
       {/* HEADER */}
       {!embedded && (
-        <>
         <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
           <div>
             <p className="text-[10px] font-bold uppercase tracking-[0.22em] text-zinc-500">
-              {isStudent ? 'Student experience' : 'Professional experience'}
+              Professional experience
             </p>
             <h1 className="mt-0.5 text-xl font-bold">Edit Profile</h1>
           </div>
-          <span
-            className={`inline-flex items-center gap-2 self-start rounded-full border px-3 py-1.5 text-[10px] font-bold uppercase tracking-widest ${
-              isStudent
-                ? 'border-[#00D632]/30 bg-[#00D632]/10 text-[#00D632]'
-                : 'border-[#D4AF37]/30 bg-[#D4AF37]/10 text-[#D4AF37]'
-            }`}
-          >
-            <i className={`fa-solid ${isStudent ? 'fa-graduation-cap' : 'fa-briefcase'}`} />
-            {isStudent ? 'Student' : 'Professional'}
+          <span className="inline-flex items-center gap-2 self-start rounded-full border border-[#D4AF37]/30 bg-[#D4AF37]/10 px-3 py-1.5 text-[10px] font-bold uppercase tracking-widest text-[#D4AF37]">
+            <i className="fa-solid fa-briefcase" />
+            Professional
           </span>
         </div>
-        </>
       )}
 
       {/* ACCOUNT */}
@@ -387,8 +377,13 @@ export default function UnifiedEditForm({
             placeholder="WEB DEVELOPER | TAPVINCI FOUNDER..."
           />
         </label>
-        <label className="block">
-          <span className={labelCls}>Bio</span>
+
+        <Field
+          label="Bio"
+          visible={profile.show_bio !== false}
+          onToggle={() => toggleProfileFlag('show_bio')}
+          hint="Shown under your title."
+        >
           <textarea
             value={profile.bio || ''}
             onChange={(event) => patch({ bio: event.target.value })}
@@ -396,9 +391,14 @@ export default function UnifiedEditForm({
             className={inputCls}
             placeholder="A simple tap. A smarter introduction..."
           />
-        </label>
-        <label className="block">
-          <span className={labelCls}>About Me</span>
+        </Field>
+
+        <Field
+          label="About Me"
+          visible={profile.show_about !== false}
+          onToggle={() => toggleProfileFlag('show_about')}
+          hint="Shown as its own section below Let's Connect."
+        >
           <textarea
             value={profile.about || ''}
             onChange={(event) => patch({ about: event.target.value })}
@@ -406,83 +406,99 @@ export default function UnifiedEditForm({
             className={inputCls}
             placeholder="Hi, I'm Shua, owner of TapVinci..."
           />
-        </label>
+        </Field>
+
+        <div className="flex items-center justify-between gap-3 rounded-xl border border-zinc-800 bg-zinc-950/40 px-3 py-2.5">
+          <div className="min-w-0">
+            <p className="text-[11px] font-bold uppercase tracking-widest text-zinc-300">
+              Stats (Taps + Streak)
+            </p>
+            <p className="mt-0.5 text-[10px] text-zinc-500">
+              The tap counter and daily streak pills under your name.
+            </p>
+          </div>
+          <VisibilityToggle
+            visible={profile.show_stats !== false}
+            onToggle={() => toggleProfileFlag('show_stats')}
+            label="Stats"
+          />
+        </div>
       </div>
 
-      {/* STUDENT DETAILS — only for student profiles */}
-      {isStudent && (
-        <div className="space-y-3 border-t border-zinc-800 pt-4">
-          <div className="flex items-center justify-between gap-2">
-            <SectionTitle>
-              <span className="inline-flex items-center gap-2">
-                <i className="fa-solid fa-graduation-cap" />
-                Student Details
-              </span>
-            </SectionTitle>
-          </div>
-          <p className="text-[11px] text-zinc-500">
-            These fields appear on your card only. Use Show / Hide to control what is public.
-          </p>
+      {/* EDUCATION */}
+      <div className="space-y-3 border-t border-zinc-800 pt-4">
+        <div className="flex items-center justify-between gap-2">
+          <SectionTitle>
+            <span className="inline-flex items-center gap-2">
+              <i className="fa-solid fa-graduation-cap" />
+              Education
+            </span>
+          </SectionTitle>
+        </div>
+        <p className="text-[11px] text-zinc-500">
+          Optional details for students, grads, and educators. Use Show / Hide to control what is public.
+        </p>
 
-          <div className="grid gap-3 sm:grid-cols-2">
-            <Field
-              label="School"
-              visible={profile.show_school !== false}
-              onToggle={() => toggleProfileFlag('show_school')}
-            >
-              <input
-                value={profile.school || ''}
-                onChange={(event) => patch({ school: event.target.value })}
-                className={inputCls}
-                placeholder="Your school"
-              />
-            </Field>
-            <Field
-              label="Year Level"
-              visible={profile.show_year_level !== false}
-              onToggle={() => toggleProfileFlag('show_year_level')}
-            >
-              <input
-                value={profile.year_level || ''}
-                onChange={(event) => patch({ year_level: event.target.value })}
-                className={inputCls}
-                placeholder="e.g. 2nd Year"
-              />
-            </Field>
-          </div>
-
+        <div className="grid gap-3 sm:grid-cols-2">
           <Field
-            label="Course"
-            visible={profile.show_course !== false}
-            onToggle={() => toggleProfileFlag('show_course')}
+            label="School"
+            visible={profile.show_school !== false}
+            onToggle={() => toggleProfileFlag('show_school')}
           >
             <input
-              value={profile.course || ''}
-              onChange={(event) => patch({ course: event.target.value })}
+              value={profile.school || ''}
+              onChange={(event) => patch({ school: event.target.value })}
               className={inputCls}
-              placeholder="e.g. BS Computer Science"
+              placeholder="Your school"
             />
           </Field>
-
-          <Field label="Spotify Link">
+          <Field
+            label="Year Level"
+            visible={profile.show_year_level !== false}
+            onToggle={() => toggleProfileFlag('show_year_level')}
+          >
             <input
-              value={profile.spotify_url || ''}
-              onChange={(event) => patch({ spotify_url: event.target.value })}
+              value={profile.year_level || ''}
+              onChange={(event) => patch({ year_level: event.target.value })}
               className={inputCls}
-              placeholder="https://open.spotify.com/track/..."
-              inputMode="url"
+              placeholder="e.g. 2nd Year"
             />
-            <p className="mt-1.5 text-[10px] text-zinc-500">
-              Paste a track, album, or playlist link. It appears on your student card.
-            </p>
-            {profile.spotify_url && !isValidSpotifyUrl(profile.spotify_url) && (
-              <p className="mt-1 text-[10px] text-red-400">
-                That doesn&apos;t look like a Spotify link yet.
-              </p>
-            )}
           </Field>
         </div>
-      )}
+
+        <Field
+          label="Course"
+          visible={profile.show_course !== false}
+          onToggle={() => toggleProfileFlag('show_course')}
+        >
+          <input
+            value={profile.course || ''}
+            onChange={(event) => patch({ course: event.target.value })}
+            className={inputCls}
+            placeholder="e.g. BS Computer Science"
+          />
+        </Field>
+
+        <Field
+          label="Spotify Link"
+          visible={profile.show_spotify !== false}
+          onToggle={() => toggleProfileFlag('show_spotify')}
+          hint="Paste a track, album, or playlist link. It appears on your public card."
+        >
+          <input
+            value={profile.spotify_url || ''}
+            onChange={(event) => patch({ spotify_url: event.target.value })}
+            className={inputCls}
+            placeholder="https://open.spotify.com/track/..."
+            inputMode="url"
+          />
+          {profile.spotify_url && !isValidSpotifyUrl(profile.spotify_url) && (
+            <p className="mt-1 text-[10px] text-red-400">
+              That doesn&apos;t look like a Spotify link yet.
+            </p>
+          )}
+        </Field>
+      </div>
 
       {/* GALLERY */}
       <div className="space-y-2 border-t border-zinc-800 pt-4">

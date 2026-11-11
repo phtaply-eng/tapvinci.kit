@@ -35,6 +35,10 @@ export type Profile = {
   show_school?: boolean
   show_year_level?: boolean
   show_course?: boolean
+  show_bio?: boolean
+  show_about?: boolean
+  show_spotify?: boolean
+  show_stats?: boolean
   taps?: number | null
   streak?: number | null
   tap_count?: number | null

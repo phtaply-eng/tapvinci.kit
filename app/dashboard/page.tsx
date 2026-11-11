@@ -7,7 +7,6 @@ import { supabase } from '../../lib/supabase'
 import HamburgerMenu from '@/components/HamburgerMenu'
 import PaymentModal, { type PaymentSubmission } from '../../components/PaymentModal'
 import { DEFAULT_SOCIALS, DEFAULT_VISIBLE } from '../../lib/profile-config'
-import { mergeStudentProfileData, resolveProfileRole } from '../../lib/profile-role'
 
 const RECEIPT_BUCKET = 'payment-proofs'
 
@@ -49,6 +48,10 @@ const DEFAULT_PROFILE_DATA = {
   show_school: true,
   show_year_level: true,
   show_course: true,
+  show_bio: true,
+  show_about: true,
+  show_spotify: true,
+  show_stats: true,
 }
 
 export default function Dashboard() {
@@ -59,8 +62,6 @@ export default function Dashboard() {
 
   const isAdminAccount =
     profile.is_admin === true || String(profile.role || '').toLowerCase() === 'admin'
-
-  const isStudent = resolveProfileRole(profile) === 'student'
 
   const [saving, setSaving] = useState(false)
   const [showLive, setShowLive] = useState(false)
@@ -133,22 +134,11 @@ export default function Dashboard() {
       const { data } = await supabase.from('profiles').select('*').eq('username', username).single()
       if (!data) return
 
-      let mergedData: any = data
-
-      if (resolveProfileRole(data) === 'student' && (data as any).id) {
-        const { data: legacy } = await supabase
-          .from('student_profiles')
-          .select('*')
-          .eq('id', (data as any).id)
-          .maybeSingle()
-        mergedData = mergeStudentProfileData(data, legacy)
-      }
-
       setProfile((previous: any) => ({
         ...previous,
-        ...mergedData,
-        socials: { ...DEFAULT_SOCIALS, ...(mergedData.socials || {}) },
-        socials_visible: { ...DEFAULT_VISIBLE, ...(mergedData.socials_visible || {}) },
+        ...data,
+        socials: { ...DEFAULT_SOCIALS, ...(data.socials || {}) },
+        socials_visible: { ...DEFAULT_VISIBLE, ...(data.socials_visible || {}) },
       }))
     }
     load()
@@ -167,30 +157,6 @@ export default function Dashboard() {
       return false
     }
     return true
-  }
-
-  const syncStudentMirror = async (profileId: string | undefined, payload: any) => {
-    if (!isStudent || !profileId) return
-    try {
-      const { error } = await supabase.from('student_profiles').upsert(
-        {
-          id: profileId,
-          school: payload.school || null,
-          course: payload.course || null,
-          year_level: payload.year_level || null,
-          show_school: payload.show_school !== false,
-          show_year_level: payload.show_year_level !== false,
-          show_course: payload.show_course !== false,
-          spotify_url: payload.spotify_url || null,
-        },
-        { onConflict: 'id' }
-      )
-      if (error) {
-        console.warn('[Dashboard] student_profiles mirror skipped:', error.message)
-      }
-    } catch (error) {
-      console.warn('[Dashboard] student_profiles mirror failed:', error)
-    }
   }
 
   const isDuplicateUsername = (error: unknown) => {
@@ -216,11 +182,13 @@ export default function Dashboard() {
     for (const key of [
       'id',
       'created_at',
+      'updated_at',
       'views',
       'receipt_url',
       'payment_status',
       'is_active',
       'is_admin',
+      'is_demo',
       'paid_at',
       'fulfillment',
       'fulfilled_at',
@@ -229,6 +197,15 @@ export default function Dashboard() {
       'plan_tier',
       'plan_amount',
       'payment_method',
+      'owner_id',
+      'claimed_by',
+      'role',
+      'tier',
+      'taps',
+      'streak',
+      'tap_count',
+      'streak_count',
+      'last_tap_date',
     ]) {
       delete rest[key]
     }
@@ -262,8 +239,6 @@ export default function Dashboard() {
         payment_status: 'paid',
       }))
 
-      await syncStudentMirror((data as any).id, fixed)
-
       showToast('Profile updated successfully')
     } catch (error) {
       console.error('[Admin save] Profile save failed:', error)
@@ -286,7 +261,7 @@ export default function Dashboard() {
     setSaving(true)
     const fixedUsername = String(profile.username || '').trim().toLowerCase()
 
-    const { id: _id, created_at: _createdAt, ...rest } = profile
+    const { id: _id, created_at: _createdAt, role: _role, tier: _tier, ...rest } = profile
 
     try {
       const rawExt = receiptFile.name.split('.').pop()?.toLowerCase() || ''
@@ -310,6 +285,7 @@ export default function Dashboard() {
       const fixed = {
         ...rest,
         username: fixedUsername,
+        role: 'professional',
         receipt_url: receiptUrl,
         payment_status: 'pending',
         is_active: false,
@@ -341,8 +317,6 @@ export default function Dashboard() {
         )
       }
       if (!saved) throw new Error('Database save failed. Please try again.')
-
-      await syncStudentMirror((saved as any).id, fixed)
 
       setProfile((previous: any) => ({
         ...previous,
@@ -440,7 +414,6 @@ export default function Dashboard() {
                     setProfile={setProfile}
                     onSave={handleSaveProfile}
                     saving={saving}
-                    isStudent={isStudent}
                     isAdminAccount={isAdminAccount}
                     showDemoCode={showDemoCode}
                     demoCode={demoCode}

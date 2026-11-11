@@ -3,16 +3,15 @@
 import type { ReactNode } from 'react'
 
 /**
- * Shared design-system primitives for the dashboard edit forms.
+ * Shared design-system primitives for the dashboard edit form.
  *
  * The unified editor (`components/dashboard/UnifiedEditForm.tsx`) imports
- * these, so inputs, labels and visibility pills can never drift apart again
- * between the professional and student sections.
+ * these so inputs, labels and visibility pills can never drift apart.
  */
 
 /** Single input style for every dashboard field. */
 export const inputCls =
-  'w-full rounded-xl border border-zinc-700 bg-zinc-950/70 px-3.5 py-2.5 text-sm text-white placeholder:text-zinc-600 outline-none transition focus:border-emerald-400/70 focus:ring-2 focus:ring-emerald-400/10'
+  'w-full rounded-xl border border-zinc-700 bg-zinc-950/70 px-3.5 py-2.5 text-sm text-white placeholder:text-zinc-600 outline-none transition focus:border-[#D4AF37]/70 focus:ring-2 focus:ring-[#D4AF37]/10'
 
 /** Single label style for every dashboard field. */
 export const labelCls =
@@ -20,7 +19,7 @@ export const labelCls =
 
 /**
  * Public-visibility pill shown next to a field label.
- * ON  = green "Show" (value renders on the public card)
+ * ON  = gold "Show" (value renders on the public card)
  * OFF = gray  "Hide" (value is saved but not rendered)
  *
  * The classes below are the only approved visibility colors. Do not create
@@ -44,7 +43,7 @@ export function VisibilityToggle({
       title={visible ? `Hide ${label} from the public card` : `Show ${label} on the public card`}
       className={`inline-flex items-center gap-1.5 rounded-full border px-2.5 py-1 text-[9px] font-bold uppercase tracking-wider transition ${
         visible
-          ? 'border-[#00D632]/30 bg-[#00D632]/10 text-[#00D632] hover:bg-[#00D632]/20'
+          ? 'border-[#D4AF37]/35 bg-[#D4AF37]/10 text-[#D4AF37] hover:bg-[#D4AF37]/20'
           : 'border-zinc-700 bg-zinc-800 text-zinc-400 hover:text-zinc-200'
       }`}
     >

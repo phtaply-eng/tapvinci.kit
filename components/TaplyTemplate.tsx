@@ -2,25 +2,18 @@
 
 import { useState, useEffect, useRef } from 'react'
 import { createPortal } from 'react-dom'
-import StudentStats from '@/components/students/StudentStats'
-import StudentEducation from '@/components/students/StudentEducation'
-import StudentSpotify from '@/components/students/StudentSpotify'
 import LoginModal from '@/components/LoginModal'
-import { getTapCount, getVisibleEducation, resolveProfileRole } from '../lib/profile-role'
+import SpotifyPlayer from '@/components/SpotifyPlayer'
+import { getStreakCount, getTapCount, getVisibleEducation } from '../lib/profile-display'
 import { createClient } from '../lib/supabase-browser'
 import dynamic from 'next/dynamic'
 import { useRouter } from 'next/navigation'
 import ToastView from '@/components/ToastView'
-import { type AuthChangeEvent } from '@supabase/supabase-js' // <-- ADDED IMPORT
+import { type AuthChangeEvent } from '@supabase/supabase-js'
 
 const EditDrawer = dynamic(() => import('@/components/EditDrawer'), { ssr: false })
 
-export default function TaplyTemplate({
-  profile,
-}: {
-  profile: any
-  viewAs?: 'student' | 'professional'
-}) {
+export default function TaplyTemplate({ profile }: { profile: any }) {
   const [isDark, setIsDark] = useState(true)
   const [lightboxOpen, setLightboxOpen] = useState(false)
   const [lightboxIndex, setLightboxIndex] = useState(0)
@@ -95,11 +88,13 @@ export default function TaplyTemplate({
   const authResultRef = useRef(handleAuthResult)
   authResultRef.current = handleAuthResult
 
-  // 1. Initial session check (handles returning from mobile redirect with ?edit_profile=1)
+  // 1. Initial session check (handles returning from the OAuth redirect with
+  // ?edit_profile=1 or the legacy ?edit=1 param)
   useEffect(() => {
     let alive = true
     const params = new URLSearchParams(window.location.search)
-    const wantsEdit = params.get('edit_profile') === '1'
+    const wantsEdit =
+      params.get('edit_profile') === '1' || params.get('edit') === '1'
 
     const run = async () => {
       try {
@@ -116,6 +111,7 @@ export default function TaplyTemplate({
         if (wantsEdit) {
           // Clean up the URL so the query param disappears
           params.delete('edit_profile')
+          params.delete('edit')
           const qs = params.toString()
           window.history.replaceState(
             null,
@@ -173,14 +169,20 @@ export default function TaplyTemplate({
       currentUserId === profile.claimed_by ||
       isCardOwner)
 
-  const isStudent = resolveProfileRole(profile) === 'student'
-  const accent = profile.accent_color || (isStudent ? '#22c55e' : '#D4AF37')
+  const accent = profile.accent_color || '#D4AF37'
 
   const visiblePhone = profile.show_phone !== false && profile.phone ? String(profile.phone) : ''
   const visibleEmail = profile.show_email !== false && profile.email ? String(profile.email) : ''
   const visibleAddress =
     profile.show_address !== false && profile.address ? String(profile.address) : ''
   const visibleEducation = getVisibleEducation(profile)
+  const taps = getTapCount(profile)
+  const streak = getStreakCount(profile)
+  const showStats = profile.show_stats !== false
+  const showBio = profile.show_bio !== false && Boolean(String(profile.bio || '').trim())
+  const showAbout = Boolean(String(profile.about || '').trim()) && profile.show_about !== false
+  const showEducation = Boolean(String(profile.school || '').trim()) && visibleEducation.hasAny
+  const showSpotify = Boolean(profile.spotify_url) && profile.show_spotify !== false
   
   const mapsVisible =
     profile.socials_visible?.google_maps !== false && profile.show_google_maps !== false
@@ -597,39 +599,21 @@ export default function TaplyTemplate({
       </p>
 
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '10px' }}>
-        {isStudent ? (
-          <div
-            style={{
-              display: 'inline-flex',
-              alignItems: 'center',
-              gap: '6px',
-              fontSize: '10px',
-              color: accent,
-              opacity: 0.9,
-            }}
-          >
-            <i className="fa-solid fa-hand-pointer" />
-            <span>
-              {getTapCount(profile)} {getTapCount(profile) === 1 ? 'tap' : 'taps'}
-            </span>
-          </div>
-        ) : (
-          <div
-            style={{
-              display: 'inline-flex',
-              alignItems: 'center',
-              gap: '6px',
-              fontSize: '10px',
-              color: '#D4AF37',
-              opacity: 0.8,
-            }}
-          >
-            <i className="fa-regular fa-eye"></i>
-            <span suppressHydrationWarning>
-              {profile.views || 0} {profile.views === 1 ? 'view' : 'views'}
-            </span>
-          </div>
-        )}
+        <div
+          style={{
+            display: 'inline-flex',
+            alignItems: 'center',
+            gap: '6px',
+            fontSize: '10px',
+            color: '#D4AF37',
+            opacity: 0.8,
+          }}
+        >
+          <i className="fa-regular fa-eye"></i>
+          <span suppressHydrationWarning>
+            {profile.views || 0} {profile.views === 1 ? 'view' : 'views'}
+          </span>
+        </div>
 
         {authReady && <span style={{ color: '#333', fontSize: '10px' }}>|</span>}
 
@@ -650,7 +634,7 @@ export default function TaplyTemplate({
                 border: 'none',
                 padding: 0,
                 cursor: 'pointer',
-                color: isStudent ? '#22c55e' : '#D4AF37',
+                color: '#D4AF37',
               }}
             >
               <i className="fa-solid fa-pen-to-square" style={{ fontSize: '9px' }} />
@@ -818,15 +802,24 @@ export default function TaplyTemplate({
                   }}
                 />
 
-                {isStudent && (
-                  <div style={{ marginTop: '16px' }}>
-                    <StudentStats profile={profile} />
+                {showStats && (
+                  <div className="taply-stat-pills" aria-label="Card activity">
+                    <span className="taply-stat-pill">
+                      <i className="fa-solid fa-hand-pointer" aria-hidden="true" />
+                      {taps} {taps === 1 ? 'tap' : 'taps'}
+                    </span>
+                    <span className="taply-stat-pill taply-stat-pill-fire">
+                      <i className="fa-solid fa-fire" aria-hidden="true" />
+                      {streak} day streak
+                    </span>
                   </div>
                 )}
 
-                <div className="taply-bio" style={{ marginTop: isStudent ? '20px' : '24px' }}>
-                  {profile.bio || 'Bio'}
-                </div>
+                {showBio && (
+                  <div className="taply-bio" style={{ marginTop: showStats ? '20px' : '24px' }}>
+                    {profile.bio}
+                  </div>
+                )}
 
                 {socialButtons.length > 0 && (
                   <a
@@ -840,7 +833,7 @@ export default function TaplyTemplate({
               </div>
             </section>
 
-            {profile.about && (
+            {showAbout && (
               <section className="taply-section">
                 <h2 style={{ color: '#D4AF37' }}>
                   <i className="fa-regular fa-user" style={{ color: '#D4AF37' }}></i> About Me
@@ -849,19 +842,52 @@ export default function TaplyTemplate({
               </section>
             )}
 
-            {isStudent && (
-              <>
-                {visibleEducation.hasAny && (
-                  <section className="taply-section student-section">
-                    <StudentEducation profile={profile} />
-                  </section>
-                )}
-                {profile.spotify_url && (
-                  <div className="taply-section">
-                    <StudentSpotify spotifyUrl={profile.spotify_url} />
-                  </div>
-                )}
-              </>
+            {showEducation && (
+              <section className="taply-section">
+                <h2 style={{ color: '#D4AF37' }}>
+                  <i className="fa-solid fa-graduation-cap" style={{ color: '#D4AF37' }}></i>{' '}
+                  Education
+                </h2>
+                <div className="taply-education-card">
+                  {visibleEducation.school && (
+                    <div className="taply-education-head">
+                      <span className="taply-education-icon" aria-hidden="true">
+                        <i className="fa-solid fa-school" />
+                      </span>
+                      <div className="min-w-0">
+                        <p className="taply-education-eyebrow">School</p>
+                        <p className="taply-education-school">{visibleEducation.school}</p>
+                      </div>
+                    </div>
+                  )}
+
+                  {(visibleEducation.course || visibleEducation.yearLevel) && (
+                    <div className="taply-education-grid">
+                      {visibleEducation.course && (
+                        <div className="taply-education-item">
+                          <span>Course</span>
+                          <strong>{visibleEducation.course}</strong>
+                        </div>
+                      )}
+                      {visibleEducation.yearLevel && (
+                        <div className="taply-education-item">
+                          <span>Year Level</span>
+                          <strong>{visibleEducation.yearLevel}</strong>
+                        </div>
+                      )}
+                    </div>
+                  )}
+                </div>
+              </section>
+            )}
+
+            {showSpotify && (
+              <section className="taply-section">
+                <h2 style={{ color: '#D4AF37' }}>
+                  <i className="fa-brands fa-spotify" style={{ color: '#D4AF37' }}></i> Now Playing
+                </h2>
+                <SpotifyPlayer spotifyUrl={profile.spotify_url} accentColor={accent} compact />
+              </section>
             )}
 
             {gallerySection}

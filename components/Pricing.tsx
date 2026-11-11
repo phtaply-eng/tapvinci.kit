@@ -2,11 +2,6 @@
 
 import { useRouter } from 'next/navigation'
 
-// Flip to true once the student checkout (/student-card) is live (Phase 4B).
-const SHOW_STUDENT = false
-// Founders Club lifetime for students? Set to false if not.
-const STUDENT_LIFETIME = true
-
 type PlanFeature = { key: string; desc?: string }
 
 const DIGITAL_FEATURES: PlanFeature[] = [
@@ -14,6 +9,9 @@ const DIGITAL_FEATURES: PlanFeature[] = [
   { key: 'All 6 themes', desc: 'Black Gold, Midnight Purple, Ocean Blue, Forest Green, Sunset Pink, Sunrise Orange' },
   { key: 'Social links', desc: 'unlimited' },
   { key: 'Gallery, Contact', desc: '+ Google Maps' },
+  { key: 'Education', desc: 'school, course and year level' },
+  { key: 'Spotify profile song', desc: 'play your track on your card' },
+  { key: 'Tap count + streak', desc: 'see your activity at a glance' },
   { key: 'GCash / Maya QR', desc: 'accept payments instantly' },
   { key: 'QR code', desc: 'to print or share' },
   { key: 'Self-service edit', desc: 'anytime' },
@@ -27,6 +25,9 @@ const CARD_FEATURES: PlanFeature[] = [
   { key: 'All 6 themes', desc: 'Black Gold, Midnight Purple, Ocean Blue, Forest Green, Sunset Pink, Sunrise Orange' },
   { key: 'Social links', desc: 'unlimited' },
   { key: 'Gallery, Contact', desc: '+ Google Maps' },
+  { key: 'Education', desc: 'school, course and year level' },
+  { key: 'Spotify profile song', desc: 'play your track on your card' },
+  { key: 'Tap count + streak', desc: 'see your activity at a glance' },
   { key: 'GCash / Maya QR', desc: 'accept payments instantly' },
   { key: 'QR code', desc: 'to print or share' },
   { key: 'Self-service edit', desc: 'anytime' },
@@ -37,38 +38,24 @@ const CARD_FEATURES: PlanFeature[] = [
   { key: 'Instant activation', desc: 'tap-ready in minutes' },
 ]
 
-const STUDENT_FEATURES: PlanFeature[] = [
-  { key: 'NFC card', desc: 'tap on any phone, no app needed' },
-  { key: 'Claim by tap', desc: 'sign in with Google or email, then enter the code in your pouch' },
-  { key: 'Profile', desc: 'tapvinci.vercel.app/username' },
-  { key: 'Education', desc: 'school, year level and course' },
-  { key: 'Profile song', desc: 'Spotify player right on your card' },
-  { key: 'Tap count + streak', desc: 'see your taps and keep your streak' },
-  { key: 'All 6 themes', desc: 'Black Gold, Midnight Purple, Ocean Blue, Forest Green, Sunset Pink, Sunrise Orange' },
-  { key: 'Social links, Gallery, Contact', desc: '+ Google Maps' },
-  { key: 'GCash / Maya QR', desc: 'accept payments instantly' },
-  { key: 'Self-service edit', desc: 'anytime, with Live Preview' },
-  { key: 'Ships anywhere PH', desc: 'Lalamove / J&T / LBC (calculated at checkout)' },
-]
-
-type ComparisonRow = { name: string; digital: boolean; pro: boolean; student: boolean }
+type ComparisonRow = { name: string; digital: boolean; pro: boolean }
 
 const COMPARISON: ComparisonRow[] = [
-  { name: 'Profile on tapvinci.vercel.app/username', digital: true, pro: true, student: true },
-  { name: 'All 6 themes', digital: true, pro: true, student: true },
-  { name: 'Social links — unlimited', digital: true, pro: true, student: true },
-  { name: 'Gallery, Contact + Google Maps', digital: true, pro: true, student: true },
-  { name: 'GCash / Maya QR', digital: true, pro: true, student: true },
-  { name: 'QR code to print', digital: true, pro: true, student: false },
-  { name: 'Self-edit anytime + Live Preview', digital: true, pro: true, student: true },
-  { name: 'NFC card', digital: false, pro: true, student: true },
-  { name: 'School, year level and course', digital: false, pro: false, student: true },
-  { name: 'Spotify profile song', digital: false, pro: false, student: true },
-  { name: 'Tap count + streak', digital: false, pro: false, student: true },
-  { name: 'Lifetime profile — Founders Club, no renewal', digital: true, pro: true, student: STUDENT_LIFETIME },
-  { name: 'Tap + Scan — all phones', digital: false, pro: true, student: true },
-  { name: 'No app needed', digital: true, pro: true, student: true },
-  { name: 'Ships anywhere PH', digital: false, pro: true, student: true },
+  { name: 'Profile on tapvinci.vercel.app/username', digital: true, pro: true },
+  { name: 'All 6 themes', digital: true, pro: true },
+  { name: 'Social links — unlimited', digital: true, pro: true },
+  { name: 'Gallery, Contact + Google Maps', digital: true, pro: true },
+  { name: 'GCash / Maya QR', digital: true, pro: true },
+  { name: 'Education — school, course and year level', digital: true, pro: true },
+  { name: 'Spotify profile song', digital: true, pro: true },
+  { name: 'Tap count + streak', digital: true, pro: true },
+  { name: 'QR code to print', digital: true, pro: true },
+  { name: 'Self-edit anytime + Live Preview', digital: true, pro: true },
+  { name: 'NFC card', digital: false, pro: true },
+  { name: 'Lifetime profile — Founders Club, no renewal', digital: true, pro: true },
+  { name: 'Tap + Scan — all phones', digital: false, pro: true },
+  { name: 'No app needed', digital: true, pro: true },
+  { name: 'Ships anywhere PH', digital: false, pro: true },
 ]
 
 function FeatureList({ features }: { features: PlanFeature[] }) {
@@ -233,7 +220,7 @@ function PlanCard({
 export default function Pricing({ contactEmail = 'tapvinci@yahoo.com' }: { contactEmail?: string }) {
   const router = useRouter()
 
-  // Professional flow: unchanged (goes through the dashboard + PaymentModal)
+  // Professional flow: the dashboard + PaymentModal handles both products.
   const handleSelect = (pkg: 'digital_only' | 'card_digital', price: '399' | '799') => {
     try {
       localStorage.setItem('selected_package', pkg)
@@ -241,9 +228,6 @@ export default function Pricing({ contactEmail = 'tapvinci@yahoo.com' }: { conta
     } catch {}
     router.push(`/dashboard?package=${pkg}&price=${price}&new=true`)
   }
-
-  // Student flow: its own checkout page (built in Phase 4B)
-  const handleStudent = () => router.push('/student-card')
 
   const digitalCard = (
     <PlanCard
@@ -278,31 +262,13 @@ export default function Pricing({ contactEmail = 'tapvinci@yahoo.com' }: { conta
     />
   )
 
-  const studentCard = (
-    <PlanCard
-      key="student"
-      title="Student Card + Digital"
-      kicker="For students"
-      price="₱499"
-      priceNote={['one-time', 'card + profile', STUDENT_LIFETIME ? 'Founders Lifetime' : 'student price']}
-      features={STUDENT_FEATURES}
-      cta="Get my Student Card"
-      ctaStyle="gold-outline"
-      onSelect={handleStudent}
-      footnote="Ships within 2–3 days"
-    />
-  )
-
-  const plans = SHOW_STUDENT ? [studentCard, proCard, digitalCard] : [digitalCard, proCard]
+  const plans = [digitalCard, proCard]
 
   const columns = [
     { key: 'digital' as const, label: 'Digital Only', tone: 'muted' as const },
     { key: 'pro' as const, label: 'Card + Digital', tone: 'gold' as const },
-    ...(SHOW_STUDENT ? [{ key: 'student' as const, label: 'Student Card', tone: 'gold' as const }] : []),
   ]
-  const rows = SHOW_STUDENT
-    ? COMPARISON
-    : COMPARISON.filter((r) => !(r.student && !r.digital && !r.pro)) // hide student-only rows until launch
+  const rows = COMPARISON
   const gridCols = { gridTemplateColumns: `1.5fr repeat(${columns.length}, 1fr)` }
 
   return (
@@ -327,22 +293,14 @@ export default function Pricing({ contactEmail = 'tapvinci@yahoo.com' }: { conta
       </div>
 
       {/* Cards */}
-      <div
-        className={`mx-auto mt-16 grid justify-center gap-8 md:grid-cols-2 ${
-          SHOW_STUDENT ? 'max-w-[1240px] lg:grid-cols-3' : 'max-w-[900px]'
-        }`}
-      >
+      <div className="mx-auto mt-16 grid max-w-[900px] justify-center gap-8 md:grid-cols-2">
         {plans}
       </div>
 
       {/* Comparison table */}
-      <div
-        className={`comparison-table mx-auto mt-24 overflow-hidden rounded-[24px] border border-[#1E1E1E] bg-[#121212]/50 backdrop-blur ${
-          SHOW_STUDENT ? 'max-w-[1000px]' : 'max-w-[900px]'
-        }`}
-      >
+      <div className="comparison-table mx-auto mt-24 max-w-[900px] overflow-hidden rounded-[24px] border border-[#1E1E1E] bg-[#121212]/50 backdrop-blur">
         <div className="overflow-x-auto">
-          <div className={SHOW_STUDENT ? 'min-w-[680px]' : 'min-w-[560px]'}>
+          <div className="min-w-[560px]">
             {/* Header row */}
             <div className="grid items-center gap-4 border-b border-[#1E1E1E] bg-[#0F0F0F] px-6 py-6" style={gridCols}>
               <span className="text-[11px] font-semibold uppercase tracking-[0.2em] text-white/35">Feature</span>

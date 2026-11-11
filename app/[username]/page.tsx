@@ -5,9 +5,8 @@ import { supabase } from '../../lib/supabase'
 import TaplyTemplate from '../../components/TaplyTemplate'
 import type { Profile } from '../../lib/types'
 import ViewTracker from '../../components/ViewTracker'
-import StudentTapTracker from '../../components/students/StudentTapTracker'
-import IntroWrapper from '../../components/IntroWrapper' // <-- IMPORT INTRO WRAPPER
-import { isStudentProfile, mergeStudentProfileData } from '../../lib/profile-role'
+import TapTracker from '../../components/TapTracker'
+import IntroWrapper from '../../components/IntroWrapper'
 
 export const dynamic = 'force-dynamic'
 export const revalidate = 0
@@ -18,27 +17,6 @@ async function getProfile(username: string): Promise<Profile | null> {
   const { data } = await supabase.from('profiles').select('*').eq('username', username.toLowerCase()).maybeSingle()
   if (!data) return null
   if ((data as { is_active?: boolean | null }).is_active === false) return null
-
-  // Student data can live in the new profiles columns (role/school/course/
-  // year_level/taps/streak) or the legacy student_profiles table. Prefer the
-  // profiles values, then fill only the gaps from the legacy row so a stale
-  // student_profiles value can never overwrite a newer profile value.
-  if (isStudentProfile(data)) {
-    const { data: studentData } = await supabase
-      .from('student_profiles')
-      .select('*')
-      .eq('id', (data as any).id)
-      .maybeSingle()
-
-    const merged: any = mergeStudentProfileData(data, studentData)
-
-    // Legacy counts used by the existing record_student_tap RPC.
-    merged.taps = merged.taps ?? merged.tap_count ?? 0
-    merged.streak = merged.streak ?? merged.streak_count ?? 1
-    merged.role = merged.role || 'student'
-
-    return merged as Profile
-  }
 
   return data as Profile
 }
@@ -58,17 +36,11 @@ export default async function UserPage({ params }: { params: { username: string 
   if (!profile) notFound()
 
   const isDemo = params.username.toLowerCase() === DEMO_USERNAME
-  // Student pages count taps only, professional pages count views only.
-  // Never both, so there is no double-count.
-  const isStudent = isStudentProfile(profile)
 
   return (
     <IntroWrapper>
-      {isStudent ? (
-        <StudentTapTracker username={params.username} />
-      ) : (
-        <ViewTracker username={params.username} />
-      )}
+      <ViewTracker username={params.username} />
+      <TapTracker username={params.username} />
       
       {isDemo && (
         <Link

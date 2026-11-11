@@ -1,6 +1,6 @@
 /**
- * Shared profile options for the professional dashboard and the student
- * editor. Keeping these in one place means the two edit flows can never
+ * Shared profile options for the dashboard editor and public profile.
+ * Keeping these in one place means the edit form and live preview can never
  * drift apart (same social keys, same visibility defaults, same themes).
  */
 
