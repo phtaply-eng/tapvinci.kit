@@ -7,3 +7,4 @@ node_modules/
 *.log
 Supabase-Final.sql
 *.sql.bak*.tsbuildinfo
+tsconfig.tsbuildinfo
