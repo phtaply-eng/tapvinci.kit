@@ -2,6 +2,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import Link from 'next/link'
 import { supabase } from '../../lib/supabase'
+import { deleteUserAction } from './actions'
 
 const SITE_URL = (process.env.NEXT_PUBLIC_SITE_URL || 'https://tapvinci.vercel.app').replace(/\/+$/, '')
 const AUTH_KEY = 'tapvinci_admin_ok'
@@ -721,6 +722,10 @@ export default function AdminPage() {
     if (PROTECTED_USERNAMES.includes((profile.username || '').toString().toLowerCase())) {
       return showToast(`${profile.username} is a protected VIP account - use Deactivate instead`)
     }
+    const userId = (profile.id || '').toString().trim()
+    if (!userId) {
+      return showToast('This profile has no linked login account - use Deactivate instead')
+    }
     setBusyAction(true)
     const username = profile.username
     const targets: Record<string, Set<string>> = {}
@@ -733,9 +738,17 @@ export default function AdminPage() {
     }
     try { (await listAllFiles(PROFILE_BUCKET, username)).forEach((p) => add(PROFILE_BUCKET, p)) } catch {}
 
-    const { data, error } = await supabase.from('profiles').delete().eq('username', username).select()
-    if (error) { setBusyAction(false); return showToast('Delete failed: ' + error.message) }
-    if (!data || data.length === 0) { setBusyAction(false); return showToast('Nothing was deleted - check the Supabase delete policy') }
+    // Server action handles cards -> profile -> auth user, in that order.
+    let result: Awaited<ReturnType<typeof deleteUserAction>>
+    try {
+      result = await deleteUserAction(userId)
+    } catch {
+      result = { ok: false, error: 'Could not reach the server. Please try again.' }
+    }
+    if (!result.ok) {
+      setBusyAction(false)
+      return showToast('Delete failed: ' + result.error)
+    }
 
     let removed = 0
     for (const [bucket, paths] of Object.entries(targets)) {

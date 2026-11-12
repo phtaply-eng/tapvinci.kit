@@ -1,7 +1,9 @@
 'use client'
 import { useCallback, useEffect, useMemo, useState, type ReactNode } from 'react'
 import Link from 'next/link'
+import { QRCodeSVG } from 'qrcode.react'
 import { supabase } from '../../../lib/supabase'
+import { generateCardAction, listUnclaimedCardsAction } from '../actions'
 
 // One page for every secondary admin section: /admin/cards, /review-stands, /demos, /feedbacks, /analytics, /cms, /pricing, /account.
 // (Overview lives in app/admin/overview/page.tsx, Orders & Business Profiles in app/admin/page.tsx.)
@@ -83,10 +85,69 @@ const active = (profiles: Row[]) => profiles.filter((p) => p.is_active !== false
 // ---------------- NFC Cards & URLs ----------------
 function CardsSection({ profiles, loading, toast }: SP) {
   const [q, setQ] = useState('')
+  const [genBusy, setGenBusy] = useState(false)
+  const [qrCard, setQrCard] = useState<string | null>(null)
+  const [genError, setGenError] = useState('')
+  const [inventory, setInventory] = useState<{ card_code: string; created_at: string | null }[]>([])
+  const [invLoading, setInvLoading] = useState(true)
+  const [invError, setInvError] = useState('')
   const rows = useMemo(() => active(profiles).filter((p) => [p.username, nameOf(p)].some((v) => v.toLowerCase().includes(q.trim().toLowerCase()))), [profiles, q])
   const cards = active(profiles).filter((p) => pkgOf(p) === 'card').length
+  const cardUrl = qrCard ? `${SITE_URL}/c/${qrCard}` : ''
+
+  const loadInventory = useCallback(async () => {
+    setInvLoading(true)
+    setInvError('')
+    try {
+      const result = await listUnclaimedCardsAction()
+      if (result.ok) setInventory(result.cards)
+      else setInvError(result.error)
+    } catch {
+      setInvError('Could not load the pre-sale inventory.')
+    } finally {
+      setInvLoading(false)
+    }
+  }, [])
+
+  useEffect(() => { loadInventory() }, [loadInventory])
+
+  async function generateCard() {
+    setGenBusy(true)
+    setGenError('')
+    try {
+      const result = await generateCardAction()
+      if (!result.ok) {
+        setGenError(result.error)
+        toast('Could not generate card: ' + result.error)
+        return
+      }
+      setQrCard(result.cardCode)
+      await loadInventory()
+      toast(`New card ready: ${result.cardCode}`)
+    } catch {
+      setGenError('Could not reach the server. Please try again.')
+    } finally {
+      setGenBusy(false)
+    }
+  }
+
   return (
     <>
+      <div className="flex flex-wrap items-center justify-between gap-3 mb-4">
+        <div>
+          <h2 className="ac-title text-lg font-bold">Pre-sale NFC cards</h2>
+          <p className="text-[11px] text-[#A1A1A1] mt-0.5">Generate a blank card, write the URL to the NFC chip, then print the QR for the back.</p>
+        </div>
+        <button
+          type="button"
+          onClick={generateCard}
+          disabled={genBusy}
+          className="h-11 px-5 rounded-xl bg-[#E8C766] hover:bg-[#D4AF37] text-black font-bold text-sm transition disabled:opacity-60 disabled:cursor-not-allowed"
+        >
+          <i className={`fa-solid ${genBusy ? 'fa-spinner fa-spin' : 'fa-plus'} mr-2`} aria-hidden="true" />
+          {genBusy ? 'Generating...' : 'Generate New Card'}
+        </button>
+      </div>
       <Grid>
         <Stat label="Live URLs" value={String(active(profiles).length)} sub="Active client profiles" />
         <Stat label="NFC Cards" value={String(cards)} sub="Card + Digital orders" />
@@ -94,6 +155,13 @@ function CardsSection({ profiles, loading, toast }: SP) {
         <Stat label="Payment QR Ready" value={String(active(profiles).filter((p) => p.gcash_qr_url || p.maya_qr_url).length)} sub="GCash / Maya uploaded" />
       </Grid>
       <Note>To program a card: open any NFC writer app (for example NFC Tools), choose Write → URL, paste the link below, and hold the card to the phone. The QR is the same link, for the back of the card.</Note>
+
+      {genError && (
+        <p className="mb-4 rounded-xl border border-red-500/30 bg-red-500/10 text-red-300 text-sm px-4 py-3" role="alert">
+          Could not generate a card: {genError}
+        </p>
+      )}
+
       <input value={q} onChange={(e) => setQ(e.target.value)} placeholder="Search username or name..." aria-label="Search URLs" className="w-full max-w-md h-11 bg-[#121214] border border-[#1E1E1E] focus:border-[#D4AF37] outline-none rounded-xl px-4 text-sm mb-4" />
       <div className="bg-[#121214] border border-[#1E1E1E] rounded-2xl overflow-hidden"><div className="overflow-x-auto">
         <table className="admin-table ac-orders">
@@ -120,6 +188,80 @@ function CardsSection({ profiles, loading, toast }: SP) {
           </tbody>
         </table>
       </div></div>
+
+      <div className="mt-8">
+        <div className="flex flex-wrap items-center justify-between gap-3 mb-4">
+          <div>
+            <h2 className="ac-title text-lg font-bold">Pre-Sale Inventory (Unclaimed)</h2>
+            <p className="text-[11px] text-[#A1A1A1] mt-0.5">Blank cards with status SHIPPED and no owner. Generate, print and keep track of them here.</p>
+          </div>
+          <button onClick={loadInventory} disabled={invLoading} className="ac-pill" type="button">
+            {invLoading ? 'Refreshing...' : 'Refresh'}
+          </button>
+        </div>
+
+        {invError && (
+          <p className="mb-4 rounded-xl border border-red-500/30 bg-red-500/10 text-red-300 text-sm px-4 py-3" role="alert">
+            Could not load the pre-sale inventory: {invError}
+          </p>
+        )}
+
+        <div className="bg-[#121214] border border-[#1E1E1E] rounded-2xl overflow-hidden"><div className="overflow-x-auto">
+          <table className="admin-table ac-orders">
+            <thead><tr><th>Card Code</th><th>Card URL</th><th>Created</th><th>Actions</th></tr></thead>
+            <tbody>
+              {invLoading ? <tr><td colSpan={4} className="text-center text-gray-500 !py-8">Loading...</td></tr>
+                : inventory.length === 0 ? <tr><td colSpan={4} className="text-center text-gray-500 !py-8">No unclaimed cards. Click Generate New Card to add one.</td></tr>
+                : inventory.map((c) => {
+                  const url = `${SITE_URL}/c/${c.card_code}`
+                  return (
+                    <tr key={c.card_code} className="ac-row">
+                      <td><p className="font-bold text-[#D4AF37] tracking-[1.5px]">{c.card_code}</p></td>
+                      <td><Link href={`/c/${c.card_code}`} target="_blank" rel="noopener noreferrer" className="text-[#D4AF37] font-semibold hover:underline break-all">{url}</Link></td>
+                      <td className="text-[#A1A1A1] whitespace-nowrap">{dateText(c.created_at)}</td>
+                      <td><div className="flex gap-1.5 flex-wrap">
+                        <button onClick={() => setQrCard(c.card_code)} className="ac-mini ac-mini-gold" type="button"><i className="fa-solid fa-qrcode mr-1.5" aria-hidden="true" />View / Print QR</button>
+                        <button onClick={() => copy(url, toast)} title="Copy URL" aria-label="Copy URL" className="ac-icon"><i className="fa-regular fa-copy" /></button>
+                      </div></td>
+                    </tr>
+                  )
+                })}
+            </tbody>
+          </table>
+        </div></div>
+      </div>
+
+      {qrCard && (
+        <div className="admin-qr-modal" onClick={() => setQrCard(null)} role="dialog" aria-modal="true" aria-label={`QR code for ${qrCard}`}>
+          <div className="admin-qr-card" onClick={(e) => e.stopPropagation()}>
+            <div className="flex justify-between items-center mb-4">
+              <div className="text-left">
+                <h3 className="text-white font-bold text-lg">Pre-Sale Card QR</h3>
+                <p className="text-[11px] text-[#A1A1A1]">Scan or print for the back of the card.</p>
+              </div>
+              <button onClick={() => setQrCard(null)} aria-label="Dismiss" type="button" className="w-8 h-8 bg-[#1E1E20] rounded-full flex items-center justify-center text-gray-400 hover:text-white">✕</button>
+            </div>
+
+            <div className="admin-qr-print">
+              <div className="admin-qr-white-box">
+                <QRCodeSVG value={cardUrl} size={228} level="M" bgColor="#ffffff" fgColor="#050505" />
+              </div>
+              <p className="admin-qr-caption text-[12px] font-bold text-white mt-3 tracking-[2px]">{qrCard}</p>
+              <p className="admin-qr-caption text-[11px] text-[#A1A1A1] mt-1 break-all max-w-[300px] mx-auto">{cardUrl}</p>
+            </div>
+
+            <p className="text-[10px] text-[#6B7280] mt-2">Status: SHIPPED • Unclaimed • TapVinci NFC card</p>
+
+            <div className="grid grid-cols-2 gap-3 mt-5">
+              <button onClick={() => copy(qrCard, toast)} className="h-11 bg-[#1E1E20] text-white rounded-xl text-sm border border-[#2A2A2A] hover:border-[#D4AF37]/50" type="button">Copy Code</button>
+              <button onClick={() => copy(cardUrl, toast)} className="h-11 bg-[#1E1E20] text-white rounded-xl text-sm border border-[#2A2A2A] hover:border-[#D4AF37]/50" type="button">Copy URL</button>
+            </div>
+            <button onClick={() => window.print()} className="w-full h-11 mt-3 bg-[#E8C766] hover:bg-[#D4AF37] text-black rounded-xl text-sm font-bold" type="button">
+              <i className="fa-solid fa-print mr-2" aria-hidden="true" />Print QR
+            </button>
+          </div>
+        </div>
+      )}
     </>
   )
 }
@@ -382,8 +524,12 @@ function AccountSection({ toast }: SP) {
   )
 }
 
+const CARDS_SECTION = { title: 'NFC Cards & URLs', sub: 'Every client link, ready to write to a card or print as a QR', View: CardsSection }
+
 const SECTIONS: Record<string, { title: string; sub: string; View: (p: SP) => JSX.Element }> = {
-  cards: { title: 'NFC Cards & URLs', sub: 'Every client link, ready to write to a card or print as a QR', View: CardsSection },
+  // The sidebar links to /admin/nfc. Keep "cards" as an alias for old links.
+  nfc: CARDS_SECTION,
+  cards: CARDS_SECTION,
   'review-stands': { title: 'Review Stands & QRs', sub: 'Printable QR stands that send customers to leave a review', View: ReviewStandsSection },
   demos: { title: 'Live Test Demos', sub: 'Open or scan any profile to test what customers see', View: DemosSection },
   feedbacks: { title: 'User Feedbacks', sub: 'Read, hide or delete customer reviews', View: FeedbacksSection },
