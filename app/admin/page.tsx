@@ -1,8 +1,9 @@
 'use client'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import Link from 'next/link'
+import { useRouter } from 'next/navigation'
 import { supabase } from '../../lib/supabase'
-import { deleteUserAction } from './actions'
+import { deleteUserAction, toggleVipAction } from './actions'
 
 const SITE_URL = (process.env.NEXT_PUBLIC_SITE_URL || 'https://tapvinci.vercel.app').replace(/\/+$/, '')
 const AUTH_KEY = 'tapvinci_admin_ok'
@@ -245,8 +246,8 @@ const payOf = (p: Row): PayStatus => (p.payment_status === 'pending' || p.paymen
 const fulOf = (p: Row): FulStatus => (FUL_OPTIONS as readonly string[]).includes(p.fulfillment as string) ? (p.fulfillment as FulStatus) : 'pending'
 
 const PROTECTED_USERNAMES = ['shua', 'tapvinci', 'shuashushu']
-// ONLY checks the database column now!
-const isDemo = (p: Row) => p.is_demo === true
+// VIP = demo/test account or admin account. Both are excluded from sales.
+const isDemo = (p: Row) => p.is_demo === true || p.is_admin === true
 type DemoFilter = 'all' | 'real' | 'demo'
 const DEMO_BADGE_STYLE = { background: 'rgba(255,194,28,0.2)', color: '#FFC21C' } as const
 const VIP_FUL_STYLE = { background: 'rgba(255,194,28,0.2)', color: '#FFC21C', borderColor: 'rgba(255,194,28,0.35)' } as const
@@ -298,6 +299,7 @@ table{width:100%;border-collapse:collapse;margin-top:28px}td,th{padding:10px 8px
 }
 
 export default function AdminPage() {
+  const router = useRouter()
   const [isAuthed, setIsAuthed] = useState(false)
   const [checked, setChecked] = useState(false)
   const [password, setPassword] = useState('')
@@ -335,6 +337,7 @@ export default function AdminPage() {
   const [deleteConfirm, setDeleteConfirm] = useState<Row | null>(null)
   const [deleteText, setDeleteText] = useState('')
   const [busyAction, setBusyAction] = useState(false)
+  const [vipBusy, setVipBusy] = useState('')
 
   const [view, setView] = useState<'orders' | 'profiles'>('orders')
   const [oDraft, setODraft] = useState('')
@@ -861,10 +864,36 @@ export default function AdminPage() {
   const setPackage = (p: Row, v: PackageId) => updateOrder(p, { package: v, plan_tier: v, plan_amount: PLAN_META[v].price }, `Package: ${PACKAGES[v].label}`)
   // VIP = is_demo in DB. Handled by Payment Status dropdown + Mark as VIP button in Fulfillment column.
   const setDemo = (p: Row, v: boolean) => updateOrder(p, { is_demo: v, fulfillment: v ? 'vip' : (p.fulfillment === 'vip' ? 'pending' : p.fulfillment) }, v ? 'Set as VIP - excluded from sales' : 'Removed from VIP - now counts as real sale')
+
+  // VIP/Admin toggle goes through the service-role server action so is_admin
+  // and role are updated together. is_demo is mirrored for revenue exclusion.
+  async function toggleVip(p: Row, next: boolean) {
+    const userId = (p.id || '').toString().trim()
+    if (!userId) return showToast('This profile has no linked login account')
+    setVipBusy(p.username)
+    let result: Awaited<ReturnType<typeof toggleVipAction>>
+    try {
+      result = await toggleVipAction(userId, next)
+    } catch {
+      result = { ok: false, error: 'Could not reach the server. Please try again.' }
+    }
+    setVipBusy('')
+    if (!result.ok) return showToast('Failed: ' + result.error)
+    setProfiles((list) => list.map((r) => (r.id === userId ? {
+      ...r,
+      is_admin: next,
+      is_demo: next,
+      role: next ? 'admin' : 'professional',
+      fulfillment: next ? 'vip' : (r.fulfillment === 'vip' ? 'pending' : r.fulfillment),
+    } : r)))
+    router.refresh()
+    showToast(next ? 'Marked as VIP - excluded from sales' : 'Removed VIP - now counts as a real sale')
+  }
+
   // Payment dropdown handler - VIP is an option that flips is_demo, not payment_status
   const handlePaymentSelect = (p: Row, v: string) => {
     if (v === 'demo') return setDemo(p, true)
-    if (isDemo(p)) return updateOrder(p, { is_demo: false, payment_status: v, paid_at: v === 'paid' ? new Date().toISOString() : null, fulfillment: p.fulfillment === 'vip' ? 'pending' : p.fulfillment }, `Payment: ${v.toUpperCase()} - removed from VIP`)
+    if (isDemo(p)) return updateOrder(p, { is_demo: false, is_admin: false, role: 'professional', payment_status: v, paid_at: v === 'paid' ? new Date().toISOString() : null, fulfillment: p.fulfillment === 'vip' ? 'pending' : p.fulfillment }, `Payment: ${v.toUpperCase()} - removed from VIP`)
     return setPayment(p, v as PayStatus)
   }
 
@@ -969,7 +998,7 @@ export default function AdminPage() {
           <div className="flex flex-wrap justify-between items-start gap-4 mb-6">
             <div>
               <h1 className="ac-title text-2xl md:text-[28px] font-bold">Orders &amp; Sales Management Dashboard</h1>
-              <p className="text-[12px] text-[#A1A1A1] mt-1">Real-time tracking of online GCash/Maya QR Ph transactions, NFC card fulfillment, and revenue</p>
+              <p className="text-[12px] text-[#A1A1A1] mt-1">Real-time tracking of PayMongo checkout payments, NFC card fulfillment, and revenue</p>
             </div>
             <div className="flex flex-wrap gap-2">
               <Link href="/dashboard" className="ac-pill">Dashboard</Link>
@@ -984,7 +1013,7 @@ export default function AdminPage() {
               { label: 'Total Sales Revenue', value: money(orderStats.revenue), sub: realClients.length === 0 ? 'No real sales yet - VIP accounts excluded' : 'Verified paid orders (VIP accounts excluded)', icon: 'fa-wallet', tone: '#D4AF37' },
               { label: 'Completed Purchases', value: String(orderStats.completed), sub: 'Active paid and provisioned sites', icon: 'fa-circle-check', tone: '#00D632' },
               { label: 'Total Checkout Sessions', value: String(orderStats.sessions), sub: 'Active orders & buy now sessions', icon: 'fa-cart-shopping', tone: '#007DFE' },
-              { label: 'Pending QR Scans', value: String(orderStats.pendingPay), sub: 'Awaiting GCash/Maya confirmation', icon: 'fa-qrcode', tone: '#FFC21C' },
+              { label: 'Awaiting PayMongo Checkout', value: String(orderStats.pendingPay), sub: 'Pending automated checkout confirmation', icon: 'fa-clock', tone: '#FFC21C' },
             ].map((c) => (
               <div key={c.label} className="ac-stat">
                 <div className="flex items-start justify-between gap-3">
@@ -1003,7 +1032,7 @@ export default function AdminPage() {
               onChange={(e) => { setODraft(e.target.value); setOQuery(e.target.value) }}
               placeholder="Search Order #, Customer Name, Email, or Custom URL..."
               aria-label="Search orders"
-              className="flex-1 min-w-[240px] h-11 bg-[#121214] border border-[#1E1E1E] focus:border-[#D4AF37] outline-none rounded-xl px-4 text-sm"
+              className="flex-1 min-w-[240px] h-11 bg-[#1A1A1D]/80 backdrop-blur-xl border border-white/10 focus:border-[#D4AF37] outline-none rounded-xl px-4 text-sm"
             />
             <button type="submit" className="h-11 px-5 rounded-xl bg-[#D4AF37] hover:bg-[#E8C766] text-black font-bold text-sm transition">Search</button>
             <select value={payFilter} onChange={(e) => setPayFilter(e.target.value as typeof payFilter)} aria-label="Filter orders" className="ac-select h-11 px-3 rounded-xl">
@@ -1059,7 +1088,7 @@ export default function AdminPage() {
             <div className="mb-4 rounded-xl border border-red-500/30 bg-red-500/10 text-red-300 text-sm px-4 py-3" role="alert">Could not load profiles: {loadError}</div>
           )}
 
-          <div className="bg-[#121214] border border-[#1E1E1E] rounded-2xl overflow-hidden">
+          <div className="bg-[#1A1A1D]/80 backdrop-blur-xl border border-white/10 rounded-2xl overflow-hidden">
             <div className="overflow-x-auto">
               <table className="admin-table ac-orders">
                 <thead>
@@ -1144,16 +1173,17 @@ export default function AdminPage() {
                           </td>
                           <td>
                             <select value={ful} onChange={(e) => setFulfillment(p, e.target.value as FulStatus)} aria-label="Fulfillment" className={`ac-badge ac-ful-${ful}`} style={ful === 'vip' ? VIP_FUL_STYLE : undefined}>
-                              {FUL_OPTIONS.map((o) => <option key={o} value={o}>{o.toUpperCase()}</option>)}
+                              {FUL_OPTIONS.map((o) => <option key={o} value={o}>{o.charAt(0).toUpperCase() + o.slice(1)}</option>)}
                             </select>
                             <p className="text-[10px] text-[#A1A1A1] mt-1 whitespace-nowrap">{p.fulfilled_at ? `Updated ${formatDateTime(p.fulfilled_at)}` : plan.tier === 'digital' ? 'No card to print' : 'Not started'}</p>
-                            {/* Mark as VIP - same flag as Payment Status VIP (is_demo in DB) */}
+                            {/* VIP/Admin toggle - updates is_admin + role via server action. */}
                             <button
-                              onClick={() => setDemo(p, !isDemo(p))}
+                              onClick={() => toggleVip(p, !isDemo(p))}
+                              disabled={vipBusy === p.username}
                               title={isDemo(p) ? 'Remove VIP - this will count as a real sale again' : 'Mark as VIP - this will be excluded from Total Sales Revenue, same as DEMO'}
                               className={isDemo(p) ? 'ac-mini mt-1.5' : 'ac-mini ac-mini-gold mt-1.5'}
                             >
-                              {isDemo(p) ? 'Remove VIP' : 'Mark as VIP'}
+                              {vipBusy === p.username ? 'Saving...' : isDemo(p) ? 'Remove VIP' : 'Mark as VIP'}
                             </button>
                           </td>
                           <td>
@@ -1173,16 +1203,14 @@ export default function AdminPage() {
                               <button onClick={() => { if (!openInvoice(p)) showToast('Allow pop-ups to open the invoice') }} title="Download PDF invoice" aria-label="Download PDF invoice" className="ac-icon"><i className="fa-solid fa-file-pdf" /></button>
                               <button onClick={() => sendLink(p)} title="Send link by email" aria-label="Send link by email" className="ac-icon"><i className="fa-solid fa-paper-plane" /></button>
                               
-                              {p.payment_status === 'pending' && (
-                                <button onClick={() => handleApprove(p)} className="ac-mini ac-mini-gold">
-                                  Approve
-                                </button>
-                              )}
-                              
                               {p.is_active === false ? (
                                 <button onClick={() => handleSetActive(p, true)} className="ac-mini ac-mini-gold">Restore</button>
+                              ) : ful === 'shipped' ? (
+                                <span className="ac-mini ac-mini-gold inline-flex items-center gap-1.5 opacity-75 cursor-default" aria-disabled="true" title="Card already marked as shipped">
+                                  <i className="fa-solid fa-check text-[9px]" aria-hidden="true" />Shipped
+                                </span>
                               ) : next && (
-                                <button onClick={() => setFulfillment(p, next)} className="ac-mini ac-mini-gold">Mark {next.toUpperCase()} →</button>
+                                <button onClick={() => setFulfillment(p, next)} disabled={busyAction} className="ac-mini ac-mini-gold">Mark {next.toUpperCase()} →</button>
                               )}
 
                             </div>
@@ -1212,15 +1240,15 @@ export default function AdminPage() {
         </div>
 
         <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-6">
-          <div className="bg-[#121214] border border-[#2A2A2A] rounded-2xl p-4">
+          <div className="bg-[#1A1A1D]/80 backdrop-blur-xl border border-white/10 rounded-2xl p-4">
             <p className="text-[11px] text-gray-400 uppercase tracking-widest">Total Clients</p>
             <p className="text-3xl font-bold text-[#D4AF37] mt-1">{stats.total}</p>
           </div>
-          <div className="bg-[#121214] border border-[#2A2A2A] rounded-2xl p-4">
+          <div className="bg-[#1A1A1D]/80 backdrop-blur-xl border border-white/10 rounded-2xl p-4">
             <p className="text-[11px] text-gray-400 uppercase tracking-widest">This Month</p>
             <p className="text-3xl font-bold mt-1">{stats.thisMonth}</p>
           </div>
-          <div className="bg-[#121214] border border-[#2A2A2A] rounded-2xl p-4">
+          <div className="bg-[#1A1A1D]/80 backdrop-blur-xl border border-white/10 rounded-2xl p-4">
             <p className="text-[11px] text-gray-400 uppercase tracking-widest">With Payment QR</p>
             <p className="text-3xl font-bold mt-1">{stats.withQR}</p>
           </div>
@@ -1240,7 +1268,7 @@ export default function AdminPage() {
           </div>
         )}
 
-        <div className="bg-[#121214] border border-[#2A2A2A] rounded-2xl overflow-hidden">
+        <div className="bg-[#1A1A1D]/80 backdrop-blur-xl border border-white/10 rounded-2xl overflow-hidden">
           <div className="overflow-x-auto">
             <table className="admin-table">
               <thead>
@@ -1278,11 +1306,11 @@ export default function AdminPage() {
                       <td className="text-gray-500 whitespace-nowrap">{formatDate(profile.created_at)}</td>
                       <td>
                         <div className="flex gap-2 flex-wrap">
-                          <button onClick={() => copyLink(profile.username)} className="text-[11px] bg-[#2A2A2A] hover:bg-[#333] px-2.5 py-1.5 rounded whitespace-nowrap">Copy Link</button>
-                          <button onClick={() => window.open(`/${profile.username}`, '_blank', 'noopener')} className="text-[11px] bg-[#E8C766] hover:bg-[#D4AF37] text-black font-semibold px-2.5 py-1.5 rounded">Open</button>
-                          <button onClick={() => handleEdit(profile)} title="Edit client" className="text-[11px] bg-[#1E1E20] border border-[#2563eb]/50 text-[#60a5fa] hover:bg-[#2563eb]/20 font-semibold px-2.5 py-1.5 rounded transition">Edit</button>
-                          <button onClick={() => handleDeleteConfirm(profile)} title="Delete or deactivate client" className="text-[11px] bg-[#1E1E20] border border-[#ef4444]/50 text-[#f87171] hover:bg-[#ef4444]/20 font-semibold px-2.5 py-1.5 rounded transition">Delete</button>
-                          <button onClick={() => handleGenerateQR(profile)} title="Generate QR" className="text-[11px] bg-[#121214] border border-[#D4AF37]/50 text-[#D4AF37] hover:bg-[#D4AF37] hover:text-black font-semibold px-2.5 py-1.5 rounded transition">
+                          <button onClick={() => copyLink(profile.username)} className="text-[11px] bg-[#1A1A1D]/80 backdrop-blur-xl border border-white/10 text-white/80 hover:border-[#D4AF37]/50 hover:text-white px-2.5 py-1.5 rounded-lg whitespace-nowrap transition">Copy Link</button>
+                          <button onClick={() => window.open(`/${profile.username}`, '_blank', 'noopener')} className="text-[11px] bg-[#E8C766] hover:bg-[#D4AF37] text-black font-semibold px-2.5 py-1.5 rounded-lg">Open</button>
+                          <button onClick={() => handleEdit(profile)} title="Edit client" className="text-[11px] bg-[#1A1A1D]/80 backdrop-blur-xl border border-[#2563eb]/50 text-[#60a5fa] hover:bg-[#2563eb]/20 font-semibold px-2.5 py-1.5 rounded-lg transition">Edit</button>
+                          <button onClick={() => handleDeleteConfirm(profile)} title="Delete or deactivate client" className="text-[11px] bg-[#1A1A1D]/80 backdrop-blur-xl border border-[#ef4444]/50 text-[#f87171] hover:bg-[#ef4444]/20 font-semibold px-2.5 py-1.5 rounded-lg transition">Delete</button>
+                          <button onClick={() => handleGenerateQR(profile)} title="Generate QR" className="text-[11px] bg-[#1A1A1D]/80 backdrop-blur-xl border border-[#D4AF37]/50 text-[#D4AF37] hover:bg-[#D4AF37] hover:text-black font-semibold px-2.5 py-1.5 rounded-lg transition">
                             <i className="fa-solid fa-qrcode mr-1"></i>QR
                           </button>
                         </div>
@@ -1310,15 +1338,15 @@ export default function AdminPage() {
           </div>
 
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-6">
-            <div className="bg-[#121214] border border-[#2A2A2A] rounded-2xl p-4">
+            <div className="bg-[#1A1A1D]/80 backdrop-blur-xl border border-white/10 rounded-2xl p-4">
               <p className="text-[11px] text-gray-400 uppercase tracking-widest">Total Reviews</p>
               <p className="text-3xl font-bold text-[#D4AF37] mt-1">{reviewsStats.total}</p>
             </div>
-            <div className="bg-[#121214] border border-[#2A2A2A] rounded-2xl p-4">
+            <div className="bg-[#1A1A1D]/80 backdrop-blur-xl border border-white/10 rounded-2xl p-4">
               <p className="text-[11px] text-gray-400 uppercase tracking-widest">Average Rating</p>
               <p className="text-3xl font-bold mt-1">{reviewsStats.avg} <span className="text-[#D4AF37] text-xl">★</span></p>
             </div>
-            <div className="bg-[#121214] border border-[#2A2A2A] rounded-2xl p-4">
+            <div className="bg-[#1A1A1D]/80 backdrop-blur-xl border border-white/10 rounded-2xl p-4">
               <p className="text-[11px] text-gray-400 uppercase tracking-widest">Five Stars</p>
               <p className="text-3xl font-bold mt-1">{reviewsStats.fiveStar}</p>
             </div>
@@ -1332,7 +1360,7 @@ export default function AdminPage() {
           />
           <p className="text-[11px] text-gray-500 mb-4">Showing {filteredReviews.length} of {reviews.length} reviews. Gold stars = premium.</p>
 
-          <div className="bg-[#121214] border border-[#2A2A2A] rounded-2xl overflow-hidden">
+          <div className="bg-[#1A1A1D]/80 backdrop-blur-xl border border-white/10 rounded-2xl overflow-hidden">
             <div className="overflow-x-auto">
               <table className="admin-table">
                 <thead>
@@ -1362,7 +1390,7 @@ export default function AdminPage() {
                         <td className="text-gray-300 max-w-xs truncate" title={r.comment}>{r.comment}</td>
                         <td className="text-gray-500 whitespace-nowrap">{formatDate(r.created_at)}</td>
                         <td>
-                          <button onClick={() => handleDeleteReview(r.id)} className="text-[11px] bg-[#1E1E20] border border-[#ef4444]/50 text-[#f87171] hover:bg-[#ef4444]/20 font-semibold px-2.5 py-1.5 rounded transition">Delete</button>
+                          <button onClick={() => handleDeleteReview(r.id)} className="text-[11px] bg-[#1A1A1D]/80 backdrop-blur-xl border border-[#ef4444]/50 text-[#f87171] hover:bg-[#ef4444]/20 font-semibold px-2.5 py-1.5 rounded-lg transition">Delete</button>
                         </td>
                       </tr>
                     ))

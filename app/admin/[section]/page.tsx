@@ -58,7 +58,7 @@ const copy = (text: string, toast: SP['toast']) => navigator.clipboard.writeText
 
 function Card({ title, sub, children, right }: { title: string; sub?: string; children: ReactNode; right?: ReactNode }) {
   return (
-    <section className="bg-[#121214] border border-[#1E1E1E] rounded-2xl p-5">
+    <section className="bg-[#1A1A1D]/80 backdrop-blur-xl border border-white/10 rounded-2xl p-5">
       <div className="flex items-start justify-between gap-3 mb-4">
         <div><h2 className="ac-title text-lg font-bold">{title}</h2>{sub && <p className="text-[11px] text-[#A1A1A1] mt-0.5">{sub}</p>}</div>
         {right}
@@ -162,8 +162,8 @@ function CardsSection({ profiles, loading, toast }: SP) {
         </p>
       )}
 
-      <input value={q} onChange={(e) => setQ(e.target.value)} placeholder="Search username or name..." aria-label="Search URLs" className="w-full max-w-md h-11 bg-[#121214] border border-[#1E1E1E] focus:border-[#D4AF37] outline-none rounded-xl px-4 text-sm mb-4" />
-      <div className="bg-[#121214] border border-[#1E1E1E] rounded-2xl overflow-hidden"><div className="overflow-x-auto">
+      <input value={q} onChange={(e) => setQ(e.target.value)} placeholder="Search username or name..." aria-label="Search URLs" className="w-full max-w-md h-11 bg-[#1A1A1D]/80 backdrop-blur-xl border border-white/10 focus:border-[#D4AF37] outline-none rounded-xl px-4 text-sm mb-4" />
+      <div className="bg-[#1A1A1D]/80 backdrop-blur-xl border border-white/10 rounded-2xl overflow-hidden"><div className="overflow-x-auto">
         <table className="admin-table ac-orders">
           <thead><tr><th>Client</th><th>NFC URL</th><th>Package</th><th>QR</th><th>Actions</th></tr></thead>
           <tbody>
@@ -206,7 +206,7 @@ function CardsSection({ profiles, loading, toast }: SP) {
           </p>
         )}
 
-        <div className="bg-[#121214] border border-[#1E1E1E] rounded-2xl overflow-hidden"><div className="overflow-x-auto">
+        <div className="bg-[#1A1A1D]/80 backdrop-blur-xl border border-white/10 rounded-2xl overflow-hidden"><div className="overflow-x-auto">
           <table className="admin-table ac-orders">
             <thead><tr><th>Card Code</th><th>Card URL</th><th>Created</th><th>Actions</th></tr></thead>
             <tbody>
@@ -239,7 +239,7 @@ function CardsSection({ profiles, loading, toast }: SP) {
                 <h3 className="text-white font-bold text-lg">Pre-Sale Card QR</h3>
                 <p className="text-[11px] text-[#A1A1A1]">Scan or print for the back of the card.</p>
               </div>
-              <button onClick={() => setQrCard(null)} aria-label="Dismiss" type="button" className="w-8 h-8 bg-[#1E1E20] rounded-full flex items-center justify-center text-gray-400 hover:text-white">✕</button>
+              <button onClick={() => setQrCard(null)} aria-label="Dismiss" type="button" className="w-8 h-8 bg-[#1A1A1D]/80 backdrop-blur-xl border border-white/10 rounded-full flex items-center justify-center text-gray-400 hover:text-white">✕</button>
             </div>
 
             <div className="admin-qr-print">
@@ -253,8 +253,8 @@ function CardsSection({ profiles, loading, toast }: SP) {
             <p className="text-[10px] text-[#6B7280] mt-2">Status: SHIPPED • Unclaimed • TapVinci NFC card</p>
 
             <div className="grid grid-cols-2 gap-3 mt-5">
-              <button onClick={() => copy(qrCard, toast)} className="h-11 bg-[#1E1E20] text-white rounded-xl text-sm border border-[#2A2A2A] hover:border-[#D4AF37]/50" type="button">Copy Code</button>
-              <button onClick={() => copy(cardUrl, toast)} className="h-11 bg-[#1E1E20] text-white rounded-xl text-sm border border-[#2A2A2A] hover:border-[#D4AF37]/50" type="button">Copy URL</button>
+              <button onClick={() => copy(qrCard, toast)} className="h-11 bg-[#1A1A1D]/80 backdrop-blur-xl text-white rounded-xl text-sm border border-white/10 hover:border-[#D4AF37]/50" type="button">Copy Code</button>
+              <button onClick={() => copy(cardUrl, toast)} className="h-11 bg-[#1A1A1D]/80 backdrop-blur-xl text-white rounded-xl text-sm border border-white/10 hover:border-[#D4AF37]/50" type="button">Copy URL</button>
             </div>
             <button onClick={() => window.print()} className="w-full h-11 mt-3 bg-[#E8C766] hover:bg-[#D4AF37] text-black rounded-xl text-sm font-bold" type="button">
               <i className="fa-solid fa-print mr-2" aria-hidden="true" />Print QR
@@ -366,13 +366,13 @@ function FeedbacksSection({ reviews, loading, reload, toast }: SP) {
         <Stat label="Hidden" value={String(reviews.filter((r) => r.approved === false).length)} sub="Not shown on /reviews" />
       </Grid>
       <div className="flex flex-wrap gap-2 mb-4">
-        <input value={q} onChange={(e) => setQ(e.target.value)} placeholder="Search name or comment..." aria-label="Search reviews" className="flex-1 min-w-[220px] h-11 bg-[#121214] border border-[#1E1E1E] focus:border-[#D4AF37] outline-none rounded-xl px-4 text-sm" />
+        <input value={q} onChange={(e) => setQ(e.target.value)} placeholder="Search name or comment..." aria-label="Search reviews" className="flex-1 min-w-[220px] h-11 bg-[#1A1A1D]/80 backdrop-blur-xl border border-white/10 focus:border-[#D4AF37] outline-none rounded-xl px-4 text-sm" />
         <select value={star} onChange={(e) => setStar(Number(e.target.value))} aria-label="Filter by rating" className="ac-select h-11 px-3 rounded-xl">
           <option value={0}>All ratings</option>{[5, 4, 3, 2, 1].map((n) => <option key={n} value={n}>{n} stars</option>)}
         </select>
         <a href="/reviews" target="_blank" rel="noopener noreferrer" className="ac-pill !h-11">View public page →</a>
       </div>
-      <div className="bg-[#121214] border border-[#1E1E1E] rounded-2xl overflow-hidden"><div className="overflow-x-auto">
+      <div className="bg-[#1A1A1D]/80 backdrop-blur-xl border border-white/10 rounded-2xl overflow-hidden"><div className="overflow-x-auto">
         <table className="admin-table ac-orders">
           <thead><tr><th>Name</th><th>Rating</th><th>Comment</th><th>Date</th><th>Actions</th></tr></thead>
           <tbody>

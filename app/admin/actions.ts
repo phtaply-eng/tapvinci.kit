@@ -170,6 +170,64 @@ export async function listUnclaimedCardsAction(): Promise<UnclaimedCardsResult> 
 }
 
 /**
+ * Toggle a profile between VIP/admin and a normal professional account.
+ * The sales dashboard uses is_demo for VIP exclusion, so keep it in sync
+ * with is_admin to avoid the account still counting as a real sale.
+ */
+export async function toggleVipAction(userId: string, isVip: boolean): Promise<ActionResult> {
+  const id = (userId || '').trim()
+  if (!id) return { ok: false, error: 'Missing user id.' }
+
+  const denied = await authorizeAdmin()
+  if (denied) return { ok: false, error: denied }
+
+  try {
+    const admin = supabaseAdmin()
+
+    const { data: current, error: readError } = await admin
+      .from('profiles')
+      .select('fulfillment')
+      .eq('id', id)
+      .maybeSingle()
+
+    if (readError) {
+      return { ok: false, error: `Could not read the profile: ${readError.message}` }
+    }
+    if (!current) return { ok: false, error: 'Profile not found.' }
+
+    const patch: Record<string, unknown> = {
+      is_admin: isVip,
+      role: isVip ? 'admin' : 'professional',
+      is_demo: isVip,
+    }
+
+    if (isVip) {
+      patch.fulfillment = 'vip'
+    } else if (current.fulfillment === 'vip') {
+      patch.fulfillment = 'pending'
+    }
+
+    const { data, error } = await admin
+      .from('profiles')
+      .update(patch)
+      .eq('id', id)
+      .select('id')
+
+    if (error) {
+      return { ok: false, error: `Could not update VIP status: ${error.message}` }
+    }
+    if (!data || data.length === 0) {
+      return { ok: false, error: 'Profile not found.' }
+    }
+
+    return { ok: true }
+  } catch (error) {
+    const message = error instanceof Error ? error.message : 'Unknown error'
+    return { ok: false, error: message }
+  }
+}
+
+/**
  * Create a blank pre-sale NFC card. It is ready to be written/printed and can
  * be claimed later through /c/[card_code].
  */
