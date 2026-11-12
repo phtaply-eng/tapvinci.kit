@@ -217,7 +217,6 @@ export default function Dashboard() {
         username: fixedUsername,
         is_admin: profile.is_admin === true, // Only preserve true admins
         is_active: true, // Force active for users who just claimed a card
-        payment_status: 'paid', // Mark as paid so it skips the modal
         paid_at: profile.paid_at || new Date().toISOString(),
       }
 

@@ -3,7 +3,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import { supabase } from '../../lib/supabase'
-import { deleteUserAction, toggleVipAction } from './actions'
+import { deleteUserAction, toggleVipAction, updateOrderAction } from './actions'
 
 const SITE_URL = (process.env.NEXT_PUBLIC_SITE_URL || 'https://tapvinci.vercel.app').replace(/\/+$/, '')
 const AUTH_KEY = 'tapvinci_admin_ok'
@@ -674,6 +674,10 @@ export default function AdminPage() {
     if (!editingProfile) return
     if (uploading) return showToast('Wait for the upload to finish')
     if (!isValidSpotifyUrl(editForm.spotify_url)) return showToast('That does not look like a Spotify link')
+
+    const profileId = (editingProfile.id || '').toString().trim()
+    if (!profileId) return showToast('This profile has no linked login account - cannot save.')
+
     setSavingEdit(true)
     const f = editForm
     const base = (editingProfile.socials && typeof editingProfile.socials === 'object' ? editingProfile.socials : {}) as Record<string, unknown>
@@ -684,9 +688,10 @@ export default function AdminPage() {
       website: withSocial(base, 'website', f.website.trim()),
     }
     const nameKey = 'business' in editingProfile && !('name' in editingProfile) ? 'business' : 'name'
-    const { data, error } = await supabase
-      .from('profiles')
-      .update({
+
+    let result: Awaited<ReturnType<typeof updateOrderAction>>
+    try {
+      result = await updateOrderAction(profileId, {
         [nameKey]: f.name.trim(),
         title: f.title.trim(),
         bio: f.bio,
@@ -706,11 +711,12 @@ export default function AdminPage() {
         gcash_qr_url: f.gcash_qr_url,
         maya_qr_url: f.maya_qr_url,
       })
-      .eq('username', editingProfile.username)
-      .select()
+    } catch {
+      result = { ok: false, error: 'Could not reach the server. Please try again.' }
+    }
+
     setSavingEdit(false)
-    if (error) return showToast('Save failed: ' + error.message)
-    if (!data || data.length === 0) return showToast('Nothing was updated - check the Supabase update policy')
+    if (!result.ok) return showToast('Save failed: ' + result.error)
     showToast('Updated!')
     setEditingProfile(null)
     fetchProfiles()
@@ -765,15 +771,23 @@ export default function AdminPage() {
   }
 
   async function handleSetActive(profile: Row, active: boolean) {
+    const profileId = (profile.id || '').toString().trim()
+    if (!profileId) return showToast('This profile has no linked login account')
+
     setBusyAction(true)
-    const { data, error } = await supabase
-      .from('profiles')
-      .update({ is_active: active, deactivated_at: active ? null : new Date().toISOString() })
-      .eq('username', profile.username)
-      .select()
+    let result: Awaited<ReturnType<typeof updateOrderAction>>
+    try {
+      result = await updateOrderAction(profileId, {
+        is_active: active,
+        deactivated_at: active ? null : new Date().toISOString(),
+      })
+    } catch {
+      result = { ok: false, error: 'Could not reach the server. Please try again.' }
+    }
     setBusyAction(false)
-    if (error) return showToast(/is_active|deactivated_at/.test(error.message) ? 'Run supabase-admin.sql in Supabase first' : 'Failed: ' + error.message)
-    if (!data || data.length === 0) return showToast('Nothing was updated - check the Supabase update policy')
+    if (!result.ok) {
+      return showToast(/is_active|deactivated_at/.test(result.error) ? 'Run supabase-admin.sql in Supabase first' : 'Failed: ' + result.error)
+    }
     setDeleteConfirm(null)
     showToast(active ? 'Reactivated - profile is live again' : 'Deactivated - profile hidden, data kept')
     fetchProfiles()
@@ -851,10 +865,21 @@ export default function AdminPage() {
     setSelected((prev) => { const next = new Set(prev); if (next.has(username)) next.delete(username); else next.add(username); return next })
 
   async function updateOrder(profile: Row, patch: Record<string, unknown>, okMsg?: string) {
-    const { data, error } = await supabase.from('profiles').update(patch).eq('username', profile.username).select()
-    if (error) return showToast(MISSING_COLS.test(error.message) ? 'Run supabase-orders.sql and supabase-plan-tier.sql in Supabase first' : 'Failed: ' + error.message)
-    if (!data || data.length === 0) return showToast('Nothing was updated - check the Supabase update policy')
-    setProfiles((list) => list.map((r) => (r.username === profile.username ? { ...r, ...(data[0] as Row) } : r)))
+    const profileId = (profile.id || '').toString().trim()
+    if (!profileId) return showToast('This profile has no linked login account')
+
+    let result: Awaited<ReturnType<typeof updateOrderAction>>
+    try {
+      result = await updateOrderAction(profileId, patch)
+    } catch {
+      result = { ok: false, error: 'Could not reach the server. Please try again.' }
+    }
+
+    if (!result.ok) {
+      return showToast(MISSING_COLS.test(result.error) ? 'Run supabase-orders.sql and supabase-plan-tier.sql in Supabase first' : 'Failed: ' + result.error)
+    }
+
+    setProfiles((list) => list.map((r) => (r.id === profileId ? { ...r, ...(result.profile as Row) } : r)))
     if (okMsg) showToast(okMsg)
   }
   
@@ -899,18 +924,34 @@ export default function AdminPage() {
 
   async function setSelectedActive(active: boolean) {
     if (selectedList.length === 0) return
+
+    const targets = selectedList
+      .map((p) => ({ id: (p.id || '').toString().trim() }))
+      .filter((p) => p.id)
+    if (targets.length === 0) return showToast('These profiles have no linked login accounts')
+
     setBusyAction(true)
-    const names = selectedList.map((p) => p.username)
-    const { data, error } = await supabase
-      .from('profiles')
-      .update({ is_active: active, deactivated_at: active ? null : new Date().toISOString() })
-      .in('username', names)
-      .select()
+    const deactivatedAt = active ? null : new Date().toISOString()
+    const results = await Promise.all(
+      targets.map(async ({ id }) => {
+        try {
+          return await updateOrderAction(id, { is_active: active, deactivated_at: deactivatedAt })
+        } catch {
+          return { ok: false as const, error: 'Could not reach the server. Please try again.' }
+        }
+      })
+    )
     setBusyAction(false)
-    if (error) return showToast(MISSING_COLS.test(error.message) ? 'Run supabase-admin.sql in Supabase first' : 'Failed: ' + error.message)
-    if (!data || data.length === 0) return showToast('Nothing was updated - check the Supabase update policy')
+
+    const errors = results.filter((r): r is { ok: false; error: string } => !r.ok)
+    if (errors.length > 0) {
+      fetchProfiles()
+      const firstError = errors[0].error
+      return showToast(MISSING_COLS.test(firstError) ? 'Run supabase-admin.sql in Supabase first' : `Failed for ${errors.length} profile${errors.length > 1 ? 's' : ''}: ${firstError}`)
+    }
+
     setSelected(new Set())
-    showToast(active ? `Restored ${data.length} order${data.length > 1 ? 's' : ''}` : `Moved ${data.length} to Deleted History (profiles hidden, data kept)`)
+    showToast(active ? `Restored ${results.length} order${results.length > 1 ? 's' : ''}` : `Moved ${results.length} to Deleted History (profiles hidden, data kept)`)
     fetchProfiles()
   }
 

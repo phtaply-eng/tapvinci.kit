@@ -24,6 +24,51 @@ type UnclaimedCardsResult =
   | { ok: true; cards: UnclaimedCard[] }
   | { ok: false; error: string }
 
+type UpdateOrderResult =
+  | { ok: true; profile: Record<string, unknown> }
+  | { ok: false; error: string }
+
+// Keep server-side writes limited to known profile columns. This prevents a
+// compromised client from mass-assigning fields such as id or username.
+const ALLOWED_PROFILE_UPDATE_FIELDS = new Set([
+  // Profile editor
+  'name',
+  'business',
+  'title',
+  'bio',
+  'about',
+  'phone',
+  'email',
+  'address',
+  'mapsLink',
+  'socials',
+  'hero_image',
+  'avatar_url',
+  'gallery',
+  'theme',
+  'accent_color',
+  'spotify_url',
+  'gcash_qr_url',
+  'maya_qr_url',
+  // Orders / fulfillment
+  'payment_status',
+  'paid_at',
+  'fulfillment',
+  'fulfilled_at',
+  'is_demo',
+  'package',
+  'plan_tier',
+  'plan_amount',
+  'is_admin',
+  'role',
+  'is_active',
+  'deactivated_at',
+])
+
+/**
+ * Service-role client. Only call this from requireAdmin() after both the
+ * authentication and authorization checks have passed.
+ */
 function supabaseAdmin() {
   const url = process.env.NEXT_PUBLIC_SUPABASE_URL
   const key = process.env.SUPABASE_SERVICE_ROLE_KEY
@@ -34,6 +79,8 @@ function supabaseAdmin() {
     auth: { persistSession: false, autoRefreshToken: false },
   })
 }
+
+type AdminSupabase = ReturnType<typeof supabaseAdmin>
 
 /**
  * The admin console signs in with the password cookie from /api/admin/login.
@@ -60,32 +107,49 @@ function hasValidAdminCookie(): boolean {
   return timingSafeEqual(provided, wanted)
 }
 
-async function currentUserIsAdmin(): Promise<boolean> {
+/**
+ * Authenticate and authorize an admin caller before any service-role access.
+ *
+ * 1. Authenticate: read the Supabase session on the server with getUser().
+ * 2. Authorize: require profiles.is_admin === true, or a valid signed admin
+ *    console cookie (the password console does not create a Supabase session).
+ * 3. Only after those checks pass, create the service-role client.
+ */
+async function requireAdmin(): Promise<{ error: string } | { admin: AdminSupabase }> {
+  let isAdmin = false
+
   try {
     const supabase = createServerClient()
     const {
       data: { user },
     } = await supabase.auth.getUser()
 
-    if (!user) return false
+    if (user) {
+      const { data: profile } = await supabase
+        .from('profiles')
+        .select('is_admin')
+        .eq('id', user.id)
+        .maybeSingle()
 
-    const { data: profile } = await supabase
-      .from('profiles')
-      .select('is_admin')
-      .eq('id', user.id)
-      .maybeSingle()
-
-    return profile?.is_admin === true
+      isAdmin = profile?.is_admin === true
+    }
   } catch {
-    return false
+    // Fall through to the admin console cookie check below.
   }
-}
 
-/** Returns an error message, or null when the caller is allowed. */
-async function authorizeAdmin(): Promise<string | null> {
-  if (await currentUserIsAdmin()) return null
-  if (hasValidAdminCookie()) return null
-  return 'Not authorized. Sign in to the admin console again.'
+  // The admin console authenticates with a signed, httpOnly password session
+  // instead of Supabase Auth, so a valid cookie is an authenticated admin.
+  if (!isAdmin && !hasValidAdminCookie()) {
+    return { error: 'Not authorized. Sign in to the admin console again.' }
+  }
+
+  // Service-role client creation is intentionally after both checks above.
+  try {
+    return { admin: supabaseAdmin() }
+  } catch (error) {
+    const message = error instanceof Error ? error.message : 'Admin client unavailable.'
+    return { error: message }
+  }
 }
 
 function makeCardCode(): string {
@@ -103,14 +167,14 @@ function makeCardCode(): string {
  *   3. delete the Supabase Auth user.
  */
 export async function deleteUserAction(userId: string): Promise<ActionResult> {
-  const id = (userId || '').trim()
+  const id = typeof userId === 'string' ? userId.trim() : ''
   if (!id) return { ok: false, error: 'Missing user id.' }
 
-  const denied = await authorizeAdmin()
-  if (denied) return { ok: false, error: denied }
+  const auth = await requireAdmin()
+  if ('error' in auth) return { ok: false, error: auth.error }
 
   try {
-    const admin = supabaseAdmin()
+    const admin = auth.admin
 
     // 1. Free the cards first, otherwise the profile -> auth foreign key blocks
     //    the account deletion.
@@ -146,11 +210,11 @@ export async function deleteUserAction(userId: string): Promise<ActionResult> {
  * Cards that are ready to sell: status shipped and no owner yet.
  */
 export async function listUnclaimedCardsAction(): Promise<UnclaimedCardsResult> {
-  const denied = await authorizeAdmin()
-  if (denied) return { ok: false, error: denied }
+  const auth = await requireAdmin()
+  if ('error' in auth) return { ok: false, error: auth.error }
 
   try {
-    const admin = supabaseAdmin()
+    const admin = auth.admin
     const { data, error } = await admin
       .from('cards')
       .select('card_code, created_at')
@@ -175,14 +239,15 @@ export async function listUnclaimedCardsAction(): Promise<UnclaimedCardsResult> 
  * with is_admin to avoid the account still counting as a real sale.
  */
 export async function toggleVipAction(userId: string, isVip: boolean): Promise<ActionResult> {
-  const id = (userId || '').trim()
+  const id = typeof userId === 'string' ? userId.trim() : ''
   if (!id) return { ok: false, error: 'Missing user id.' }
+  if (typeof isVip !== 'boolean') return { ok: false, error: 'Invalid VIP status.' }
 
-  const denied = await authorizeAdmin()
-  if (denied) return { ok: false, error: denied }
+  const auth = await requireAdmin()
+  if ('error' in auth) return { ok: false, error: auth.error }
 
   try {
-    const admin = supabaseAdmin()
+    const admin = auth.admin
 
     const { data: current, error: readError } = await admin
       .from('profiles')
@@ -228,15 +293,68 @@ export async function toggleVipAction(userId: string, isVip: boolean): Promise<A
 }
 
 /**
+ * Update one profile from the admin console. The caller must be an
+ * authenticated admin, and only whitelisted profile columns are accepted.
+ */
+export async function updateOrderAction(
+  profileId: string,
+  updates: Record<string, unknown>
+): Promise<UpdateOrderResult> {
+  const id = typeof profileId === 'string' ? profileId.trim() : ''
+  if (!id) return { ok: false, error: 'Missing profile id.' }
+  if (!updates || typeof updates !== 'object' || Array.isArray(updates)) {
+    return { ok: false, error: 'Invalid update payload.' }
+  }
+
+  const invalidFields = Object.keys(updates).filter((key) => !ALLOWED_PROFILE_UPDATE_FIELDS.has(key))
+  if (invalidFields.length > 0) {
+    return { ok: false, error: `Fields not allowed: ${invalidFields.join(', ')}` }
+  }
+
+  const patch: Record<string, unknown> = {}
+  for (const [key, value] of Object.entries(updates)) {
+    patch[key] = value
+  }
+  if (Object.keys(patch).length === 0) {
+    return { ok: false, error: 'No fields to update.' }
+  }
+
+  const auth = await requireAdmin()
+  if ('error' in auth) return { ok: false, error: auth.error }
+
+  try {
+    const admin = auth.admin
+    const { data, error } = await admin
+      .from('profiles')
+      .update(patch)
+      .eq('id', id)
+      .select()
+      .maybeSingle()
+
+    if (error) {
+      return { ok: false, error: `Could not update the profile: ${error.message}` }
+    }
+    if (!data) {
+      return { ok: false, error: 'Profile not found.' }
+    }
+
+    return { ok: true, profile: data as Record<string, unknown> }
+  } catch (error) {
+    const message = error instanceof Error ? error.message : 'Unknown error'
+    return { ok: false, error: message }
+  }
+}
+
+/**
  * Create a blank pre-sale NFC card. It is ready to be written/printed and can
  * be claimed later through /c/[card_code].
  */
 export async function generateCardAction(): Promise<GenerateCardResult> {
-  const denied = await authorizeAdmin()
-  if (denied) return { ok: false, error: denied }
+  const auth = await requireAdmin()
+  if ('error' in auth) return { ok: false, error: auth.error }
 
   try {
-    const admin = supabaseAdmin()
+    const admin = auth.admin
 
     // Retry when the short code collides with an existing card.
     for (let attempt = 0; attempt < 10; attempt += 1) {
