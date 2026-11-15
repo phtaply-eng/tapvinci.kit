@@ -1,5 +1,5 @@
 'use client'
-import { useCallback, useEffect, useMemo, useState, type ReactNode } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import { QRCodeSVG } from 'qrcode.react'
@@ -57,6 +57,41 @@ h1{font-size:30px;margin:0 0 6px}p{color:#555;margin:6px 0}img{width:340px;heigh
 }
 const copy = (text: string, toast: SP['toast']) => navigator.clipboard.writeText(text).then(() => toast('Copied!'), () => toast('Copy failed'))
 
+/**
+ * Rasterize the rendered QRCodeSVG to a PNG blob so it can go on the image
+ * clipboard. The SVG is self-contained, so a blob URL can be drawn to a
+ * canvas without tainting it.
+ */
+async function svgToPngBlob(svg: SVGSVGElement, size = 1024): Promise<Blob> {
+  const clone = svg.cloneNode(true) as SVGSVGElement
+  clone.setAttribute('xmlns', 'http://www.w3.org/2000/svg')
+  clone.setAttribute('width', String(size))
+  clone.setAttribute('height', String(size))
+  const source = new XMLSerializer().serializeToString(clone)
+  const objectUrl = URL.createObjectURL(new Blob([source], { type: 'image/svg+xml;charset=utf-8' }))
+  try {
+    const image = new Image()
+    await new Promise<void>((resolve, reject) => {
+      image.onload = () => resolve()
+      image.onerror = () => reject(new Error('Could not render the QR image.'))
+      image.src = objectUrl
+    })
+    const canvas = document.createElement('canvas')
+    canvas.width = size
+    canvas.height = size
+    const ctx = canvas.getContext('2d')
+    if (!ctx) throw new Error('Canvas is unavailable in this browser.')
+    ctx.fillStyle = '#ffffff'
+    ctx.fillRect(0, 0, size, size)
+    ctx.drawImage(image, 0, 0, size, size)
+    const blob = await new Promise<Blob | null>((resolve) => canvas.toBlob(resolve, 'image/png'))
+    if (!blob) throw new Error('Could not create the PNG.')
+    return blob
+  } finally {
+    URL.revokeObjectURL(objectUrl)
+  }
+}
+
 function Card({ title, sub, children, right }: { title: string; sub?: string; children: ReactNode; right?: ReactNode }) {
   return (
     <section className="bg-[#1A1A1D]/80 backdrop-blur-xl border border-white/10 rounded-2xl p-5">
@@ -94,6 +129,10 @@ function CardsSection({ profiles, loading, toast }: SP) {
   const [invLoading, setInvLoading] = useState(true)
   const [invError, setInvError] = useState('')
   const [nfcBusy, setNfcBusy] = useState<string | null>(null)
+  const qrSvgRef = useRef<SVGSVGElement | null>(null)
+  const [imgCopied, setImgCopied] = useState(false)
+  const [imgBusy, setImgBusy] = useState(false)
+  const copiedTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
   const rows = useMemo(() => active(profiles).filter((p) => [p.username, nameOf(p)].some((v) => v.toLowerCase().includes(q.trim().toLowerCase()))), [profiles, q])
   const cards = active(profiles).filter((p) => pkgOf(p) === 'card').length
   const cardUrl = qrCard ? `${SITE_URL}/c/${qrCard}` : ''
@@ -113,6 +152,42 @@ function CardsSection({ profiles, loading, toast }: SP) {
   }, [])
 
   useEffect(() => { loadInventory() }, [loadInventory])
+
+  // Clear the "Copied!" feedback timer if the section unmounts.
+  useEffect(() => () => { if (copiedTimer.current) clearTimeout(copiedTimer.current) }, [])
+
+  async function copyQrImage() {
+    const svg = qrSvgRef.current
+    if (!svg) {
+      toast('The QR code is not ready yet.')
+      return
+    }
+    if (typeof ClipboardItem === 'undefined' || !navigator.clipboard?.write) {
+      toast('Copying images is not supported in this browser. Use Print QR to save it.')
+      return
+    }
+
+    setImgBusy(true)
+    try {
+      // Construct ClipboardItem synchronously from a promise so Safari keeps
+      // the user gesture. The SVG rasterizes on the next tick.
+      const png = svgToPngBlob(svg)
+      await navigator.clipboard.write([new ClipboardItem({ 'image/png': png })])
+      setImgCopied(true)
+      if (copiedTimer.current) clearTimeout(copiedTimer.current)
+      copiedTimer.current = setTimeout(() => setImgCopied(false), 2000)
+      toast('QR image copied')
+    } catch (error) {
+      const detail = error instanceof Error ? error.message : 'Unknown error'
+      toast(
+        /denied|not allowed|permission/i.test(detail)
+          ? 'Clipboard permission denied. Allow clipboard access and try again.'
+          : 'Could not copy the QR image. Use Print QR to save it instead.'
+      )
+    } finally {
+      setImgBusy(false)
+    }
+  }
 
   async function generateCard() {
     setGenBusy(true)
@@ -297,7 +372,7 @@ function CardsSection({ profiles, loading, toast }: SP) {
 
             <div className="admin-qr-print">
               <div className="admin-qr-white-box">
-                <QRCodeSVG value={cardUrl} size={228} level="M" bgColor="#ffffff" fgColor="#050505" />
+                <QRCodeSVG ref={qrSvgRef} value={cardUrl} size={228} level="M" bgColor="#ffffff" fgColor="#050505" />
               </div>
               <p className="admin-qr-caption text-[12px] font-bold text-white mt-3 tracking-[2px]">{qrCard}</p>
               <p className="admin-qr-caption text-[11px] text-[#A1A1A1] mt-1 break-all max-w-[300px] mx-auto">{cardUrl}</p>
@@ -305,9 +380,23 @@ function CardsSection({ profiles, loading, toast }: SP) {
 
             <p className="text-[10px] text-[#6B7280] mt-2">Status: SHIPPED • Unclaimed • TapVinci NFC card</p>
 
-            <div className="grid grid-cols-2 gap-3 mt-5">
-              <button onClick={() => copy(qrCard, toast)} className="h-11 bg-[#1A1A1D]/80 backdrop-blur-xl text-white rounded-xl text-sm border border-white/10 hover:border-[#D4AF37]/50" type="button">Copy Code</button>
-              <button onClick={() => copy(cardUrl, toast)} className="h-11 bg-[#1A1A1D]/80 backdrop-blur-xl text-white rounded-xl text-sm border border-white/10 hover:border-[#D4AF37]/50" type="button">Copy URL</button>
+            <div className="grid grid-cols-3 gap-2 mt-5">
+              <button onClick={() => copy(qrCard, toast)} className="h-11 bg-[#1A1A1D]/80 backdrop-blur-xl text-white rounded-xl text-[12px] font-semibold border border-white/10 hover:border-[#D4AF37]/50" type="button">
+                <i className="fa-regular fa-copy mr-1.5" aria-hidden="true" />Copy Code
+              </button>
+              <button onClick={() => copy(cardUrl, toast)} className="h-11 bg-[#1A1A1D]/80 backdrop-blur-xl text-white rounded-xl text-[12px] font-semibold border border-white/10 hover:border-[#D4AF37]/50" type="button">
+                <i className="fa-solid fa-link mr-1.5" aria-hidden="true" />Copy URL
+              </button>
+              <button
+                onClick={copyQrImage}
+                disabled={imgBusy}
+                aria-label="Copy QR code image to clipboard"
+                className={`h-11 rounded-xl text-[12px] font-semibold border transition disabled:opacity-60 disabled:cursor-not-allowed ${imgCopied ? 'bg-[#00D632]/15 border-[#00D632]/60 text-[#00D632]' : 'bg-[#1A1A1D]/80 backdrop-blur-xl text-white border-white/10 hover:border-[#D4AF37]/50'}`}
+                type="button"
+              >
+                <i className={`fa-solid ${imgBusy ? 'fa-spinner fa-spin' : imgCopied ? 'fa-check' : 'fa-image'} mr-1.5`} aria-hidden="true" />
+                {imgBusy ? 'Copying...' : imgCopied ? 'Copied!' : 'Copy Image'}
+              </button>
             </div>
             <button onClick={() => window.print()} className="w-full h-11 mt-3 bg-[#E8C766] hover:bg-[#D4AF37] text-black rounded-xl text-sm font-bold" type="button">
               <i className="fa-solid fa-print mr-2" aria-hidden="true" />Print QR
