@@ -19,7 +19,12 @@ type GenerateCardResult =
   | { ok: true; cardCode: string }
   | { ok: false; error: string }
 
-type UnclaimedCard = { card_code: string; created_at: string | null }
+type UnclaimedCard = {
+  id: string
+  card_code: string
+  created_at: string | null
+  is_nfc_programmed: boolean | null
+}
 type UnclaimedCardsResult =
   | { ok: true; cards: UnclaimedCard[] }
   | { ok: false; error: string }
@@ -217,7 +222,7 @@ export async function listUnclaimedCardsAction(): Promise<UnclaimedCardsResult> 
     const admin = auth.admin
     const { data, error } = await admin
       .from('cards')
-      .select('card_code, created_at')
+      .select('id, card_code, created_at, is_nfc_programmed')
       .eq('status', 'shipped')
       .is('claimed_by', null)
       .order('created_at', { ascending: false })
@@ -227,6 +232,41 @@ export async function listUnclaimedCardsAction(): Promise<UnclaimedCardsResult> 
     }
 
     return { ok: true, cards: (data || []) as UnclaimedCard[] }
+  } catch (error) {
+    const message = error instanceof Error ? error.message : 'Unknown error'
+    return { ok: false, error: message }
+  }
+}
+
+/**
+ * Mark a pre-sale card as written to a physical NFC chip (or undo it).
+ * The caller must be an authenticated admin; writes use the service role
+ * client after requireAdmin() has passed.
+ */
+export async function toggleNfcProgrammedAction(cardId: string, isProgrammed: boolean): Promise<ActionResult> {
+  const id = typeof cardId === 'string' ? cardId.trim() : ''
+  if (!id) return { ok: false, error: 'Missing card id.' }
+  if (typeof isProgrammed !== 'boolean') return { ok: false, error: 'Invalid NFC status.' }
+
+  const auth = await requireAdmin()
+  if ('error' in auth) return { ok: false, error: auth.error }
+
+  try {
+    const admin = auth.admin
+    const { data, error } = await admin
+      .from('cards')
+      .update({ is_nfc_programmed: isProgrammed })
+      .eq('id', id)
+      .select('id')
+
+    if (error) {
+      return { ok: false, error: `Could not update the NFC status: ${error.message}` }
+    }
+    if (!data || data.length === 0) {
+      return { ok: false, error: 'Card not found.' }
+    }
+
+    return { ok: true }
   } catch (error) {
     const message = error instanceof Error ? error.message : 'Unknown error'
     return { ok: false, error: message }

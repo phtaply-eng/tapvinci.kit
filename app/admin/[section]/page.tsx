@@ -1,9 +1,10 @@
 'use client'
 import { useCallback, useEffect, useMemo, useState, type ReactNode } from 'react'
 import Link from 'next/link'
+import { useRouter } from 'next/navigation'
 import { QRCodeSVG } from 'qrcode.react'
 import { supabase } from '../../../lib/supabase'
-import { generateCardAction, listUnclaimedCardsAction } from '../actions'
+import { generateCardAction, listUnclaimedCardsAction, toggleNfcProgrammedAction } from '../actions'
 
 // One page for every secondary admin section: /admin/cards, /review-stands, /demos, /feedbacks, /analytics, /cms, /pricing, /account.
 // (Overview lives in app/admin/overview/page.tsx, Orders & Business Profiles in app/admin/page.tsx.)
@@ -84,13 +85,15 @@ const active = (profiles: Row[]) => profiles.filter((p) => p.is_active !== false
 
 // ---------------- NFC Cards & URLs ----------------
 function CardsSection({ profiles, loading, toast }: SP) {
+  const router = useRouter()
   const [q, setQ] = useState('')
   const [genBusy, setGenBusy] = useState(false)
   const [qrCard, setQrCard] = useState<string | null>(null)
   const [genError, setGenError] = useState('')
-  const [inventory, setInventory] = useState<{ card_code: string; created_at: string | null }[]>([])
+  const [inventory, setInventory] = useState<{ id: string; card_code: string; created_at: string | null; is_nfc_programmed: boolean | null }[]>([])
   const [invLoading, setInvLoading] = useState(true)
   const [invError, setInvError] = useState('')
+  const [nfcBusy, setNfcBusy] = useState<string | null>(null)
   const rows = useMemo(() => active(profiles).filter((p) => [p.username, nameOf(p)].some((v) => v.toLowerCase().includes(q.trim().toLowerCase()))), [profiles, q])
   const cards = active(profiles).filter((p) => pkgOf(p) === 'card').length
   const cardUrl = qrCard ? `${SITE_URL}/c/${qrCard}` : ''
@@ -128,6 +131,26 @@ function CardsSection({ profiles, loading, toast }: SP) {
       setGenError('Could not reach the server. Please try again.')
     } finally {
       setGenBusy(false)
+    }
+  }
+
+  async function toggleNfc(cardId: string, isProgrammed: boolean) {
+    setNfcBusy(cardId)
+    try {
+      const result = await toggleNfcProgrammedAction(cardId, isProgrammed)
+      if (!result.ok) {
+        toast('Could not update NFC status: ' + result.error)
+        return
+      }
+      // The inventory is loaded through a server action, so refresh the local
+      // list as well as the server-rendered route.
+      await loadInventory()
+      router.refresh()
+      toast(isProgrammed ? 'Marked as programmed' : 'Marked as not programmed')
+    } catch {
+      toast('Could not reach the server. Please try again.')
+    } finally {
+      setNfcBusy(null)
     }
   }
 
@@ -208,17 +231,47 @@ function CardsSection({ profiles, loading, toast }: SP) {
 
         <div className="bg-[#1A1A1D]/80 backdrop-blur-xl border border-white/10 rounded-2xl overflow-hidden"><div className="overflow-x-auto">
           <table className="admin-table ac-orders">
-            <thead><tr><th>Card Code</th><th>Card URL</th><th>Created</th><th>Actions</th></tr></thead>
+            <thead><tr><th>Card Code</th><th>Card URL</th><th>Created</th><th>NFC Status</th><th>Actions</th></tr></thead>
             <tbody>
-              {invLoading ? <tr><td colSpan={4} className="text-center text-gray-500 !py-8">Loading...</td></tr>
-                : inventory.length === 0 ? <tr><td colSpan={4} className="text-center text-gray-500 !py-8">No unclaimed cards. Click Generate New Card to add one.</td></tr>
+              {invLoading ? <tr><td colSpan={5} className="text-center text-gray-500 !py-8">Loading...</td></tr>
+                : inventory.length === 0 ? <tr><td colSpan={5} className="text-center text-gray-500 !py-8">No unclaimed cards. Click Generate New Card to add one.</td></tr>
                 : inventory.map((c) => {
                   const url = `${SITE_URL}/c/${c.card_code}`
+                  const busy = nfcBusy === c.id
                   return (
-                    <tr key={c.card_code} className="ac-row">
+                    <tr key={c.id} className="ac-row">
                       <td><p className="font-bold text-[#D4AF37] tracking-[1.5px]">{c.card_code}</p></td>
                       <td><Link href={`/c/${c.card_code}`} target="_blank" rel="noopener noreferrer" className="text-[#D4AF37] font-semibold hover:underline break-all">{url}</Link></td>
                       <td className="text-[#A1A1A1] whitespace-nowrap">{dateText(c.created_at)}</td>
+                      <td className="whitespace-nowrap">
+                        {c.is_nfc_programmed ? (
+                          <button
+                            type="button"
+                            onClick={() => toggleNfc(c.id, false)}
+                            disabled={busy}
+                            title="Programmed — click to mark as not programmed"
+                            aria-label={`${c.card_code} is programmed; click to mark as not programmed`}
+                            aria-pressed
+                            className="inline-flex h-7 items-center rounded-lg border border-[#00D632]/50 bg-[#00D632]/10 px-3 text-[11px] font-bold text-[#00D632] transition hover:border-[#00D632] hover:bg-[#00D632]/20 disabled:opacity-50 disabled:cursor-not-allowed"
+                          >
+                            <i className={`fa-solid ${busy ? 'fa-spinner fa-spin' : 'fa-circle-check'} mr-1.5`} aria-hidden="true" />
+                            Programmed (✓)
+                          </button>
+                        ) : (
+                          <button
+                            type="button"
+                            onClick={() => toggleNfc(c.id, true)}
+                            disabled={busy}
+                            title="Mark this card as written to an NFC chip"
+                            aria-label={`Mark ${c.card_code} as programmed`}
+                            aria-pressed={false}
+                            className="ac-mini inline-flex items-center !text-[#A1A1A1] hover:!text-white disabled:opacity-50 disabled:cursor-not-allowed"
+                          >
+                            <i className={`fa-solid ${busy ? 'fa-spinner fa-spin' : 'fa-circle'} mr-1.5 text-[8px]`} aria-hidden="true" />
+                            {busy ? 'Saving...' : 'Not Programmed'}
+                          </button>
+                        )}
+                      </td>
                       <td><div className="flex gap-1.5 flex-wrap">
                         <button onClick={() => setQrCard(c.card_code)} className="ac-mini ac-mini-gold" type="button"><i className="fa-solid fa-qrcode mr-1.5" aria-hidden="true" />View / Print QR</button>
                         <button onClick={() => copy(url, toast)} title="Copy URL" aria-label="Copy URL" className="ac-icon"><i className="fa-regular fa-copy" /></button>
