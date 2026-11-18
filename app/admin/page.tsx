@@ -2,8 +2,9 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
+import { RotateCcw } from 'lucide-react'
 import { supabase } from '../../lib/supabase'
-import { deleteUserAction, toggleVipAction, updateOrderAction } from './actions'
+import { deleteUserAction, resetViewsAsAdmin, toggleVipAction, updateOrderAction } from './actions'
 
 const SITE_URL = (process.env.NEXT_PUBLIC_SITE_URL || 'https://tapvinci.vercel.app').replace(/\/+$/, '')
 const AUTH_KEY = 'tapvinci_admin_ok'
@@ -338,6 +339,7 @@ export default function AdminPage() {
   const [deleteText, setDeleteText] = useState('')
   const [busyAction, setBusyAction] = useState(false)
   const [vipBusy, setVipBusy] = useState('')
+  const [resetViewsBusy, setResetViewsBusy] = useState('')
 
   const [view, setView] = useState<'orders' | 'profiles'>('orders')
   const [oDraft, setODraft] = useState('')
@@ -915,6 +917,28 @@ export default function AdminPage() {
     showToast(next ? 'Marked as VIP - excluded from sales' : 'Removed VIP - now counts as a real sale')
   }
 
+  // Admin-only: resets a profile's public view counter through the
+  // service-role server action (requireAdmin is enforced there).
+  async function resetViews(p: Row) {
+    const profileId = (p.id || '').toString().trim()
+    if (!profileId) return showToast('This profile has no linked record')
+    if (!window.confirm(`Reset views for ${p.username}?`)) return
+
+    setResetViewsBusy(p.username)
+    let result: Awaited<ReturnType<typeof resetViewsAsAdmin>>
+    try {
+      result = await resetViewsAsAdmin(profileId)
+    } catch {
+      result = { ok: false, error: 'Could not reach the server. Please try again.' }
+    }
+    setResetViewsBusy('')
+    if (!result.ok) return showToast('Failed: ' + result.error)
+
+    setProfiles((list) => list.map((r) => (r.id === profileId ? { ...r, views: 0 } : r)))
+    router.refresh()
+    showToast(`Views reset to 0 for ${p.username}`)
+  }
+
   // Payment dropdown handler - VIP is an option that flips is_demo, not payment_status
   const handlePaymentSelect = (p: Row, v: string) => {
     if (v === 'demo') return setDemo(p, true)
@@ -1232,6 +1256,9 @@ export default function AdminPage() {
                               <button onClick={() => copyLink(p.username)} title="Copy link" aria-label="Copy link" className="ac-icon"><i className="fa-regular fa-copy" /></button>
                               <button onClick={() => window.open(`/${p.username}`, '_blank', 'noopener')} title="Open live profile" aria-label="Open live profile" className="ac-icon ac-icon-open"><i className="fa-solid fa-arrow-up-right-from-square" /></button>
                               <button onClick={() => handleEdit(p)} title="Edit client" aria-label="Edit client" className="ac-icon ac-icon-blue"><i className="fa-solid fa-pen" /></button>
+                              <button onClick={() => resetViews(p)} disabled={resetViewsBusy === p.username} title="Reset view count" aria-label={`Reset views for ${p.username}`} className="ac-icon ac-icon-gold disabled:opacity-40">
+                                <RotateCcw size={13} aria-hidden="true" />
+                              </button>
                               <button onClick={() => handleDeleteConfirm(p)} title="Delete or deactivate client" aria-label="Delete client" className="ac-icon ac-icon-red"><i className="fa-solid fa-trash" /></button>
                               <button onClick={() => handleGenerateQR(p)} title="Generate QR" aria-label="Generate QR" className="ac-icon ac-icon-gold"><i className="fa-solid fa-qrcode" /></button>
                               

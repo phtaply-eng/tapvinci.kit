@@ -10,11 +10,18 @@ import dynamic from 'next/dynamic'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 import ToastView from '@/components/ToastView'
+import { resetMyViewsAction } from '@/app/actions'
 import { type AuthChangeEvent } from '@supabase/supabase-js'
 
 const EditDrawer = dynamic(() => import('@/components/EditDrawer'), { ssr: false })
 
-export default function TaplyTemplate({ profile }: { profile: any }) {
+export default function TaplyTemplate({
+  profile,
+  isOwner: serverIsOwner = false,
+}: {
+  profile: any
+  isOwner?: boolean
+}) {
   // Local state for real-time live preview
   const [localProfile, setLocalProfile] = useState(profile)
   
@@ -44,6 +51,7 @@ export default function TaplyTemplate({ profile }: { profile: any }) {
   const [isEditDrawerOpen, setIsEditDrawerOpen] = useState(false)
   const [drawerMounted, setDrawerMounted] = useState(false)
   const [notice, setNotice] = useState('')
+  const [resettingViews, setResettingViews] = useState(false)
   const noticeTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
 
   const awaitingSignIn = useRef(false)
@@ -57,6 +65,28 @@ export default function TaplyTemplate({ profile }: { profile: any }) {
   const openEditor = () => {
     setDrawerMounted(true)
     setIsEditDrawerOpen(true)
+  }
+
+  // Owner-only: the server action re-verifies the session and only updates
+  // the signed-in user's own row (auth.uid() = id).
+  const handleResetViews = async () => {
+    if (resettingViews) return
+    if (!window.confirm('Reset your view count to 0?')) return
+
+    setResettingViews(true)
+    try {
+      const result = await resetMyViewsAction()
+      if (!result.ok) {
+        showNotice(result.error)
+        return
+      }
+      setLocalProfile((prev: any) => ({ ...prev, views: 0 }))
+      showNotice('View count reset to 0.')
+    } catch {
+      showNotice('Could not reset views. Please try again.')
+    } finally {
+      setResettingViews(false)
+    }
   }
 
   const handleCloseDrawer = useCallback(() => {
@@ -180,10 +210,11 @@ export default function TaplyTemplate({ profile }: { profile: any }) {
   }, [localProfile.id])
 
   const isOwner =
-    !!currentUserId &&
-    (currentUserId === localProfile.owner_id ||
-      currentUserId === localProfile.claimed_by ||
-      isCardOwner)
+    serverIsOwner ||
+    (!!currentUserId &&
+      (currentUserId === localProfile.owner_id ||
+        currentUserId === localProfile.claimed_by ||
+        isCardOwner))
 
   const accent = localProfile.accent_color || '#D4AF37'
 
@@ -728,16 +759,47 @@ export default function TaplyTemplate({ profile }: { profile: any }) {
           style={{
             display: 'inline-flex',
             alignItems: 'center',
-            gap: '6px',
+            gap: '8px',
             fontSize: '10px',
             color: '#D4AF37',
             opacity: 0.8,
           }}
         >
-          <i className="fa-regular fa-eye"></i>
-          <span suppressHydrationWarning>
-            {localProfile.views || 0} {localProfile.views === 1 ? 'view' : 'views'}
+          <span style={{ display: 'inline-flex', alignItems: 'center', gap: '6px' }}>
+            <i className="fa-regular fa-eye"></i>
+            <span suppressHydrationWarning>
+              {localProfile.views || 0} {localProfile.views === 1 ? 'view' : 'views'}
+            </span>
           </span>
+
+          {isOwner && (
+            <button
+              type="button"
+              onClick={handleResetViews}
+              disabled={resettingViews}
+              title="Reset view count to 0"
+              style={{
+                display: 'inline-flex',
+                alignItems: 'center',
+                gap: '4px',
+                fontSize: '9px',
+                fontWeight: 600,
+                letterSpacing: '0.05em',
+                textTransform: 'uppercase',
+                background: 'transparent',
+                border: 'none',
+                padding: 0,
+                cursor: resettingViews ? 'default' : 'pointer',
+                color: '#D4AF37',
+                textDecoration: 'underline',
+                textUnderlineOffset: '2px',
+                opacity: resettingViews ? 0.5 : 1,
+              }}
+            >
+              <i className="fa-solid fa-rotate-left" style={{ fontSize: '9px' }} />
+              {resettingViews ? 'Resetting' : 'Reset'}
+            </button>
+          )}
         </div>
 
         {authReady && <span style={{ color: '#333', fontSize: '10px' }}>|</span>}

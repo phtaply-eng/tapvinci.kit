@@ -274,6 +274,39 @@ export async function toggleNfcProgrammedAction(cardId: string, isProgrammed: bo
 }
 
 /**
+ * Reset the public view counter for one profile. Admin only.
+ * The caller must be an authenticated admin; the write uses the service role
+ * client after requireAdmin() has passed.
+ */
+export async function resetViewsAsAdmin(profileId: string): Promise<ActionResult> {
+  const id = typeof profileId === 'string' ? profileId.trim() : ''
+  if (!id) return { ok: false, error: 'Missing profile id.' }
+
+  const auth = await requireAdmin()
+  if ('error' in auth) return { ok: false, error: auth.error }
+
+  try {
+    const { data, error } = await auth.admin
+      .from('profiles')
+      .update({ views: 0 })
+      .eq('id', id)
+      .select('id')
+
+    if (error) {
+      return { ok: false, error: `Could not reset views: ${error.message}` }
+    }
+    if (!data || data.length === 0) {
+      return { ok: false, error: 'Profile not found.' }
+    }
+
+    return { ok: true }
+  } catch (error) {
+    const message = error instanceof Error ? error.message : 'Unknown error'
+    return { ok: false, error: message }
+  }
+}
+
+/**
  * Toggle a profile between VIP/admin and a normal professional account.
  * The sales dashboard uses is_demo for VIP exclusion, so keep it in sync
  * with is_admin to avoid the account still counting as a real sale.

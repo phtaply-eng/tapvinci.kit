@@ -2,6 +2,7 @@ import type { Metadata } from 'next'
 import { notFound } from 'next/navigation'
 import Link from 'next/link'
 import { supabase } from '../../lib/supabase'
+import { createClient } from '../../lib/supabase-server'
 import TaplyTemplate from '../../components/TaplyTemplate'
 import type { Profile } from '../../lib/types'
 import ViewTracker from '../../components/ViewTracker'
@@ -37,6 +38,26 @@ export default async function UserPage({ params }: { params: { username: string 
 
   const isDemo = params.username.toLowerCase() === DEMO_USERNAME
 
+  // Server-side ownership check so the public profile can show owner-only
+  // controls (e.g. Reset views) as soon as the page renders.
+  let isOwner = false
+  try {
+    const supabaseServer = createClient()
+    const {
+      data: { user },
+    } = await supabaseServer.auth.getUser()
+
+    if (user) {
+      isOwner =
+        user.id === profile.id ||
+        user.id === profile.owner_id ||
+        user.id === profile.claimed_by
+    }
+  } catch {
+    // A failed session read must never break the public profile.
+    isOwner = false
+  }
+
   return (
     <IntroWrapper>
       <ViewTracker username={params.username} />
@@ -59,7 +80,7 @@ export default async function UserPage({ params }: { params: { username: string 
         </Link>
       )}
       
-      <TaplyTemplate profile={profile} />
+      <TaplyTemplate profile={profile} isOwner={isOwner} />
     </IntroWrapper>
   )
 }

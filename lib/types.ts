@@ -2,6 +2,10 @@ export type SocialKey = 'facebook'|'instagram'|'tiktok'|'messenger'|'linkedin'|'
 export type GalleryItem = { src: string; alt?: string }
 
 export type Profile = {
+  id?: string
+  owner_id?: string | null
+  claimed_by?: string | null
+  views?: number | null
   username: string
   name: string
   title?: string
