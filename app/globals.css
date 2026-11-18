@@ -180,6 +180,8 @@ body {
 .taply-contact-item a, .taply-contact-item p { font-size: 13px; color: var(--heading); text-decoration: none; margin: 0; word-break: break-word; }
 .taply-footer { padding: 12px 24px 24px; text-align: center; }
 .taply-footer p { font-size: 10px; color: var(--faint); margin: 0; }
+.taply-footer .taply-footer-credit { color: #D4AF37; font-weight: 600; text-decoration: none; transition: color .2s, text-decoration-color .2s; }
+.taply-footer .taply-footer-credit:hover { color: #E8C766; text-decoration: underline; text-underline-offset: 2px; }
 
 .taply-theme-toggle {
   position: absolute; top: 16px; right: 16px; z-index: 10;

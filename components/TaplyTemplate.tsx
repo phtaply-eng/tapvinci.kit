@@ -8,6 +8,7 @@ import { getStreakCount, getTapCount, getVisibleEducation } from '../lib/profile
 import { createClient } from '../lib/supabase-browser'
 import dynamic from 'next/dynamic'
 import { useRouter } from 'next/navigation'
+import Link from 'next/link'
 import ToastView from '@/components/ToastView'
 import { type AuthChangeEvent } from '@supabase/supabase-js'
 
@@ -715,7 +716,11 @@ export default function TaplyTemplate({ profile }: { profile: any }) {
       style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '10px' }}
     >
       <p suppressHydrationWarning style={{ margin: 0 }}>
-        © {new Date().getFullYear()} {localProfile.name}. All rights reserved.
+        Powered by{' '}
+        <Link href="/" className="taply-footer-credit">
+          TapVinci
+        </Link>{' '}
+        © {new Date().getFullYear()}.
       </p>
 
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '10px' }}>
