@@ -67,15 +67,20 @@ export default function TaplyTemplate({
     setIsEditDrawerOpen(true)
   }
 
-  // Owner-only: the server action re-verifies the session and only updates
-  // the signed-in user's own row (auth.uid() = id).
+  // Owner-only: the server action re-verifies the session and only resets
+  // this profile after confirming the caller owns it or is an admin.
   const handleResetViews = async () => {
     if (resettingViews) return
     if (!window.confirm('Reset your view count to 0?')) return
 
     setResettingViews(true)
     try {
-      const result = await resetMyViewsAction()
+      const profileId = String(localProfile.id || '').trim()
+      if (!profileId) {
+        showNotice('This profile cannot be reset.')
+        return
+      }
+      const result = await resetMyViewsAction(profileId)
       if (!result.ok) {
         showNotice(result.error)
         return

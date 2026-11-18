@@ -11,6 +11,14 @@ export default function LoginPage() {
   const [userEmail, setUserEmail] = useState<string | null>(null);
   const [myUsername, setMyUsername] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [notice, setNotice] = useState<string | null>(null);
+
+  useEffect(() => {
+    const message = new URLSearchParams(window.location.search).get("message");
+    if (message === "session_expired") {
+      setNotice("Your session expired after 20 minutes. Please sign in again.");
+    }
+  }, []);
 
   useEffect(() => {
     const check = async () => {
@@ -98,6 +106,25 @@ export default function LoginPage() {
       <div style={{ width: "100%", maxWidth: 420, background: "#171717", border: "1px solid #333", borderRadius: 16, padding: 28, textAlign: "center" }}>
         <h1 style={{ fontSize: 28, fontWeight: 800, margin: 0 }}>TapVinci</h1>
         <p style={{ color: "#a3a3a3", marginTop: 8, marginBottom: 24 }}>Sign in to edit your card</p>
+
+        {notice && (
+          <p
+            role="status"
+            style={{
+              color: "#facc15",
+              background: "rgba(250, 204, 21, 0.1)",
+              border: "1px solid rgba(250, 204, 21, 0.35)",
+              borderRadius: 10,
+              padding: "10px 12px",
+              fontSize: 13,
+              lineHeight: 1.5,
+              marginTop: 0,
+              marginBottom: 20,
+            }}
+          >
+            {notice}
+          </p>
+        )}
 
         {userEmail ? (
           <>
