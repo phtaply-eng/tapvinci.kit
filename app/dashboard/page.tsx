@@ -216,10 +216,10 @@ export default function Dashboard() {
       const fixed = {
         ...rest,
         username: fixedUsername,
-        is_admin: profile.is_admin === true, // Only preserve true admins
-        is_active: true, // Force active for users who just claimed a card
-        paid_at: profile.paid_at || new Date().toISOString(),
       }
+      // Protected/administrative columns (is_admin, is_active, paid_at, role,
+      // etc.) stay out of the write. Sending them back — even unchanged — can
+      // trip database triggers or RLS policies and mask the real save error.
 
       const { data, error } = await supabase
         .from('profiles')
@@ -242,6 +242,7 @@ export default function Dashboard() {
 
       showToast('Profile updated successfully')
     } catch (error) {
+      console.error('RAW SAVE ERROR:', error, JSON.stringify(error, null, 2))
       console.error('[Admin save] Profile save failed:', error)
       showToast(
         isDuplicateUsername(error)

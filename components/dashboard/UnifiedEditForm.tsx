@@ -452,33 +452,6 @@ export default function UnifiedEditForm({
           />
         </div>
 
-        <div className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-zinc-800 bg-zinc-950/40 px-3 py-2.5">
-          <div className="min-w-0">
-            <p className="text-[11px] font-bold uppercase tracking-widest text-zinc-300">
-              Views Counter
-            </p>
-            <p className="mt-0.5 text-[10px] text-zinc-500">
-              {profile.views || 0} {profile.views === 1 ? 'view' : 'views'} in your public footer.
-            </p>
-          </div>
-          <div className="flex shrink-0 items-center gap-2">
-            <button
-              type="button"
-              onClick={() => void handleResetViews()}
-              disabled={resettingViews}
-              title="Reset view count to 0"
-              className="inline-flex items-center gap-1.5 rounded-full border border-zinc-700 bg-zinc-800 px-2.5 py-1 text-[9px] font-bold uppercase tracking-wider text-zinc-300 transition hover:border-[#D4AF37]/40 hover:text-[#D4AF37] disabled:opacity-50"
-            >
-              <i className="fa-solid fa-rotate-left" aria-hidden="true" />
-              {resettingViews ? 'Resetting' : 'Reset Views'}
-            </button>
-            <VisibilityToggle
-              visible={profile.show_views !== false}
-              onToggle={() => toggleProfileFlag('show_views')}
-              label="Views counter"
-            />
-          </div>
-        </div>
       </div>
 
       {/* EDUCATION */}
@@ -875,6 +848,29 @@ export default function UnifiedEditForm({
           <p className="text-[9px] text-zinc-500">This field is hidden from public users.</p>
         </div>
       )}
+
+      {/* VIEWS COUNTER */}
+      <div className="rounded-xl border border-zinc-800 bg-zinc-950/40 px-3 py-2.5">
+        <Field
+          label="Views Counter"
+          visible={profile.show_views !== false}
+          onToggle={() => toggleProfileFlag('show_views')}
+          hint={`${profile.views || 0} ${
+            profile.views === 1 ? 'view' : 'views'
+          } in your public footer.`}
+        >
+          <button
+            type="button"
+            onClick={() => void handleResetViews()}
+            disabled={resettingViews}
+            title="Reset view count to 0"
+            className="inline-flex items-center gap-1.5 rounded-full border border-zinc-700 bg-zinc-800 px-2.5 py-1 text-[9px] font-bold uppercase tracking-wider text-zinc-300 transition hover:border-[#D4AF37]/40 hover:text-[#D4AF37] disabled:opacity-50"
+          >
+            <i className="fa-solid fa-rotate-left" aria-hidden="true" />
+            {resettingViews ? 'Resetting' : 'Reset Views'}
+          </button>
+        </Field>
+      </div>
 
       {/* SAVE */}
       <button
