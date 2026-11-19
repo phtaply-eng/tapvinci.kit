@@ -6,6 +6,7 @@ import dynamic from 'next/dynamic'
 import { AnimatePresence, motion, useDragControls } from 'framer-motion'
 import ToastView from '@/components/ToastView'
 import { useOwnerProfileEditor } from '@/components/dashboard/useOwnerProfileEditor'
+import { createClient } from '@/lib/supabase-browser'
 
 function FormSkeleton() {
   return (
@@ -46,6 +47,7 @@ export default function EditDrawer({
   const [mounted, setMounted] = useState(false)
   const [isDesktop, setIsDesktop] = useState(true)
   const [toast, setToast] = useState('')
+  const [signingOut, setSigningOut] = useState(false)
   const toastTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
   const closeButtonRef = useRef<HTMLButtonElement>(null)
   const dragControls = useDragControls()
@@ -136,6 +138,21 @@ export default function EditDrawer({
       }
     } catch (err) {
       console.error("Unhandled error during save:", err)
+    }
+  }
+
+  const handleSignOut = async () => {
+    if (signingOut) return
+    setSigningOut(true)
+    try {
+      const supabase = createClient()
+      const { error } = await supabase.auth.signOut()
+      if (error) throw error
+      window.location.assign('/')
+    } catch (err) {
+      console.error('[Edit drawer] sign-out failed:', err)
+      showToast('Could not sign out. Please try again.')
+      setSigningOut(false)
     }
   }
 
@@ -254,6 +271,17 @@ export default function EditDrawer({
                       embedded
                       lockUsername={editor.usernameLocked}
                     />
+                  )}
+
+                  {isOwner && editor.profile && (
+                    <button
+                      type="button"
+                      onClick={() => void handleSignOut()}
+                      disabled={signingOut}
+                      className="mt-3 w-full rounded-xl border border-red-500/40 py-2.5 text-xs font-semibold text-red-400 transition hover:border-red-400 hover:bg-red-500/10 disabled:opacity-50"
+                    >
+                      {signingOut ? 'Signing out...' : 'Sign Out'}
+                    </button>
                   )}
                 </div>
               </div>

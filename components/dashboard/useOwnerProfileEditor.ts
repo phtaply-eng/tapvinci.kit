@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { createClient } from '@/lib/supabase-browser'
+import { isProfileOwner } from '@/lib/profile-ownership'
 import { DEFAULT_VISIBLE } from '@/lib/profile-config'
 
 const PROTECTED_KEYS = [
@@ -129,11 +130,11 @@ export function useOwnerProfileEditor({
       if (!user) {
         throw new Error('No active session found. Please log in again.')
       }
-      if (user.id !== profile.id) {
+      if (!isProfileOwner(user.id, profile, user.email)) {
         throw new Error(
-          `Ownership mismatch: signed-in user ${user.id} does not match profile id ${String(
-            profile.id
-          )}.`
+          `Ownership mismatch: signed-in user ${user.id} (${
+            user.email ?? 'no email'
+          }) does not own profile ${String(profile.id)}.`
         )
       }
 

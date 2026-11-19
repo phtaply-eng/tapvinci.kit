@@ -114,7 +114,7 @@ export default function TaplyTemplate({
         return
       }
       // Strict check against the profile row — never "a user is signed in".
-      const owner = isProfileOwner(user.id, localProfile)
+      const owner = isProfileOwner(user.id, localProfile, user.email)
       setIsOwner(owner)
       if (awaitingSignIn.current) {
         setIsLoginModalOpen(false)
@@ -144,7 +144,7 @@ export default function TaplyTemplate({
         if (!alive) return
         const user = data?.user ?? null
 
-        const owner = user ? isProfileOwner(user.id, localProfile) : false
+        const owner = user ? isProfileOwner(user.id, localProfile, user.email) : false
         if (!alive) return
         setIsOwner(owner)
 

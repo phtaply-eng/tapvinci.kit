@@ -51,7 +51,7 @@ export default async function UserPage({ params }: { params: { username: string 
     if (user) {
       // Strict ownership: the signed-in account must be the profile itself or
       // its recorded owner. A session alone must never unlock editing.
-      isOwner = isProfileOwner(user.id, profile)
+      isOwner = isProfileOwner(user.id, profile, user.email)
     }
   } catch {
     // A failed session read must never break the public profile.
