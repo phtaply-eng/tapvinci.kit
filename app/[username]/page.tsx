@@ -4,6 +4,7 @@ import Link from 'next/link'
 import { supabase } from '../../lib/supabase'
 import { createClient } from '../../lib/supabase-server'
 import TaplyTemplate from '../../components/TaplyTemplate'
+import { isProfileOwner } from '../../lib/profile-ownership'
 import type { Profile } from '../../lib/types'
 import ViewTracker from '../../components/ViewTracker'
 import TapTracker from '../../components/TapTracker'
@@ -48,9 +49,9 @@ export default async function UserPage({ params }: { params: { username: string 
     } = await supabaseServer.auth.getUser()
 
     if (user) {
-      // profiles has no claimed_by column (that lives on cards), so ownership
-      // here is limited to the profile row itself.
-      isOwner = user.id === profile.id || user.id === profile.owner_id
+      // Strict ownership: the signed-in account must be the profile itself or
+      // its recorded owner. A session alone must never unlock editing.
+      isOwner = isProfileOwner(user.id, profile)
     }
   } catch {
     // A failed session read must never break the public profile.

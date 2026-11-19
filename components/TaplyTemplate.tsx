@@ -5,6 +5,7 @@ import { createPortal } from 'react-dom'
 import LoginModal from '@/components/LoginModal'
 import SpotifyPlayer from '@/components/SpotifyPlayer'
 import { getStreakCount, getTapCount, getVisibleEducation } from '../lib/profile-display'
+import { isProfileOwner } from '../lib/profile-ownership'
 import { createClient } from '../lib/supabase-browser'
 import dynamic from 'next/dynamic'
 import { useRouter } from 'next/navigation'
@@ -45,8 +46,9 @@ export default function TaplyTemplate({
 
   const router = useRouter()
   const [isLoginModalOpen, setIsLoginModalOpen] = useState(false)
-  const [currentUserId, setCurrentUserId] = useState<string | null>(null)
-  const [isCardOwner, setIsCardOwner] = useState(false)
+  // Seeded from the strict server check, then re-verified against the browser
+  // session below. Being signed in is never enough to become an owner.
+  const [isOwner, setIsOwner] = useState(serverIsOwner === true)
   const [authReady, setAuthReady] = useState(false)
   const [isEditDrawerOpen, setIsEditDrawerOpen] = useState(false)
   const [drawerMounted, setDrawerMounted] = useState(false)
@@ -102,31 +104,18 @@ export default function TaplyTemplate({
     setLocalProfile(draftProfile)
   }, [])
 
-  const checkOwnership = async (userId: string): Promise<boolean> => {
-    if (userId === localProfile.owner_id || userId === localProfile.id) return true
-    if (!localProfile.id) return false
-    const supabase = createClient()
-    const { data } = await supabase
-      .from('cards')
-      .select('profile_id')
-      .eq('claimed_by', userId)
-      .eq('profile_id', localProfile.id)
-      .maybeSingle()
-    return !!data?.profile_id
-  }
-
   const handleAuthResult = async () => {
     try {
       const supabase = createClient()
       const { data } = await supabase.auth.getUser()
       const user = data?.user ?? null
-      setCurrentUserId(user?.id ?? null)
       if (!user) {
-        setIsCardOwner(false)
+        setIsOwner(false)
         return
       }
-      const owner = await checkOwnership(user.id)
-      setIsCardOwner(owner)
+      // Strict check against the profile row — never "a user is signed in".
+      const owner = isProfileOwner(user.id, localProfile)
+      setIsOwner(owner)
       if (awaitingSignIn.current) {
         setIsLoginModalOpen(false)
         if (owner) openEditor()
@@ -134,6 +123,7 @@ export default function TaplyTemplate({
       }
     } catch (error) {
       console.error('[Auth] ownership check failed:', error)
+      setIsOwner(false)
     } finally {
       awaitingSignIn.current = false
     }
@@ -153,11 +143,10 @@ export default function TaplyTemplate({
         const { data } = await supabase.auth.getUser()
         if (!alive) return
         const user = data?.user ?? null
-        setCurrentUserId(user?.id ?? null)
 
-        const owner = user ? await checkOwnership(user.id) : false
+        const owner = user ? isProfileOwner(user.id, localProfile) : false
         if (!alive) return
-        setIsCardOwner(owner)
+        setIsOwner(owner)
 
         if (wantsEdit) {
           params.delete('edit_profile')
@@ -179,6 +168,9 @@ export default function TaplyTemplate({
           }
         }
       } catch {
+        // If the session cannot be read, fail closed: never leave owner UI
+        // unlocked from the server hint alone.
+        if (alive) setIsOwner(false)
       } finally {
         if (alive) setAuthReady(true)
       }
@@ -198,8 +190,7 @@ export default function TaplyTemplate({
       data: { subscription },
     } = supabase.auth.onAuthStateChange((event: AuthChangeEvent) => {
       if (event === 'SIGNED_OUT') {
-        setCurrentUserId(null)
-        setIsCardOwner(false)
+        setIsOwner(false)
         setIsEditDrawerOpen(false)
         return
       }
@@ -214,12 +205,10 @@ export default function TaplyTemplate({
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [localProfile.id])
 
-  const isOwner =
-    serverIsOwner ||
-    (!!currentUserId &&
-      (currentUserId === localProfile.owner_id ||
-        currentUserId === localProfile.id ||
-        isCardOwner))
+  // Ownership is strictly verified from the browser session's user id against
+  // this profile row. The server hint is only the initial value, so a stale
+  // render or a different Google account can never keep editing unlocked.
+  const canEdit = authReady && isOwner === true
 
   const accent = localProfile.accent_color || '#D4AF37'
 
@@ -779,7 +768,7 @@ export default function TaplyTemplate({
               </span>
             </span>
 
-            {isOwner && (
+            {canEdit && (
               <button
                 type="button"
                 onClick={handleResetViews}
@@ -813,7 +802,7 @@ export default function TaplyTemplate({
         {showViews && authReady && <span style={{ color: '#333', fontSize: '10px' }}>|</span>}
 
         {authReady &&
-          (isOwner ? (
+          (canEdit === true ? (
             <button
               type="button"
               onClick={openEditor}
@@ -913,6 +902,7 @@ export default function TaplyTemplate({
       {drawerMounted && (
         <EditDrawer
           isOpen={isEditDrawerOpen}
+          isOwner={canEdit === true}
           onClose={handleCloseDrawer}
           profile={profile}
           onPreviewChange={handlePreviewChange}

@@ -29,12 +29,15 @@ const noop = () => {}
 
 export default function EditDrawer({
   isOpen,
+  isOwner,
   onClose,
   profile,
   onSaved,
   onPreviewChange,
 }: {
   isOpen: boolean
+  /** Strict ownership result. The form must never render for non-owners. */
+  isOwner: boolean
   onClose: () => void
   profile: any
   onSaved?: (updatedProfile: any) => void
@@ -54,8 +57,8 @@ export default function EditDrawer({
   }, [])
 
   const editor = useOwnerProfileEditor({
-    profileId: profile?.id,
-    enabled: isOpen,
+    profileId: isOwner ? profile?.id : null,
+    enabled: isOpen && isOwner,
     showToast,
   })
 
@@ -76,10 +79,10 @@ export default function EditDrawer({
 
   // Send real-time updates to the parent page
   useEffect(() => {
-    if (isOpen && editor.profile) {
+    if (isOpen && isOwner && editor.profile) {
       onPreviewChange?.(editor.profile)
     }
-  }, [editor.profile, isOpen, onPreviewChange])
+  }, [editor.profile, isOpen, isOwner, onPreviewChange])
 
   const requestClose = useCallback(() => {
     if (editor.saving) return
@@ -111,6 +114,10 @@ export default function EditDrawer({
   }, [isOpen]) // Only run when isOpen changes
 
   const handleSave = async () => {
+    if (!isOwner) {
+      showToast('You do not have permission to edit this profile.')
+      return
+    }
     try {
       const result = await editor.save()
       if (!result.ok) {
@@ -204,7 +211,23 @@ export default function EditDrawer({
 
               <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain px-4 pb-[max(24px,env(safe-area-inset-bottom))] pt-4">
                 <div className="rounded-2xl bg-zinc-900 p-5">
-                  {editor.loading || (!editor.profile && !editor.error) ? (
+                  {!isOwner ? (
+                    <div className="py-8 text-center" role="alert">
+                      <p className="text-sm font-semibold text-white">
+                        You do not have permission to edit this profile.
+                      </p>
+                      <p className="mt-2 text-xs leading-relaxed text-zinc-400">
+                        Sign in with the Google account that owns this card.
+                      </p>
+                      <button
+                        type="button"
+                        onClick={onClose}
+                        className="mt-4 rounded-full border border-white/15 px-5 py-2 text-xs font-semibold text-white transition hover:border-[#D4AF37] hover:text-[#D4AF37]"
+                      >
+                        Close
+                      </button>
+                    </div>
+                  ) : editor.loading || (!editor.profile && !editor.error) ? (
                     <FormSkeleton />
                   ) : editor.error || !editor.profile ? (
                     <div className="py-8 text-center">
