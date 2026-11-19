@@ -114,21 +114,50 @@ export function useOwnerProfileEditor({
     setSaving(true)
 
     try {
+      // Browser client from @supabase/ssr: this is the same singleton that
+      // holds the signed-in session (not the anonymous lib/supabase client).
       const supabase = createClient()
+
+      // Verify the session before attempting a write, so a missing/expired
+      // session surfaces as a clear error instead of a silent 0-row update.
+      const {
+        data: { user },
+        error: authError,
+      } = await supabase.auth.getUser()
+
+      if (authError) throw authError
+      if (!user) {
+        throw new Error('No active session found. Please log in again.')
+      }
+      if (user.id !== profile.id) {
+        throw new Error(
+          `Ownership mismatch: signed-in user ${user.id} does not match profile id ${String(
+            profile.id
+          )}.`
+        )
+      }
 
       const payload: Record<string, any> = { ...profile }
       for (const key of PROTECTED_KEYS) delete payload[key]
       delete payload.username
 
+      console.log('SAVE PAYLOAD:', payload)
       const { data: saved, error: saveError } = await supabase
         .from('profiles')
         .update(payload)
         .eq('id', profile.id)
         .select('*')
         .maybeSingle()
+      console.log('UPDATE RESPONSE:', { data: saved, error: saveError })
 
       if (saveError) throw saveError
-      if (!saved) throw new Error('No row was updated. Are you signed in as the owner?')
+      if (!saved) {
+        throw new Error(
+          `No row was updated for profile ${String(
+            profile.id
+          )} (signed-in user ${user.id}). Check the profiles RLS UPDATE policy.`
+        )
+      }
 
       const next = normalize(saved)
       baselineRef.current = JSON.stringify(next)

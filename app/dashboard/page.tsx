@@ -242,7 +242,21 @@ export default function Dashboard() {
 
       showToast('Profile updated successfully')
     } catch (error) {
-      console.error('RAW SAVE ERROR:', error, JSON.stringify(error, null, 2))
+      // Print the full Postgres/PostgREST error so the exact code, message,
+      // details and hint are visible in the browser console.
+      console.error('RAW SAVE ERROR:', JSON.stringify(error, null, 2))
+      const rawError = error as {
+        message?: string
+        details?: string
+        hint?: string
+        code?: string
+      }
+      console.error('RAW SAVE ERROR FIELDS:', {
+        code: rawError?.code,
+        message: rawError?.message,
+        details: rawError?.details,
+        hint: rawError?.hint,
+      })
       console.error('[Admin save] Profile save failed:', error)
       showToast(
         isDuplicateUsername(error)
