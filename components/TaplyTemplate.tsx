@@ -103,7 +103,7 @@ export default function TaplyTemplate({
   }, [])
 
   const checkOwnership = async (userId: string): Promise<boolean> => {
-    if (userId === localProfile.owner_id || userId === localProfile.claimed_by) return true
+    if (userId === localProfile.owner_id || userId === localProfile.id) return true
     if (!localProfile.id) return false
     const supabase = createClient()
     const { data } = await supabase
@@ -218,7 +218,7 @@ export default function TaplyTemplate({
     serverIsOwner ||
     (!!currentUserId &&
       (currentUserId === localProfile.owner_id ||
-        currentUserId === localProfile.claimed_by ||
+        currentUserId === localProfile.id ||
         isCardOwner))
 
   const accent = localProfile.accent_color || '#D4AF37'
@@ -231,6 +231,7 @@ export default function TaplyTemplate({
   const taps = getTapCount(localProfile)
   const streak = getStreakCount(localProfile)
   const showStats = localProfile.show_stats !== false
+  const showViews = localProfile.show_views !== false
   const showBio = localProfile.show_bio !== false && Boolean(String(localProfile.bio || '').trim())
   const showAbout = Boolean(String(localProfile.about || '').trim()) && localProfile.show_about !== false
   const showEducation = Boolean(String(localProfile.school || '').trim()) && visibleEducation.hasAny
@@ -760,54 +761,56 @@ export default function TaplyTemplate({
       </p>
 
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '10px' }}>
-        <div
-          style={{
-            display: 'inline-flex',
-            alignItems: 'center',
-            gap: '8px',
-            fontSize: '10px',
-            color: '#D4AF37',
-            opacity: 0.8,
-          }}
-        >
-          <span style={{ display: 'inline-flex', alignItems: 'center', gap: '6px' }}>
-            <i className="fa-regular fa-eye"></i>
-            <span suppressHydrationWarning>
-              {localProfile.views || 0} {localProfile.views === 1 ? 'view' : 'views'}
+        {showViews && (
+          <div
+            style={{
+              display: 'inline-flex',
+              alignItems: 'center',
+              gap: '8px',
+              fontSize: '10px',
+              color: '#D4AF37',
+              opacity: 0.8,
+            }}
+          >
+            <span style={{ display: 'inline-flex', alignItems: 'center', gap: '6px' }}>
+              <i className="fa-regular fa-eye"></i>
+              <span suppressHydrationWarning>
+                {localProfile.views || 0} {localProfile.views === 1 ? 'view' : 'views'}
+              </span>
             </span>
-          </span>
 
-          {isOwner && (
-            <button
-              type="button"
-              onClick={handleResetViews}
-              disabled={resettingViews}
-              title="Reset view count to 0"
-              style={{
-                display: 'inline-flex',
-                alignItems: 'center',
-                gap: '4px',
-                fontSize: '9px',
-                fontWeight: 600,
-                letterSpacing: '0.05em',
-                textTransform: 'uppercase',
-                background: 'transparent',
-                border: 'none',
-                padding: 0,
-                cursor: resettingViews ? 'default' : 'pointer',
-                color: '#D4AF37',
-                textDecoration: 'underline',
-                textUnderlineOffset: '2px',
-                opacity: resettingViews ? 0.5 : 1,
-              }}
-            >
-              <i className="fa-solid fa-rotate-left" style={{ fontSize: '9px' }} />
-              {resettingViews ? 'Resetting' : 'Reset'}
-            </button>
-          )}
-        </div>
+            {isOwner && (
+              <button
+                type="button"
+                onClick={handleResetViews}
+                disabled={resettingViews}
+                title="Reset view count to 0"
+                style={{
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  gap: '4px',
+                  fontSize: '9px',
+                  fontWeight: 600,
+                  letterSpacing: '0.05em',
+                  textTransform: 'uppercase',
+                  background: 'transparent',
+                  border: 'none',
+                  padding: 0,
+                  cursor: resettingViews ? 'default' : 'pointer',
+                  color: '#D4AF37',
+                  textDecoration: 'underline',
+                  textUnderlineOffset: '2px',
+                  opacity: resettingViews ? 0.5 : 1,
+                }}
+              >
+                <i className="fa-solid fa-rotate-left" style={{ fontSize: '9px' }} />
+                {resettingViews ? 'Resetting' : 'Reset'}
+              </button>
+            )}
+          </div>
+        )}
 
-        {authReady && <span style={{ color: '#333', fontSize: '10px' }}>|</span>}
+        {showViews && authReady && <span style={{ color: '#333', fontSize: '10px' }}>|</span>}
 
         {authReady &&
           (isOwner ? (

@@ -48,10 +48,9 @@ export default async function UserPage({ params }: { params: { username: string 
     } = await supabaseServer.auth.getUser()
 
     if (user) {
-      isOwner =
-        user.id === profile.id ||
-        user.id === profile.owner_id ||
-        user.id === profile.claimed_by
+      // profiles has no claimed_by column (that lives on cards), so ownership
+      // here is limited to the profile row itself.
+      isOwner = user.id === profile.id || user.id === profile.owner_id
     }
   } catch {
     // A failed session read must never break the public profile.

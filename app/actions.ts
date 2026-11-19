@@ -9,7 +9,7 @@ export type ResetViewsResult = { ok: true } | { ok: false; error: string }
  * Reset the view counter for one profile.
  *
  * Allowed callers:
- *   - the owner of the profile (profile.id / owner_id / claimed_by), or
+ *   - the owner of the profile (profile.id / owner_id), or
  *   - an account flagged as admin (profiles.is_admin or role = 'admin').
  *
  * Authorization is checked with the signed-in user's session. Only after it
@@ -32,7 +32,7 @@ export async function resetMyViewsAction(profileId: string): Promise<ResetViewsR
 
     const { data: target, error: targetError } = await supabase
       .from('profiles')
-      .select('id, owner_id, claimed_by')
+      .select('id, owner_id')
       .eq('id', id)
       .maybeSingle()
 
@@ -43,10 +43,7 @@ export async function resetMyViewsAction(profileId: string): Promise<ResetViewsR
       return { ok: false, error: 'Profile not found.' }
     }
 
-    const isOwner =
-      user.id === target.id ||
-      user.id === target.owner_id ||
-      user.id === target.claimed_by
+    const isOwner = user.id === target.id || user.id === target.owner_id
 
     let isAdmin = false
     if (!isOwner) {

@@ -52,6 +52,7 @@ const DEFAULT_PROFILE_DATA = {
   show_about: true,
   show_spotify: true,
   show_stats: true,
+  show_views: true,
 }
 
 export default function Dashboard() {

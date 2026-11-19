@@ -2,6 +2,7 @@
 
 import { useRef, useState, type Dispatch, type SetStateAction } from 'react'
 import { supabase } from '../../lib/supabase'
+import { resetMyViewsAction } from '@/app/actions'
 import { SOCIALS_CONFIG, THEMES, isValidSpotifyUrl } from '../../lib/profile-config'
 import { Field, VisibilityToggle, inputCls, labelCls } from './FormControls'
 
@@ -92,6 +93,7 @@ export default function UnifiedEditForm({
   const [galleryUploading, setGalleryUploading] = useState(false)
   const [gcashUploading, setGcashUploading] = useState(false)
   const [mayaUploading, setMayaUploading] = useState(false)
+  const [resettingViews, setResettingViews] = useState(false)
 
   const [dragOverHero, setDragOverHero] = useState(false)
   const [dragOverGallery, setDragOverGallery] = useState(false)
@@ -126,6 +128,32 @@ export default function UnifiedEditForm({
       const isCurrentlyVisible = previous[key] !== false
       return { ...previous, [key]: !isCurrentlyVisible }
     })
+  }
+
+  const handleResetViews = async () => {
+    if (resettingViews) return
+    const profileId = String(profile.id || '').trim()
+    if (!profileId) {
+      showToast('Save your profile before resetting views.')
+      return
+    }
+    if (!window.confirm('Are you sure you want to reset your views to 0?')) return
+
+    setResettingViews(true)
+    try {
+      const result = await resetMyViewsAction(profileId)
+      if (!result.ok) {
+        showToast(result.error)
+        return
+      }
+      // Update the draft so the preview (and the next save) shows 0 right away.
+      patch({ views: 0 })
+      showToast('Views reset to 0.')
+    } catch {
+      showToast('Could not reset views. Please try again.')
+    } finally {
+      setResettingViews(false)
+    }
   }
 
   const uploadToSupabase = async (file: File, kind: UploadKind): Promise<string | null> => {
@@ -422,6 +450,34 @@ export default function UnifiedEditForm({
             onToggle={() => toggleProfileFlag('show_stats')}
             label="Stats"
           />
+        </div>
+
+        <div className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-zinc-800 bg-zinc-950/40 px-3 py-2.5">
+          <div className="min-w-0">
+            <p className="text-[11px] font-bold uppercase tracking-widest text-zinc-300">
+              Views Counter
+            </p>
+            <p className="mt-0.5 text-[10px] text-zinc-500">
+              {profile.views || 0} {profile.views === 1 ? 'view' : 'views'} in your public footer.
+            </p>
+          </div>
+          <div className="flex shrink-0 items-center gap-2">
+            <button
+              type="button"
+              onClick={() => void handleResetViews()}
+              disabled={resettingViews}
+              title="Reset view count to 0"
+              className="inline-flex items-center gap-1.5 rounded-full border border-zinc-700 bg-zinc-800 px-2.5 py-1 text-[9px] font-bold uppercase tracking-wider text-zinc-300 transition hover:border-[#D4AF37]/40 hover:text-[#D4AF37] disabled:opacity-50"
+            >
+              <i className="fa-solid fa-rotate-left" aria-hidden="true" />
+              {resettingViews ? 'Resetting' : 'Reset Views'}
+            </button>
+            <VisibilityToggle
+              visible={profile.show_views !== false}
+              onToggle={() => toggleProfileFlag('show_views')}
+              label="Views counter"
+            />
+          </div>
         </div>
       </div>
 
