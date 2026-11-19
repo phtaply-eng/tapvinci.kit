@@ -44,19 +44,42 @@ export async function claimCardAction(
     // only on the server after the session above has been verified.
     const admin = createSupabaseAdmin()
 
-    // The card and the profile share the same id as the signed-in user. Make
-    // sure that profile exists before writing the card.
-    const { data: existingProfile, error: profileError } = await admin
+    // Reuse the account's existing profile when it exists — either keyed by
+    // the auth user id or linked through owner_id. Claiming another card must
+    // only update the cards row, never create a duplicate profile.
+    let existingProfile: { id: string; username: string | null } | null = null
+
+    const { data: profileById, error: profileByIdError } = await admin
       .from('profiles')
       .select('id, username')
       .eq('id', user.id)
       .maybeSingle()
 
-    if (profileError) {
-      console.error('[claim_card] profile lookup failed:', profileError)
+    if (profileByIdError) {
+      console.error('[claim_card] profile lookup by id failed:', profileByIdError)
       return { error: 'Something went wrong. Please try again.' }
     }
 
+    existingProfile = profileById
+
+    if (!existingProfile) {
+      const { data: profileByOwner, error: profileByOwnerError } = await admin
+        .from('profiles')
+        .select('id, username')
+        .eq('owner_id', user.id)
+        .maybeSingle()
+
+      if (profileByOwnerError) {
+        console.error('[claim_card] profile lookup by owner failed:', profileByOwnerError)
+        return { error: 'Something went wrong. Please try again.' }
+      }
+
+      existingProfile = profileByOwner
+    }
+
+    // New profiles are always created with id = owner_id = auth user id.
+    // Existing profiles keep their own id so the card links to the right row.
+    const profileId = existingProfile?.id ?? user.id
     profileUsername = existingProfile?.username ?? username
 
     if (!existingProfile) {
@@ -72,6 +95,7 @@ export async function claimCardAction(
           .from('profiles')
           .insert({
             id: user.id,
+            owner_id: user.id,
             name: fullName,
             username: generatedUsername,
           })
@@ -99,7 +123,7 @@ export async function claimCardAction(
       .update({
         status: 'claimed',
         claimed_by: user.id,
-        profile_id: user.id,
+        profile_id: profileId,
       })
       .eq('card_code', cardCode)
       .is('claimed_by', null)
