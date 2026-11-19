@@ -1,10 +1,10 @@
 'use client'
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState, type FormEvent } from 'react'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import { RotateCcw } from 'lucide-react'
 import { supabase } from '../../lib/supabase'
-import { deleteUserAction, resetViewsAsAdmin, toggleVipAction, updateOrderAction } from './actions'
+import { deleteUserAction, resetViewsAsAdmin, toggleVipAction, updateOrderAction, createDemoAccountAction } from './actions'
 
 const SITE_URL = (process.env.NEXT_PUBLIC_SITE_URL || 'https://tapvinci.vercel.app').replace(/\/+$/, '')
 const AUTH_KEY = 'tapvinci_admin_ok'
@@ -352,6 +352,13 @@ export default function AdminPage() {
   const [selected, setSelected] = useState<Set<string>>(new Set())
   const [genOpen, setGenOpen] = useState(false)
 
+  const [demoOpen, setDemoOpen] = useState(false)
+  const [demoName, setDemoName] = useState('')
+  const [demoUsername, setDemoUsername] = useState('')
+  const [demoBusy, setDemoBusy] = useState(false)
+  const [demoError, setDemoError] = useState('')
+  const [demoResult, setDemoResult] = useState<{ username: string; email: string; password: string } | null>(null)
+
   useEffect(() => {
     try {
       if (sessionStorage.getItem(AUTH_KEY) === '1') setIsAuthed(true)
@@ -557,6 +564,48 @@ export default function AdminPage() {
     } catch {
       window.open(apiUrl, '_blank', 'noopener')
       showToast('Opened QR in a new tab - right-click to save')
+    }
+  }
+
+  function openDemoModal() {
+    setDemoName('')
+    setDemoUsername('')
+    setDemoError('')
+    setDemoResult(null)
+    setDemoOpen(true)
+  }
+
+  function closeDemoModal() {
+    if (demoBusy) return
+    setDemoOpen(false)
+  }
+
+  async function handleCreateDemo(event: FormEvent) {
+    event.preventDefault()
+    if (demoBusy) return
+
+    setDemoBusy(true)
+    setDemoError('')
+    setDemoResult(null)
+
+    try {
+      const formData = new FormData()
+      formData.set('name', demoName)
+      formData.set('username', demoUsername)
+
+      const result = await createDemoAccountAction(formData)
+      if (!result.ok) {
+        setDemoError(result.error)
+        return
+      }
+
+      setDemoResult({ username: result.username, email: result.email, password: result.password })
+      showToast('Demo/VIP account created')
+      fetchProfiles()
+    } catch {
+      setDemoError('Could not reach the server. Please try again.')
+    } finally {
+      setDemoBusy(false)
     }
   }
 
@@ -1123,6 +1172,13 @@ export default function AdminPage() {
                 </div>
               )}
             </div>
+            <button
+              type="button"
+              onClick={openDemoModal}
+              className="h-11 px-5 rounded-xl border border-[#D4AF37]/60 text-[#D4AF37] font-bold text-sm hover:bg-[#D4AF37]/10 transition"
+            >
+              <i className="fa-solid fa-user-plus mr-2" aria-hidden="true" />Generate Demo/VIP
+            </button>
           </form>
 
           <div className="flex flex-wrap gap-2 mb-3" role="group" aria-label="Fulfillment filter">
@@ -1766,6 +1822,90 @@ export default function AdminPage() {
                 <button onClick={() => handleSetActive(deleteConfirm, false)} disabled={busyAction} className="mt-2 text-[11px] text-[#f59e0b] underline">Deactivate (hide but keep data) →</button>
               )}
             </div>
+          </div>
+        </div>
+      )}
+
+      {demoOpen && (
+        <div className="admin-delete-modal" onClick={closeDemoModal} role="dialog" aria-modal="true" aria-label="Generate Demo/VIP account">
+          <div className="admin-delete-card" onClick={(e) => e.stopPropagation()}>
+            <div className="w-12 h-12 bg-[#D4AF37]/20 rounded-full flex items-center justify-center mx-auto mb-4 text-[#D4AF37]">
+              <i className="fa-solid fa-user-plus" aria-hidden="true" />
+            </div>
+            <h3 className="text-white font-bold text-[16px]">Generate Demo/VIP account</h3>
+            <p className="text-gray-400 text-[12px] mt-2">
+              Creates a paid, active profile marked as VIP/demo. It stays out of real sales data.
+            </p>
+
+            {demoResult ? (
+              <>
+                <div className="bg-[#1E1E20] rounded-[12px] p-3 mt-4 text-left text-[11px] space-y-1">
+                  <p className="text-white">Profile: <span className="text-[#D4AF37] font-bold">/{demoResult.username}</span></p>
+                  <p className="text-gray-300 break-all">Email: {demoResult.email}</p>
+                  <p className="text-gray-300 break-all">Password: {demoResult.password}</p>
+                </div>
+                <p className="text-[10px] text-gray-500 mt-2 text-left">
+                  Share these credentials so the account can sign in later.
+                </p>
+                <button
+                  type="button"
+                  onClick={closeDemoModal}
+                  className="mt-5 w-full h-[44px] bg-[#E8C766] hover:bg-[#D4AF37] text-black rounded-[12px] font-bold text-sm"
+                >
+                  Done
+                </button>
+              </>
+            ) : (
+              <form onSubmit={handleCreateDemo} className="mt-4 text-left">
+                <label className="block text-[10px] uppercase tracking-widest text-gray-500">
+                  Name
+                  <input
+                    value={demoName}
+                    onChange={(e) => setDemoName(e.target.value)}
+                    placeholder="Demo Client"
+                    required
+                    autoFocus
+                    className="w-full mt-1 h-10 bg-[#1E1E20] border border-[#2A2A2A] focus:border-[#D4AF37] outline-none rounded-[10px] px-3 text-[13px] normal-case tracking-normal text-white"
+                  />
+                </label>
+                <label className="block text-[10px] uppercase tracking-widest text-gray-500 mt-3">
+                  Username
+                  <input
+                    value={demoUsername}
+                    onChange={(e) =>
+                      setDemoUsername(e.target.value.toLowerCase().replace(/[^a-z0-9_-]/g, ''))
+                    }
+                    placeholder="democlient"
+                    required
+                    autoComplete="off"
+                    className="w-full mt-1 h-10 bg-[#1E1E20] border border-[#2A2A2A] focus:border-[#D4AF37] outline-none rounded-[10px] px-3 text-[13px] normal-case tracking-normal text-white"
+                  />
+                </label>
+                <p className="text-[10px] text-gray-500 mt-1">Letters, numbers, hyphens and underscores only.</p>
+
+                {demoError && (
+                  <p className="text-[11px] text-red-300 mt-3" role="alert">{demoError}</p>
+                )}
+
+                <div className="grid grid-cols-2 gap-3 mt-5">
+                  <button
+                    type="button"
+                    onClick={closeDemoModal}
+                    disabled={demoBusy}
+                    className="h-[44px] bg-[#1E1E20] border border-[#2A2A2A] rounded-[12px] text-white text-sm disabled:opacity-50"
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    type="submit"
+                    disabled={demoBusy || !demoName.trim() || !demoUsername.trim()}
+                    className="h-[44px] bg-[#E8C766] hover:bg-[#D4AF37] text-black rounded-[12px] font-bold text-sm disabled:opacity-40 disabled:cursor-not-allowed"
+                  >
+                    {demoBusy ? 'Creating...' : 'Generate'}
+                  </button>
+                </div>
+              </form>
+            )}
           </div>
         </div>
       )}

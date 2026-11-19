@@ -1,6 +1,6 @@
 'use server'
 
-import { createHmac, randomInt, timingSafeEqual } from 'crypto'
+import { createHmac, randomBytes, randomInt, timingSafeEqual } from 'crypto'
 import { cookies } from 'next/headers'
 import { createClient } from '@supabase/supabase-js'
 import { createClient as createServerClient } from '@/lib/supabase-server'
@@ -447,6 +447,107 @@ export async function generateCardAction(): Promise<GenerateCardResult> {
     }
 
     return { ok: false, error: 'Could not find a unique card code. Please try again.' }
+  } catch (error) {
+    const message = error instanceof Error ? error.message : 'Unknown error'
+    return { ok: false, error: message }
+  }
+}
+
+export type CreateDemoAccountResult =
+  | { ok: true; username: string; email: string; password: string }
+  | { ok: false; error: string }
+
+/**
+ * Create a VIP/demo client from the admin console.
+ *
+ * The profile row is keyed by the Supabase Auth user id so it can later be
+ * claimed and edited like a normal account. The profile is flagged is_demo so
+ * the sales dashboard keeps it out of real revenue, and is_admin/payment_status
+ * let the owner edit it without going through the payment flow.
+ */
+export async function createDemoAccountAction(formData: FormData): Promise<CreateDemoAccountResult> {
+  const auth = await requireAdmin()
+  if ('error' in auth) return { ok: false, error: auth.error }
+
+  const name = String(formData.get('name') || '').trim()
+  const username = String(formData.get('username') || '').trim().toLowerCase()
+  const providedEmail = String(formData.get('email') || '').trim().toLowerCase()
+
+  if (!name) return { ok: false, error: 'Name is required.' }
+  if (!/^[a-z0-9_-]{3,30}$/.test(username)) {
+    return {
+      ok: false,
+      error: 'Username must be 3-30 characters using only letters, numbers, hyphens, and underscores.',
+    }
+  }
+
+  const admin = auth.admin
+  const email = providedEmail || `${username}@demo.tapvinci.app`
+  const password = `demo-${randomBytes(9).toString('base64url')}`
+
+  try {
+    const { data: existingProfile, error: existingError } = await admin
+      .from('profiles')
+      .select('id')
+      .eq('username', username)
+      .maybeSingle()
+
+    if (existingError) {
+      return { ok: false, error: `Could not check the username: ${existingError.message}` }
+    }
+    if (existingProfile) {
+      return { ok: false, error: `Username "${username}" is already taken.` }
+    }
+
+    // The profile id must be a real auth user id, otherwise the profiles.id
+    // foreign key (and later RLS ownership checks) will reject the row.
+    const { data: created, error: createError } = await admin.auth.admin.createUser({
+      email,
+      password,
+      email_confirm: true,
+      user_metadata: {
+        full_name: name,
+        username,
+        is_demo: true,
+      },
+    })
+
+    if (createError || !created?.user) {
+      const message = createError?.message || 'Could not create the demo auth user.'
+      return {
+        ok: false,
+        error: /already|exist|registered/i.test(message)
+          ? 'That email address is already registered. Choose a different username.'
+          : message,
+      }
+    }
+
+    const userId = created.user.id
+    const demoProfile = {
+      id: userId,
+      owner_id: userId,
+      name,
+      username,
+      email,
+      is_admin: true,
+      is_demo: true,
+      payment_status: 'paid',
+      is_active: true,
+    }
+
+    // A handle_new_user trigger may already have created the profile for this
+    // auth user, so upsert keeps the row count at exactly one.
+    const { error: profileError } = await admin
+      .from('profiles')
+      .upsert(demoProfile, { onConflict: 'id' })
+
+    if (profileError) {
+      // Never leave an orphaned auth account behind.
+      await admin.auth.admin.deleteUser(userId).catch(() => {})
+      return { ok: false, error: `Could not create the demo profile: ${profileError.message}` }
+    }
+
+    return { ok: true, username, email, password }
   } catch (error) {
     const message = error instanceof Error ? error.message : 'Unknown error'
     return { ok: false, error: message }

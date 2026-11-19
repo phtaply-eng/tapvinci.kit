@@ -213,8 +213,23 @@ export default function Dashboard() {
     }
 
     try {
+      // The save is an update of the signed-in account's own row, never an
+      // insert. RLS INSERT policies are the reason the old upsert failed with
+      // 42501, so resolve the authenticated user first and update by id.
+      const {
+        data: { user },
+        error: userError,
+      } = await supabase.auth.getUser()
+
+      if (userError) throw userError
+      if (!user) {
+        throw new Error('No active session found. Please log in again.')
+      }
+
       const fixed = {
         ...rest,
+        id: user.id,
+        owner_id: user.id,
         username: fixedUsername,
       }
       // Protected/administrative columns (is_admin, is_active, paid_at, role,
@@ -223,7 +238,8 @@ export default function Dashboard() {
 
       const { data, error } = await supabase
         .from('profiles')
-        .upsert(fixed, { onConflict: 'username' })
+        .update(fixed)
+        .eq('id', user.id)
         .select('*')
         .single()
 
