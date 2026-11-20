@@ -16,24 +16,6 @@ import { type AuthChangeEvent } from '@supabase/supabase-js'
 
 const EditDrawer = dynamic(() => import('@/components/EditDrawer'), { ssr: false })
 
-/**
- * Floating "HOME" pill. Fixed to the viewport so it stays in the top-left
- * corner while the profile scrolls. No transform/transition on hover, which
- * avoids repaint flicker on the fixed, backdrop-blurred element.
- */
-function HomeButton() {
-  return (
-    <Link
-      href="/"
-      aria-label="Back to TapVinci home"
-      className="fixed left-4 top-4 z-50 inline-flex items-center gap-2 rounded-full border border-white/15 bg-black/60 px-3.5 py-2 text-xs font-bold tracking-wider text-white shadow-lg backdrop-blur-md sm:left-6 sm:top-6"
-    >
-      <i className="fa-solid fa-house text-[11px]" aria-hidden="true" />
-      HOME
-    </Link>
-  )
-}
-
 export default function TaplyTemplate({
   profile,
   isOwner: serverIsOwner = false,
@@ -468,7 +450,7 @@ export default function TaplyTemplate({
           <i className="fa-solid fa-link" style={{ color: '#D4AF37' }}></i> Social Media
         </h2>
         
-        <div className="mt-4 flex w-full flex-row flex-nowrap gap-4 overflow-x-auto px-4 pb-2 [&::-webkit-scrollbar]:hidden [-ms-overflow-style:none] [scrollbar-width:none] justify-center">
+        <div className="mt-4 flex w-full flex-row flex-nowrap gap-4 overflow-x-auto overscroll-x-contain scroll-smooth snap-x snap-mandatory scroll-px-4 px-4 pb-2 touch-pan-x [-webkit-overflow-scrolling:touch] [&::-webkit-scrollbar]:hidden [-ms-overflow-style:none] [scrollbar-width:none]">
           {socialButtons.map((s) => {
             let bgStyle: React.CSSProperties = { background: '#1E1E20' }
             if (s.id === 'facebook') bgStyle = { background: '#1877F2' }
@@ -496,7 +478,7 @@ export default function TaplyTemplate({
                 rel="noreferrer"
                 aria-label={s.label}
                 title={s.label}
-                className="flex h-16 w-16 flex-shrink-0 cursor-pointer items-center justify-center rounded-2xl text-white shadow-sm transition-transform hover:scale-105 active:scale-95"
+                className="flex h-16 w-16 flex-shrink-0 snap-center snap-always cursor-pointer items-center justify-center rounded-2xl text-white shadow-sm transition-transform hover:scale-105 active:scale-95"
                 style={bgStyle}
               >
                 <i className={`${iconClass} ${s.icon} text-3xl`}></i>
@@ -951,7 +933,16 @@ export default function TaplyTemplate({
               boxShadow: `0 0 80px ${accent}45, 0 0 140px ${accent}22`,
             } as any}
           >
-            <HomeButton />
+            {profile.username === 'shuashushu' && (
+              <Link
+                href="/"
+                aria-label="Back to TapVinci home"
+                className="absolute left-4 top-4 z-50 inline-flex items-center gap-2 rounded-full border border-white/15 bg-black/60 px-3.5 py-2 text-xs font-bold tracking-wider text-white shadow-lg backdrop-blur-md"
+              >
+                <i className="fa-solid fa-house text-[11px]" aria-hidden="true" />
+                HOME
+              </Link>
+            )}
 
             <button className="taply-theme-toggle" onClick={toggleMode} aria-label="Toggle dark mode">
               <i className={`fa-solid ${isDark ? 'fa-sun' : 'fa-moon'}`}></i>
