@@ -16,7 +16,6 @@ const fraunces = Fraunces({ subsets: ['latin'], style: ['normal', 'italic'], var
 const dmSans = DM_Sans({ subsets: ['latin'], variable: '--font-dmsans', display: 'swap' })
 
 // ---- Edit these in one place ----
-const DEMO_USERNAME = (process.env.NEXT_PUBLIC_DEMO_USERNAME || 'shua').toLowerCase()
 const SITE_URL = (process.env.NEXT_PUBLIC_SITE_URL || 'https://tapvinci.vercel.app').replace(/\/+$/, '')
 const CONTACT_EMAIL = 'tapvinci@yahoo.com'
 const SOCIALS = [
@@ -60,7 +59,7 @@ export default function Home() {
             <p className="tv-hero-sub tv-in" style={{ ['--d' as string]: '.4s' }}></p>
             <div className="tv-hero-actions tv-in" style={{ ['--d' as string]: '.52s' }}>
               <Link href="/dashboard" className="tv-btn tv-btn-gold">Create a Profile</Link>
-              <Link href={`/${DEMO_USERNAME}`} className="tv-btn tv-btn-glass">View Demo</Link>
+              <Link href="/shuashushu" className="tv-btn tv-btn-glass">View Demo</Link>
             </div>
             <p className="tv-tagline tv-in" style={{ ['--d' as string]: '.66s' }}>A NEW STANDARD OF INTRODUCTION • MADE TO CONNECT • PHILIPPINES 2026</p>
           </div>

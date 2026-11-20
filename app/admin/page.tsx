@@ -4,6 +4,8 @@ import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import { RotateCcw } from 'lucide-react'
 import { supabase } from '../../lib/supabase'
+import { SOCIALS_CONFIG } from '@/lib/profile-config'
+import { Field, VisibilityToggle, inputCls } from '@/components/dashboard/FormControls'
 import { deleteUserAction, resetViewsAsAdmin, toggleVipAction, updateOrderAction, createDemoAccountAction } from './actions'
 
 const SITE_URL = (process.env.NEXT_PUBLIC_SITE_URL || 'https://tapvinci.vercel.app').replace(/\/+$/, '')
@@ -79,9 +81,7 @@ type EditForm = {
   about: string
   phone: string
   email: string
-  facebook: string
-  instagram: string
-  website: string
+  socials: Record<string, string>
   address: string
   mapsLink: string
   hero_image: string
@@ -91,24 +91,34 @@ type EditForm = {
   spotify_url: string
   gcash_qr_url: string
   maya_qr_url: string
+  school: string
+  year_level: string
+  course: string
+  views: number
+  show_stats: boolean
+  show_bio: boolean
+  show_about: boolean
+  show_phone: boolean
+  show_email: boolean
+  show_address: boolean
+  show_views: boolean
+  show_school: boolean
+  show_year_level: boolean
+  show_course: boolean
+  show_spotify: boolean
+  socials_visible: Record<string, boolean>
 }
 const EMPTY_EDIT: EditForm = {
-  name: '', title: '', bio: '', about: '', phone: '', email: '', facebook: '', instagram: '', website: '',
+  name: '', title: '', bio: '', about: '', phone: '', email: '', socials: {},
   address: '', mapsLink: '', hero_image: '', gallery: [], theme: 'gold', accent_color: '#D4AF37',
-  spotify_url: '', gcash_qr_url: '', maya_qr_url: '',
+  spotify_url: '', gcash_qr_url: '', maya_qr_url: '', school: '', year_level: '', course: '', views: 0,
+  show_stats: true, show_bio: true, show_about: true, show_phone: true, show_email: true,
+  show_address: true, show_views: true, show_school: true, show_year_level: true,
+  show_course: true, show_spotify: true, socials_visible: {},
 }
-type EditTextField = 'name' | 'title' | 'bio' | 'about' | 'phone' | 'email' | 'facebook' | 'instagram' | 'website'
-const EDIT_FIELDS: { key: EditTextField; label: string; rows?: number }[] = [
-  { key: 'name', label: 'Name' },
-  { key: 'title', label: 'Title' },
-  { key: 'bio', label: 'Bio', rows: 3 },
-  { key: 'about', label: 'About Me', rows: 4 },
-  { key: 'phone', label: 'Phone' },
-  { key: 'email', label: 'Email' },
-  { key: 'facebook', label: 'Facebook Link' },
-  { key: 'instagram', label: 'Instagram Link' },
-  { key: 'website', label: 'Website' },
-]
+
+// Every social key plus Google Maps uses the profiles.socials_visible JSON.
+const SOCIAL_VISIBILITY_KEYS = [...SOCIALS_CONFIG.map((social) => social.key), 'google_maps']
 
 type UploadKind = 'hero' | 'gallery' | 'gcash' | 'maya'
 const UPLOAD_OPTS: Record<UploadKind, { maxWidth: number; quality: number }> = {
@@ -150,8 +160,6 @@ function compressImage(file: File, maxWidth: number, quality: number): Promise<F
   })
 }
 
-const fieldCls = 'w-full mt-1 h-10 bg-[#1E1E20] border border-[#2A2A2A] focus:border-[#D4AF37] outline-none rounded-[10px] px-3 text-[13px] normal-case tracking-normal text-white'
-const areaCls = 'w-full mt-1 bg-[#1E1E20] border border-[#2A2A2A] focus:border-[#D4AF37] outline-none rounded-[10px] p-3 text-[13px] normal-case tracking-normal text-white'
 const sectionTitle = 'text-[10px] uppercase tracking-[1.5px] text-[#D4AF37] font-bold'
 
 function socialUrl(v: unknown): string {
@@ -340,6 +348,7 @@ export default function AdminPage() {
   const [busyAction, setBusyAction] = useState(false)
   const [vipBusy, setVipBusy] = useState('')
   const [resetViewsBusy, setResetViewsBusy] = useState('')
+  const [resettingModalViews, setResettingModalViews] = useState(false)
 
   const [view, setView] = useState<'orders' | 'profiles'>('orders')
   const [oDraft, setODraft] = useState('')
@@ -611,6 +620,9 @@ export default function AdminPage() {
 
   function handleEdit(profile: Row) {
     const soc = (profile.socials && typeof profile.socials === 'object' ? profile.socials : {}) as Record<string, unknown>
+    const visibleRaw = (profile.socials_visible && typeof profile.socials_visible === 'object'
+      ? profile.socials_visible
+      : {}) as Record<string, unknown>
     const rawTheme = typeof profile.theme === 'object' && profile.theme ? profile.theme.pack : profile.theme
     const themeId = (rawTheme || 'gold').toString()
     const themeMeta = THEME_OPTIONS.find((t) => t.id === themeId)
@@ -623,6 +635,14 @@ export default function AdminPage() {
           )
           .filter((g) => !!g.src)
       : []
+
+    const socials = Object.fromEntries(
+      SOCIALS_CONFIG.map((social) => [social.key, socialUrl(soc[social.key])])
+    ) as Record<string, string>
+    const socialsVisible = Object.fromEntries(
+      SOCIAL_VISIBILITY_KEYS.map((key) => [key, visibleRaw[key] !== false])
+    ) as Record<string, boolean>
+
     setEditForm({
       ...EMPTY_EDIT,
       name: displayName(profile),
@@ -631,9 +651,8 @@ export default function AdminPage() {
       about: profile.about || '',
       phone: profile.phone || '',
       email: profile.email || '',
-      facebook: socialUrl(soc.facebook),
-      instagram: socialUrl(soc.instagram),
-      website: socialUrl(soc.website),
+      socials,
+      socials_visible: socialsVisible,
       address: profile.address || '',
       mapsLink: profile.mapsLink || profile.maps_link || '',
       hero_image: profile.hero_image || profile.avatar_url || '',
@@ -643,6 +662,21 @@ export default function AdminPage() {
       spotify_url: profile.spotify_url || '',
       gcash_qr_url: profile.gcash_qr_url || '',
       maya_qr_url: profile.maya_qr_url || '',
+      school: profile.school || '',
+      year_level: profile.year_level || '',
+      course: profile.course || '',
+      views: Number(profile.views) || 0,
+      show_stats: profile.show_stats !== false,
+      show_bio: profile.show_bio !== false,
+      show_about: profile.show_about !== false,
+      show_phone: profile.show_phone !== false,
+      show_email: profile.show_email !== false,
+      show_address: profile.show_address !== false,
+      show_views: profile.show_views !== false,
+      show_school: profile.show_school !== false,
+      show_year_level: profile.show_year_level !== false,
+      show_course: profile.show_course !== false,
+      show_spotify: profile.show_spotify !== false,
     })
     setUploading(null)
     setDragOver(null)
@@ -732,12 +766,19 @@ export default function AdminPage() {
     setSavingEdit(true)
     const f = editForm
     const base = (editingProfile.socials && typeof editingProfile.socials === 'object' ? editingProfile.socials : {}) as Record<string, unknown>
-    const socials = {
-      ...base,
-      facebook: withSocial(base, 'facebook', f.facebook.trim()),
-      instagram: withSocial(base, 'instagram', f.instagram.trim()),
-      website: withSocial(base, 'website', f.website.trim()),
+
+    // Save every social link, not just the three legacy inputs.
+    const socials: Record<string, unknown> = { ...base }
+    for (const social of SOCIALS_CONFIG) {
+      socials[social.key] = withSocial(base, social.key, (f.socials[social.key] || '').trim())
     }
+
+    // Always persist an explicit boolean for every social + Google Maps entry.
+    const socialsVisible: Record<string, boolean> = { ...f.socials_visible }
+    for (const key of SOCIAL_VISIBILITY_KEYS) {
+      socialsVisible[key] = f.socials_visible[key] !== false
+    }
+
     const nameKey = 'business' in editingProfile && !('name' in editingProfile) ? 'business' : 'name'
 
     let result: Awaited<ReturnType<typeof updateOrderAction>>
@@ -752,6 +793,7 @@ export default function AdminPage() {
         address: f.address.trim(),
         mapsLink: f.mapsLink.trim(),
         socials,
+        socials_visible: socialsVisible,
         hero_image: f.hero_image,
         // Keep the legacy avatar column in sync so "Remove" truly clears the photo.
         avatar_url: f.hero_image,
@@ -761,6 +803,20 @@ export default function AdminPage() {
         spotify_url: f.spotify_url.trim(),
         gcash_qr_url: f.gcash_qr_url,
         maya_qr_url: f.maya_qr_url,
+        school: f.school.trim(),
+        year_level: f.year_level.trim(),
+        course: f.course.trim(),
+        show_stats: f.show_stats,
+        show_bio: f.show_bio,
+        show_about: f.show_about,
+        show_phone: f.show_phone,
+        show_email: f.show_email,
+        show_address: f.show_address,
+        show_views: f.show_views,
+        show_school: f.show_school,
+        show_year_level: f.show_year_level,
+        show_course: f.show_course,
+        show_spotify: f.show_spotify,
       })
     } catch {
       result = { ok: false, error: 'Could not reach the server. Please try again.' }
@@ -771,6 +827,32 @@ export default function AdminPage() {
     showToast('Updated!')
     setEditingProfile(null)
     fetchProfiles()
+  }
+
+  // Admin-only reset from inside the edit modal. Uses the same service-role
+  // action as the table row button and updates the draft so the modal stays in sync.
+  async function handleResetModalViews() {
+    if (!editingProfile || resettingModalViews) return
+    const profileId = (editingProfile.id || '').toString().trim()
+    if (!profileId) return showToast('This profile has no linked record')
+    if (!window.confirm(`Reset views for ${editingProfile.username}?`)) return
+
+    setResettingModalViews(true)
+    let result: Awaited<ReturnType<typeof resetViewsAsAdmin>>
+    try {
+      result = await resetViewsAsAdmin(profileId)
+    } catch {
+      result = { ok: false, error: 'Could not reach the server. Please try again.' }
+    }
+    setResettingModalViews(false)
+
+    if (!result.ok) return showToast('Failed: ' + result.error)
+
+    setEditForm((p) => ({ ...p, views: 0 }))
+    setEditingProfile((p) => (p ? { ...p, views: 0 } : p))
+    setProfiles((list) => list.map((r) => (r.id === profileId ? { ...r, views: 0 } : r)))
+    router.refresh()
+    showToast('Views reset to 0')
   }
 
   function handleDeleteConfirm(profile: Row) {
@@ -1548,25 +1630,113 @@ export default function AdminPage() {
               {/* BASIC INFO */}
               <div className="space-y-3">
                 <p className={sectionTitle}>Basic Info</p>
-                {EDIT_FIELDS.map((fld) => (
-                  <label key={fld.key} className="block text-[10px] uppercase tracking-widest text-gray-500">
-                    {fld.label}
-                    {fld.rows ? (
-                      <textarea
-                        rows={fld.rows}
-                        value={editForm[fld.key]}
-                        onChange={(e) => setEditForm((p) => ({ ...p, [fld.key]: e.target.value }))}
-                        className={areaCls}
-                      />
-                    ) : (
-                      <input
-                        value={editForm[fld.key]}
-                        onChange={(e) => setEditForm((p) => ({ ...p, [fld.key]: e.target.value }))}
-                        className={fieldCls}
-                      />
-                    )}
-                  </label>
-                ))}
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                  <Field label="Name">
+                    <input
+                      value={editForm.name}
+                      onChange={(e) => setEditForm((p) => ({ ...p, name: e.target.value }))}
+                      className={inputCls}
+                    />
+                  </Field>
+                  <Field label="Title">
+                    <input
+                      value={editForm.title}
+                      onChange={(e) => setEditForm((p) => ({ ...p, title: e.target.value }))}
+                      className={inputCls}
+                      placeholder="WEB DEVELOPER | TAPVINCI FOUNDER..."
+                    />
+                  </Field>
+                </div>
+
+                <Field
+                  label="Bio"
+                  visible={editForm.show_bio}
+                  onToggle={() => setEditForm((p) => ({ ...p, show_bio: !p.show_bio }))}
+                  hint="Shown under the title."
+                >
+                  <textarea
+                    rows={3}
+                    value={editForm.bio}
+                    onChange={(e) => setEditForm((p) => ({ ...p, bio: e.target.value }))}
+                    className={inputCls}
+                  />
+                </Field>
+
+                <Field
+                  label="About Me"
+                  visible={editForm.show_about}
+                  onToggle={() => setEditForm((p) => ({ ...p, show_about: !p.show_about }))}
+                  hint="Shown as its own section below Let's Connect."
+                >
+                  <textarea
+                    rows={4}
+                    value={editForm.about}
+                    onChange={(e) => setEditForm((p) => ({ ...p, about: e.target.value }))}
+                    className={inputCls}
+                  />
+                </Field>
+
+                <div className="flex items-center justify-between gap-3 rounded-xl border border-zinc-800 bg-zinc-950/40 px-3 py-2.5">
+                  <div className="min-w-0">
+                    <p className="text-[11px] font-bold uppercase tracking-widest text-zinc-300">
+                      Stats (Taps + Streak)
+                    </p>
+                    <p className="mt-0.5 text-[10px] text-zinc-500">
+                      The tap counter and daily streak pills under the name.
+                    </p>
+                  </div>
+                  <VisibilityToggle
+                    visible={editForm.show_stats}
+                    onToggle={() => setEditForm((p) => ({ ...p, show_stats: !p.show_stats }))}
+                    label="Stats"
+                  />
+                </div>
+              </div>
+
+              {/* EDUCATION */}
+              <div className="space-y-3 border-t border-[#1E1E20] pt-4">
+                <p className={sectionTitle}>Education</p>
+                <p className="text-[11px] text-gray-500">
+                  Optional details for students, grads, and educators. Use Show / Hide to control what is public.
+                </p>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                  <Field
+                    label="School"
+                    visible={editForm.show_school}
+                    onToggle={() => setEditForm((p) => ({ ...p, show_school: !p.show_school }))}
+                  >
+                    <input
+                      value={editForm.school}
+                      onChange={(e) => setEditForm((p) => ({ ...p, school: e.target.value }))}
+                      className={inputCls}
+                      placeholder="Your school"
+                    />
+                  </Field>
+                  <Field
+                    label="Year Level"
+                    visible={editForm.show_year_level}
+                    onToggle={() => setEditForm((p) => ({ ...p, show_year_level: !p.show_year_level }))}
+                  >
+                    <input
+                      value={editForm.year_level}
+                      onChange={(e) => setEditForm((p) => ({ ...p, year_level: e.target.value }))}
+                      className={inputCls}
+                      placeholder="e.g. 2nd Year"
+                    />
+                  </Field>
+                </div>
+                <Field
+                  label="Course"
+                  visible={editForm.show_course}
+                  onToggle={() => setEditForm((p) => ({ ...p, show_course: !p.show_course }))}
+                >
+                  <input
+                    value={editForm.course}
+                    onChange={(e) => setEditForm((p) => ({ ...p, course: e.target.value }))}
+                    className={inputCls}
+                    placeholder="e.g. BS Computer Science"
+                  />
+                </Field>
               </div>
 
               {/* HERO IMAGE / AVATAR */}
@@ -1676,40 +1846,172 @@ export default function AdminPage() {
                     <span className="text-[9px] bg-[#1DB954]/20 px-1.5 py-0.5 rounded text-[#1ED760] font-bold">LIVE</span>
                   )}
                 </div>
-                <input
-                  value={editForm.spotify_url}
-                  onChange={(e) => setEditForm((p) => ({ ...p, spotify_url: e.target.value }))}
-                  className={fieldCls}
-                  placeholder="https://open.spotify.com/track/..."
-                  aria-label="Spotify track or playlist link"
-                />
-                <p className="text-[10px] text-gray-500">Paste a track, album, or playlist link. Appears under &ldquo;Let&apos;s Connect&rdquo;.</p>
-                {!isValidSpotifyUrl(editForm.spotify_url) && (
-                  <p className="text-[10px] text-red-400">That doesn&apos;t look like a Spotify link yet.</p>
-                )}
+                <Field
+                  label="Spotify Link"
+                  visible={editForm.show_spotify}
+                  onToggle={() => setEditForm((p) => ({ ...p, show_spotify: !p.show_spotify }))}
+                  hint="Paste a track, album, or playlist link. Appears under Let's Connect."
+                >
+                  <input
+                    value={editForm.spotify_url}
+                    onChange={(e) => setEditForm((p) => ({ ...p, spotify_url: e.target.value }))}
+                    className={inputCls}
+                    placeholder="https://open.spotify.com/track/..."
+                    aria-label="Spotify track or playlist link"
+                    inputMode="url"
+                  />
+                  {!isValidSpotifyUrl(editForm.spotify_url) && (
+                    <p className="mt-1 text-[10px] text-red-400">That doesn&apos;t look like a Spotify link yet.</p>
+                  )}
+                </Field>
               </div>
 
-              {/* LOCATION */}
+              {/* SOCIAL LINKS */}
               <div className="space-y-3 border-t border-[#1E1E20] pt-4">
-                <p className={sectionTitle}>Location &amp; Google Maps</p>
-                <label className="block text-[10px] uppercase tracking-widest text-gray-500">
-                  Address
+                <div className="flex items-center justify-between">
+                  <p className={sectionTitle}>Social Links</p>
+                  <span className="rounded-full bg-zinc-800 px-2 py-1 text-[10px] text-zinc-300">
+                    {SOCIALS_CONFIG.filter(
+                      (social) =>
+                        editForm.socials_visible[social.key] !== false &&
+                        (editForm.socials[social.key] || '').trim()
+                    ).length}{' '}
+                    visible
+                  </span>
+                </div>
+                <p className="text-[11px] text-gray-500">
+                  Show = visible, Hide = hidden but saved. Order matches Live Preview.
+                </p>
+
+                {SOCIALS_CONFIG.map((social) => {
+                  const value = editForm.socials[social.key] || ''
+                  const isVisible = editForm.socials_visible[social.key] !== false
+                  const willShow = !!value.trim() && isVisible
+                  return (
+                    <div
+                      key={social.key}
+                      className={`rounded-xl border p-3 transition-all ${
+                        willShow ? 'border-zinc-700 bg-zinc-800' : 'border-zinc-800/50 bg-zinc-800/50 opacity-75'
+                      }`}
+                    >
+                      <div className="mb-2 flex items-center justify-between gap-2">
+                        <label className={`flex items-center gap-2 text-xs font-bold ${social.color}`}>
+                          {social.label}
+                          {!value.trim() && (
+                            <span className="rounded bg-zinc-700 px-1.5 py-0.5 text-[9px] text-zinc-400">EMPTY</span>
+                          )}
+                          {value.trim() && !isVisible && (
+                            <span className="rounded bg-red-500/20 px-1.5 py-0.5 text-[9px] text-red-300">HIDDEN</span>
+                          )}
+                          {willShow && (
+                            <span className="rounded bg-green-500/20 px-1.5 py-0.5 text-[9px] text-green-300">VISIBLE</span>
+                          )}
+                        </label>
+                        <VisibilityToggle
+                          visible={isVisible}
+                          onToggle={() =>
+                            setEditForm((p) => ({
+                              ...p,
+                              socials_visible: {
+                                ...p.socials_visible,
+                                [social.key]: !(p.socials_visible[social.key] !== false),
+                              },
+                            }))
+                          }
+                          label={social.label}
+                        />
+                      </div>
+                      <input
+                        value={value}
+                        onChange={(e) =>
+                          setEditForm((p) => ({
+                            ...p,
+                            socials: { ...p.socials, [social.key]: e.target.value },
+                          }))
+                        }
+                        className={inputCls}
+                        placeholder={social.placeholder}
+                        inputMode="url"
+                      />
+                    </div>
+                  )
+                })}
+              </div>
+
+              {/* QUICK ACTIONS & CONTACT */}
+              <div className="space-y-3 border-t border-[#1E1E20] pt-4">
+                <p className={sectionTitle}>Quick Actions &amp; Contact Info</p>
+                <p className="text-[11px] text-gray-500">
+                  Controls the Quick Actions row and the Contact section. Matches Live Preview order.
+                </p>
+
+                <Field
+                  label="Phone"
+                  visible={editForm.show_phone}
+                  onToggle={() => setEditForm((p) => ({ ...p, show_phone: !p.show_phone }))}
+                >
+                  <input
+                    value={editForm.phone}
+                    onChange={(e) => setEditForm((p) => ({ ...p, phone: e.target.value }))}
+                    className={inputCls}
+                    placeholder="+63 9XX XXX XXXX"
+                    inputMode="tel"
+                  />
+                </Field>
+
+                <Field
+                  label="Email"
+                  visible={editForm.show_email}
+                  onToggle={() => setEditForm((p) => ({ ...p, show_email: !p.show_email }))}
+                >
+                  <input
+                    value={editForm.email}
+                    onChange={(e) => setEditForm((p) => ({ ...p, email: e.target.value }))}
+                    className={inputCls}
+                    placeholder="you@email.com"
+                    inputMode="email"
+                  />
+                </Field>
+
+                <Field
+                  label="Address"
+                  visible={editForm.show_address}
+                  onToggle={() => setEditForm((p) => ({ ...p, show_address: !p.show_address }))}
+                >
                   <input
                     value={editForm.address}
                     onChange={(e) => setEditForm((p) => ({ ...p, address: e.target.value }))}
-                    className={fieldCls}
-                    placeholder="Quezon City, Philippines"
+                    className={inputCls}
+                    placeholder="City, Country"
                   />
-                </label>
-                <label className="block text-[10px] uppercase tracking-widest text-gray-500">
-                  Google Maps Link
+                </Field>
+
+                <Field
+                  label="Google Maps Link"
+                  visible={editForm.socials_visible.google_maps !== false}
+                  onToggle={() =>
+                    setEditForm((p) => ({
+                      ...p,
+                      socials_visible: {
+                        ...p.socials_visible,
+                        google_maps: !(p.socials_visible.google_maps !== false),
+                      },
+                    }))
+                  }
+                  hint={
+                    editForm.socials_visible.google_maps !== false
+                      ? 'Google Maps button visible on the card.'
+                      : 'Google Maps hidden — the address is still saved.'
+                  }
+                >
                   <input
                     value={editForm.mapsLink}
                     onChange={(e) => setEditForm((p) => ({ ...p, mapsLink: e.target.value }))}
-                    className={fieldCls}
+                    className={inputCls}
                     placeholder="https://maps.app.goo.gl/..."
+                    inputMode="url"
                   />
-                </label>
+                </Field>
               </div>
 
               {/* PAYMENT QR CODES */}
@@ -1760,6 +2062,27 @@ export default function AdminPage() {
                     </div>
                   ))}
                 </div>
+              </div>
+
+              {/* VIEWS COUNTER */}
+              <div className="rounded-xl border border-[#1E1E20] bg-[#141416] px-3 py-2.5">
+                <Field
+                  label="Views Counter"
+                  visible={editForm.show_views}
+                  onToggle={() => setEditForm((p) => ({ ...p, show_views: !p.show_views }))}
+                  hint={`${editForm.views} ${editForm.views === 1 ? 'view' : 'views'} in the public footer.`}
+                >
+                  <button
+                    type="button"
+                    onClick={() => void handleResetModalViews()}
+                    disabled={resettingModalViews}
+                    title="Reset view count to 0"
+                    className="inline-flex items-center gap-1.5 rounded-full border border-zinc-700 bg-zinc-800 px-2.5 py-1 text-[9px] font-bold uppercase tracking-wider text-zinc-300 transition hover:border-[#D4AF37]/40 hover:text-[#D4AF37] disabled:opacity-50"
+                  >
+                    <i className="fa-solid fa-rotate-left" aria-hidden="true" />
+                    {resettingModalViews ? 'Resetting' : 'Reset Views'}
+                  </button>
+                </Field>
               </div>
             </div>
 

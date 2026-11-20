@@ -16,6 +16,24 @@ import { type AuthChangeEvent } from '@supabase/supabase-js'
 
 const EditDrawer = dynamic(() => import('@/components/EditDrawer'), { ssr: false })
 
+/**
+ * Floating "HOME" pill. Fixed to the viewport so it stays in the top-left
+ * corner while the profile scrolls. No transform/transition on hover, which
+ * avoids repaint flicker on the fixed, backdrop-blurred element.
+ */
+function HomeButton() {
+  return (
+    <Link
+      href="/"
+      aria-label="Back to TapVinci home"
+      className="fixed left-4 top-4 z-50 inline-flex items-center gap-2 rounded-full border border-white/15 bg-black/60 px-3.5 py-2 text-xs font-bold tracking-wider text-white shadow-lg backdrop-blur-md sm:left-6 sm:top-6"
+    >
+      <i className="fa-solid fa-house text-[11px]" aria-hidden="true" />
+      HOME
+    </Link>
+  )
+}
+
 export default function TaplyTemplate({
   profile,
   isOwner: serverIsOwner = false,
@@ -933,6 +951,8 @@ export default function TaplyTemplate({
               boxShadow: `0 0 80px ${accent}45, 0 0 140px ${accent}22`,
             } as any}
           >
+            <HomeButton />
+
             <button className="taply-theme-toggle" onClick={toggleMode} aria-label="Toggle dark mode">
               <i className={`fa-solid ${isDark ? 'fa-sun' : 'fa-moon'}`}></i>
             </button>
