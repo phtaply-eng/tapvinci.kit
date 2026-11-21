@@ -1,7 +1,7 @@
 'use client'
 
 import { useEffect, useRef } from 'react'
-import { supabase } from '../lib/supabase'
+import { createClient } from '@/lib/supabase-browser'
 
 /**
  * Invisible counter used by every public profile.
@@ -15,6 +15,9 @@ export default function TapTracker({ username }: { username: string }) {
     hasCounted.current = true
 
     const record = async () => {
+      // Initialize the singleton browser client
+      const supabase = createClient()
+      
       const { error } = await supabase.rpc('record_profile_tap', {
         p_username: username.toLowerCase(),
       })

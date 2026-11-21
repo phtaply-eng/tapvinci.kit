@@ -1,7 +1,7 @@
 'use client'
 
 import { useRef, useState, type Dispatch, type SetStateAction } from 'react'
-import { supabase } from '../../lib/supabase'
+import { createClient } from '../../lib/supabase-browser'
 import { resetMyViewsAction } from '@/app/actions'
 import { SOCIALS_CONFIG, THEMES, isValidSpotifyUrl } from '../../lib/profile-config'
 import { Field, VisibilityToggle, inputCls, labelCls } from './FormControls'
@@ -84,6 +84,9 @@ export default function UnifiedEditForm({
   embedded = false,
   lockUsername = false,
 }: UnifiedEditFormProps) {
+  // Initialize the singleton Supabase client
+  const supabase = createClient()
+
   const heroInputRef = useRef<HTMLInputElement>(null)
   const galleryInputRef = useRef<HTMLInputElement>(null)
   const gcashInputRef = useRef<HTMLInputElement>(null)
