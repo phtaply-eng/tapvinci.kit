@@ -681,11 +681,11 @@ export default function TaplyTemplate({
       {/* ROW 2 — Maps / Save / Pay / Share · scrollable   */}
       {/* ──────────────────────────────────────────────── */}
       <div className="mt-3 flex w-full flex-nowrap items-center gap-2 overflow-x-auto pb-1 [&::-webkit-scrollbar]:hidden [-ms-overflow-style:none] [scrollbar-width:none]">
-        {localProfile.address && mapsVisible && (
+        {(localProfile.mapsLink || localProfile.address) && mapsVisible && (
           <a
             href={
               localProfile.mapsLink ||
-              `https://maps.google.com/?q=${encodeURIComponent(localProfile.address)}`
+              `https://maps.google.com/?q=${encodeURIComponent(localProfile.address || '')}`
             }
             target="_blank"
             rel="noreferrer"

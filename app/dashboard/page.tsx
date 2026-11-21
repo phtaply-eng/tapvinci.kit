@@ -3,7 +3,7 @@
 import { useState, useEffect, useRef } from 'react'
 import TaplyTemplate from '../../components/TaplyTemplate'
 import UnifiedEditForm from '../../components/dashboard/UnifiedEditForm'
-import { supabase } from '../../lib/supabase'
+import { createClient } from '@/lib/supabase-browser' // FIXED
 import HamburgerMenu from '@/components/HamburgerMenu'
 import PaymentModal, { type PaymentSubmission } from '../../components/PaymentModal'
 import { DEFAULT_SOCIALS, DEFAULT_VISIBLE } from '../../lib/profile-config'
@@ -56,6 +56,9 @@ const DEFAULT_PROFILE_DATA = {
 }
 
 export default function Dashboard() {
+  // FIXED: Initialize singleton client
+  const supabase = createClient()
+
   const [profile, setProfile] = useState<any>({ ...DEFAULT_PROFILE_DATA })
 
   const [adminSession, setAdminSession] = useState(false)
@@ -171,12 +174,6 @@ export default function Dashboard() {
   const handleSaveProfile = async () => {
     if (!validateProfile()) return
 
-    // BYPASSED FOR TESTING: Removed the early return that opened the payment modal
-    // if (!isAdminAccount) {
-    //   setIsPaymentModalOpen(true)
-    //   return
-    // }
-
     setSaving(true)
     const fixedUsername = String(profile.username || '').trim().toLowerCase()
 
@@ -213,9 +210,6 @@ export default function Dashboard() {
     }
 
     try {
-      // The save is an update of the signed-in account's own row, never an
-      // insert. RLS INSERT policies are the reason the old upsert failed with
-      // 42501, so resolve the authenticated user first and update by id.
       const {
         data: { user },
         error: userError,
@@ -232,9 +226,6 @@ export default function Dashboard() {
         owner_id: user.id,
         username: fixedUsername,
       }
-      // Protected/administrative columns (is_admin, is_active, paid_at, role,
-      // etc.) stay out of the write. Sending them back — even unchanged — can
-      // trip database triggers or RLS policies and mask the real save error.
 
       const { data, error } = await supabase
         .from('profiles')
@@ -258,8 +249,6 @@ export default function Dashboard() {
 
       showToast('Profile updated successfully')
     } catch (error) {
-      // Print the full Postgres/PostgREST error so the exact code, message,
-      // details and hint are visible in the browser console.
       console.error('RAW SAVE ERROR:', JSON.stringify(error, null, 2))
       const rawError = error as {
         message?: string

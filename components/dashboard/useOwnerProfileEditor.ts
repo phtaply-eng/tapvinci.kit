@@ -115,12 +115,8 @@ export function useOwnerProfileEditor({
     setSaving(true)
 
     try {
-      // Browser client from @supabase/ssr: this is the same singleton that
-      // holds the signed-in session (not the anonymous lib/supabase client).
       const supabase = createClient()
 
-      // Verify the session before attempting a write, so a missing/expired
-      // session surfaces as a clear error instead of a silent 0-row update.
       const {
         data: { user },
         error: authError,
@@ -142,17 +138,16 @@ export function useOwnerProfileEditor({
       for (const key of PROTECTED_KEYS) delete payload[key]
       delete payload.username
 
-      console.log('SAVE PAYLOAD:', payload)
       const { data: saved, error: saveError } = await supabase
         .from('profiles')
         .update(payload)
         .eq('id', profile.id)
         .select('*')
         .maybeSingle()
-      console.log('UPDATE RESPONSE:', { data: saved, error: saveError })
 
       if (saveError) throw saveError
       if (!saved) {
+        // This throws when RLS blocks the update (0 rows affected)
         throw new Error(
           `No row was updated for profile ${String(
             profile.id
@@ -168,13 +163,23 @@ export function useOwnerProfileEditor({
       return { ok: true }
     } catch (saveFailure: any) {
       console.error('[Owner editor] save failed:', saveFailure)
+      
+      const errorMessage = saveFailure?.message || ''
       const duplicate =
         saveFailure?.code === '23505' ||
-        /duplicate key|already exists|unique constraint/i.test(saveFailure?.message || '')
+        /duplicate key|already exists|unique constraint/i.test(errorMessage)
+      
+      // Catch the specific RLS/ownership error
+      const isPermissionError = 
+        errorMessage.includes('No row was updated') || 
+        errorMessage.includes('Ownership mismatch')
+
       showToast(
         duplicate
           ? 'That username is already taken. Please choose another one.'
-          : 'Could not save profile. Please try again.'
+          : isPermissionError
+            ? 'You do not have permission to edit this profile. It belongs to another account.'
+            : 'Could not save profile. Please try again.'
       )
       return { ok: false }
     } finally {
