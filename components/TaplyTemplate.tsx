@@ -399,25 +399,63 @@ export default function TaplyTemplate({
     setPan({ x: touch.clientX - dragStart.x, y: touch.clientY - dragStart.y })
   }
 
-  const saveContact = () => {
+  const saveContact = async () => {
+    let photoLine = ''
+    
+    // Try to fetch the image and convert it to Base64 for the vCard
+    if (heroImg) {
+      try {
+        const imageUrl = heroImg.startsWith('http') 
+          ? heroImg 
+          : (typeof window !== 'undefined' ? window.location.origin + heroImg : '')
+          
+        const res = await fetch(imageUrl)
+        const blob = await res.blob()
+        
+        const base64data = await new Promise<string>((resolve, reject) => {
+          const reader = new FileReader()
+          reader.onloadend = () => resolve(reader.result as string)
+          reader.onerror = reject
+          reader.readAsDataURL(blob)
+        })
+        
+        // Extract just the raw base64 string
+        const base64String = base64data.split(',')[1]
+        if (base64String) {
+          // ENCODING=B embeds the image directly into the file
+          photoLine = `PHOTO;ENCODING=B;TYPE=JPEG:${base64String}`
+        }
+      } catch (error) {
+        console.warn('Could not embed photo in vCard:', error)
+        // Fallback: Just pass the URL if fetching fails (CORS issues, etc.)
+        const fallbackUrl = heroImg.startsWith('http') ? heroImg : window.location.origin + heroImg
+        photoLine = `PHOTO;VALUE=URI:${fallbackUrl}`
+      }
+    }
+
     const lines = [
       'BEGIN:VCARD',
       'VERSION:3.0',
       `FN:${localProfile.name}`,
       `ORG:${localProfile.title || ''}`,
-      visiblePhone ? `TEL:${visiblePhone}` : '',
-      visibleEmail ? `EMAIL:${visibleEmail}` : '',
-      visibleAddress ? `ADR:${visibleAddress}` : '',
+      photoLine, // Add the photo line here
+      visiblePhone ? `TEL;TYPE=CELL:${visiblePhone}` : '',
+      visibleEmail ? `EMAIL;TYPE=WORK:${visibleEmail}` : '',
+      visibleAddress ? `ADR;TYPE=WORK:;;${visibleAddress}` : '',
       `URL:${mounted && typeof window !== 'undefined' ? window.location.href : ''}`,
       'END:VCARD',
     ].filter(Boolean)
-    const vcard = lines.join('\n')
-    const blob = new Blob([vcard], { type: 'text/vcard' })
+    
+    // vCard standard requires \r\n (Carriage Return + Line Feed) for line breaks
+    const vcard = lines.join('\r\n')
+    const blob = new Blob([vcard], { type: 'text/vcard;charset=utf-8' })
     const url = URL.createObjectURL(blob)
     const a = document.createElement('a')
     a.href = url
     a.download = `${localProfile.name.replace(/\s+/g, '_')}.vcf`
+    document.body.appendChild(a)
     a.click()
+    document.body.removeChild(a)
     URL.revokeObjectURL(url)
   }
 
