@@ -10,6 +10,10 @@ export const viewport: Viewport = {
 export const metadata: Metadata = {
   title: 'TapVinci - Tap. Connect. Remember.',
   description: 'Premium NFC digital business cards',
+  icons: {
+    icon: '/icon.png',
+    apple: '/apple-icon.png',
+  },
 }
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
