@@ -19,7 +19,7 @@ export default function FaqAccordion() {
           <div key={f.q} className={`tv-faq-item tv-rise${isOpen ? ' is-open' : ''}`}>
             <button type="button" className="tv-faq-q" aria-expanded={isOpen} aria-controls={`faq-a-${i}`} id={`faq-q-${i}`} onClick={() => setOpen(isOpen ? null : i)}>
               <span className="tv-faq-no" aria-hidden="true">{String(i + 1).padStart(2, '0')}</span>
-              <span className="tv-faq-text">{f.q}</span>
+              <h3 className="tv-faq-text" style={{ margin: 0, fontSize: 'inherit', fontWeight: 'inherit', lineHeight: 'inherit' }}>{f.q}</h3>
               <span className="tv-faq-chev" aria-hidden="true"><i className="fa-solid fa-chevron-down" /></span>
             </button>
             <div className="tv-faq-a" id={`faq-a-${i}`} role="region" aria-labelledby={`faq-q-${i}`}>

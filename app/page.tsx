@@ -54,7 +54,8 @@ export default function Home() {
               <Image src="/logo.png" alt="TapVinci" width={400} height={100} className="h-20 md:h-24 w-auto max-w-[85vw] object-contain mx-auto" style={{ maxWidth: '85vw' }} priority />
             </div>
             <h1 className="tv-hero-h1 tv-in" style={{ ['--d' as string]: '.26s', fontSize: 'clamp(34px, 9vw, 69px)', whiteSpace: 'normal', overflowWrap: 'break-word', wordBreak: 'keep-all', textAlign: 'center', maxWidth: '100%', lineHeight: 1.05 }}>
-            <span>Tap.</span> <span>Connect.</span> <em>Remember.</em>
+              <span style={{ position: 'absolute', width: '1px', height: '1px', padding: 0, margin: '-1px', overflow: 'hidden', clip: 'rect(0, 0, 0, 0)', whiteSpace: 'nowrap', border: 0 }}>NFC Digital Business Card Philippines - </span>
+              <span>Tap.</span> <span>Connect.</span> <em>Remember.</em>
             </h1>
             <p className="tv-hero-sub tv-in" style={{ ['--d' as string]: '.4s' }}></p>
             <div className="tv-hero-actions tv-in" style={{ ['--d' as string]: '.52s' }}>
