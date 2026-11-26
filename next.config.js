@@ -6,5 +6,14 @@ const nextConfig = {
   eslint: {
     ignoreDuringBuilds: true,
   },
+  async redirects() {
+    return [
+      {
+        source: '/student-card',
+        destination: '/card',
+        permanent: true,
+      },
+    ]
+  },
 }
 module.exports = nextConfig
