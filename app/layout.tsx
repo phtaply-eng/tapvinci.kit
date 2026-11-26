@@ -147,8 +147,9 @@ const jsonLd = {
     {
       '@type': 'Product',
       name: 'TapVinci Digital Only',
+      image: `${SITE_URL}/logo.png`,
       description: 'Digital landing page and profile. Share via link and QR code. No physical card.',
-      brand: { '@id': `${SITE_URL}#organization` },
+      brand: { '@type': 'Brand', name: 'TapVinci' },
       offers: {
         '@type': 'Offer',
         priceCurrency: 'PHP',
@@ -160,8 +161,9 @@ const jsonLd = {
     {
       '@type': 'Product',
       name: 'TapVinci Card + Digital',
+      image: `${SITE_URL}/logo.png`,
       description: 'NFC card plus digital landing page and profile. Tap to share contact details and links.',
-      brand: { '@id': `${SITE_URL}#organization` },
+      brand: { '@type': 'Brand', name: 'TapVinci' },
       offers: {
         '@type': 'Offer',
         priceCurrency: 'PHP',
